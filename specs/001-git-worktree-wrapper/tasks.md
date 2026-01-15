@@ -68,11 +68,11 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T022 [P] [US1] Unit test for URI parsing in tests/unit/test_uri_parsing.py
-- [ ] T023 [P] [US1] Unit test for source rule predicate matching in tests/unit/test_config_resolver.py
-- [ ] T024 [P] [US1] Unit test for template resolution with URI context in tests/unit/test_config_resolver.py
-- [ ] T025 [P] [US1] Unit test for project action matching and execution in tests/unit/test_actions_matcher.py
-- [ ] T026 [P] [US1] Integration test for clone command end-to-end in tests/integration/test_clone_flow.py
+- [X] T022 [P] [US1] Unit test for URI parsing in tests/unit/test_uri_parsing.py
+- [X] T023 [P] [US1] Unit test for source rule predicate matching in tests/unit/test_config_resolver.py
+- [X] T024 [P] [US1] Unit test for template resolution with URI context in tests/unit/test_config_resolver.py
+- [X] T025 [P] [US1] Unit test for project action matching and execution in tests/unit/test_actions_matcher.py
+- [X] T026 [P] [US1] Integration test for clone command end-to-end in tests/integration/test_clone_flow.py
 
 ### Implementation for User Story 1
 
@@ -95,10 +95,10 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T031 [P] [US2] Unit test for worktree template resolution with branch and worktree_name context in tests/unit/test_config_resolver.py
-- [ ] T032 [P] [US2] Unit test for branch existence checking and creation in tests/unit/test_git_branch.py
-- [ ] T033 [P] [US2] Unit test for source repository detection from worktree in tests/unit/test_git_repository.py
-- [ ] T034 [P] [US2] Integration test for add command end-to-end in tests/integration/test_worktree_management.py
+- [X] T031 [P] [US2] Unit test for worktree template resolution with branch and worktree_name context in tests/unit/test_config_resolver.py
+- [X] T032 [P] [US2] Unit test for branch existence checking and creation in tests/unit/test_git_branch.py
+- [X] T033 [P] [US2] Unit test for source repository detection from worktree in tests/unit/test_git_repository.py
+- [X] T034 [P] [US2] Integration test for add command end-to-end in tests/integration/test_worktree_management.py
 
 ### Implementation for User Story 2
 
@@ -122,9 +122,9 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T040 [P] [US3] Unit test for worktree clean/dirty detection in tests/unit/test_git_worktree.py
-- [ ] T041 [P] [US3] Unit test for worktree lookup by branch name or path in tests/unit/test_git_worktree.py
-- [ ] T042 [P] [US3] Integration test for remove command end-to-end in tests/integration/test_worktree_management.py
+- [X] T040 [P] [US3] Unit test for worktree clean/dirty detection in tests/unit/test_git_worktree.py
+- [X] T041 [P] [US3] Unit test for worktree lookup by branch name or path in tests/unit/test_git_worktree.py
+- [X] T042 [P] [US3] Integration test for remove command end-to-end in tests/integration/test_worktree_management.py
 
 ### Implementation for User Story 3
 
@@ -148,8 +148,8 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T048 [P] [US4] Unit test for source repository branch detection in tests/unit/test_git_repository.py
-- [ ] T049 [P] [US4] Integration test for pull command end-to-end in tests/integration/test_worktree_management.py
+- [X] T048 [P] [US4] Unit test for source repository branch detection in tests/unit/test_git_repository.py
+- [X] T049 [P] [US4] Integration test for pull command end-to-end in tests/integration/test_worktree_management.py
 
 ### Implementation for User Story 4
 
@@ -172,9 +172,9 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T054 [P] [US5] Unit test for repository scanning and URI extraction in tests/unit/test_git_repository.py
-- [ ] T055 [P] [US5] Unit test for migration path calculation in tests/unit/test_config_resolver.py
-- [ ] T056 [P] [US5] Integration test for migrate command end-to-end in tests/integration/test_migration.py
+- [X] T054 [P] [US5] Unit test for repository scanning and URI extraction in tests/unit/test_git_repository.py
+- [X] T055 [P] [US5] Unit test for migration path calculation in tests/unit/test_config_resolver.py
+- [X] T056 [P] [US5] Integration test for migrate command end-to-end in tests/integration/test_migration.py
 
 ### Implementation for User Story 5
 
@@ -198,8 +198,8 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T062 [P] [US6] Unit test for default config generation in tests/unit/test_config_loader.py
-- [ ] T063 [P] [US6] Integration test for init config command end-to-end in tests/integration/test_cli_commands.py
+- [X] T062 [P] [US6] Unit test for default config generation in tests/unit/test_config_loader.py
+- [X] T063 [P] [US6] Integration test for init config command end-to-end in tests/integration/test_cli_commands.py
 
 ### Implementation for User Story 6
 
@@ -223,8 +223,8 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T069 [P] [US7] Unit test for completion script generation in tests/unit/test_shell_completion.py
-- [ ] T070 [P] [US7] Integration test for init shell command end-to-end in tests/integration/test_cli_commands.py
+- [X] T069 [P] [US7] Unit test for completion script generation in tests/unit/test_shell_completion.py
+- [X] T070 [P] [US7] Integration test for init shell command end-to-end in tests/integration/test_cli_commands.py
 
 ### Implementation for User Story 7
 
