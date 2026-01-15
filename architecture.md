@@ -19,7 +19,7 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 # prefix_worktree(prefix) - empty if worktree has no name, prefix and worktree name if has
 sources:
     github:
-        predicate: "gitgub" in host # host if host part of uri, e.g "http://rulez.netbird.selfhosted:3000/vadimvolk/ansible.git" -> rulez.netbird.selfhosted
+        predicate: "github" in host # host if host part of uri, e.g "http://rulez.netbird.selfhosted:3000/vadimvolk/ansible.git" -> rulez.netbird.selfhosted
         sources: ~/Developer/sources/github/path(-2)/path(-1)
         worktrees: ~/Developer/worktrees/github/path(-2)/path(-1)/branch()prefix_worktree("/")
     gitlab:
@@ -55,7 +55,7 @@ projects:
 ```
 
 # Commands:
-sgw checkout <uri> - find proper location for new source and checkout there. Then analyze result with projects and execute source_actions for any project with matched predicate
+sgw clone <uri> - find proper location for new source and checkout there. Then analyze result with projects and execute source_actions for any project with matched predicate
 
 sgw add <branch> [worktree name] - must executed inside a source or worktree folder. Add a worktree for branch with optional name. To get destination folder uses settings file
 

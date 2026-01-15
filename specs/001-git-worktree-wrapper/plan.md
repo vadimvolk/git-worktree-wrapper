@@ -91,7 +91,7 @@ src/
 │   │   ├── main.py           # Entry point, argument parsing
 │   │   └── commands/          # Command implementations
 │   │       ├── __init__.py
-│   │       ├── checkout.py
+│   │       ├── clone.py
 │   │       ├── add.py
 │   │       ├── remove.py
 │   │       ├── pull.py
@@ -118,6 +118,7 @@ src/
 │   └── utils/
 │       ├── __init__.py
 │       ├── xdg.py              # XDG_CONFIG_HOME handling
+│       ├── uri.py               # URI parsing (protocol, host, port, path segments)
 │       └── shell.py             # Shell autocompletion generation
 
 tests/
@@ -128,7 +129,7 @@ tests/
 │   ├── test_actions_executor.py
 │   └── test_cli_commands.py
 ├── integration/
-│   ├── test_checkout_flow.py
+│   ├── test_clone_flow.py
 │   ├── test_worktree_management.py
 │   └── test_migration.py
 └── fixtures/
