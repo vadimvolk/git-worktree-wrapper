@@ -14,7 +14,7 @@ This document provides practical examples, test scenarios, and usage patterns fo
 sgw init config
 
 # Output:
-# Created config file: ~/.config/sgw.yml
+# Created config file: ~/.config/sgw/config.yml
 ```
 
 The default config will be created with:
@@ -24,7 +24,7 @@ The default config will be created with:
 
 ### 2. Customize Configuration (Optional)
 
-Edit `~/.config/sgw.yml` to add your source routing rules:
+Edit `~/.config/sgw/config.yml` to add your source routing rules:
 
 ```yaml
 default_sources: ~/Developer/sources/default/path(-2)/path(-1)
@@ -60,13 +60,13 @@ sgw init shell fish
 
 ## Basic Workflows
 
-### Workflow 1: Checkout a New Repository
+### Workflow 1: Clone a New Repository
 
-**Scenario**: Checkout a GitHub repository
+**Scenario**: Clone a GitHub repository
 
 ```bash
-# Checkout repository
-sgw checkout https://github.com/vadimvolk/ansible.git
+# Clone repository
+sgw clone https://github.com/vadimvolk/ansible.git
 
 # Expected output:
 # ~/Developer/sources/github/vadimvolk/ansible
@@ -78,7 +78,7 @@ git status
 
 **Test Case**:
 - **Given**: No existing repository at expected location
-- **When**: `sgw checkout https://github.com/vadimvolk/ansible.git`
+- **When**: `sgw clone https://github.com/vadimvolk/ansible.git`
 - **Then**: Repository cloned to `~/Developer/sources/github/vadimvolk/ansible`
 
 ### Workflow 2: Add a Worktree
@@ -108,7 +108,7 @@ git branch
 
 ### Workflow 3: Add Named Worktree
 
-**Scenario**: Create a named worktree for easier identification
+**Scenario**: Create a named worktree (name used in path template only)
 
 ```bash
 cd ~/Developer/sources/github/vadimvolk/ansible
@@ -119,15 +119,39 @@ sgw add feature/new-ui ui-work
 # Expected output:
 # ~/Developer/worktrees/github/vadimvolk/ansible/ui-work-feature-new-ui
 
-# Verify worktree name
+# Verify worktree (name is part of path, worktree remains attached)
 git worktree list
-# Output shows worktree with name "ui-work"
+# Output shows worktree at computed path
 ```
 
 **Test Case**:
 - **Given**: Source repository
 - **When**: `sgw add feature/new-ui ui-work`
-- **Then**: Named worktree created with name "ui-work"
+- **Then**: Worktree created at path using worktree_name in template (worktree remains attached to repository)
+
+### Workflow 3a: Create Branch from Current Commit
+
+**Scenario**: Create a new branch from current commit and add worktree
+
+```bash
+cd ~/Developer/sources/github/vadimvolk/ansible
+
+# Create branch from current commit and add worktree
+sgw add new-feature -c
+
+# Expected output:
+# ~/Developer/worktrees/github/vadimvolk/ansible/new-feature
+
+# Or from a worktree
+cd ~/Developer/worktrees/github/vadimvolk/ansible/other-branch
+sgw add another-feature -c
+# Creates branch from commit in current worktree
+```
+
+**Test Case**:
+- **Given**: Source repository on commit abc123
+- **When**: `sgw add new-feature -c`
+- **Then**: Branch 'new-feature' created from abc123, worktree added
 
 ### Workflow 4: Remove Worktree
 
@@ -219,19 +243,19 @@ sources:
 **Test Cases**:
 ```bash
 # GitHub repository
-sgw checkout https://github.com/user/repo.git
+sgw clone https://github.com/user/repo.git
 # → ~/Developer/sources/github/user/repo
 
 # GitLab repository
-sgw checkout https://gitlab.com/group/subgroup/project.git
+sgw clone https://gitlab.com/group/subgroup/project.git
 # → ~/Developer/sources/gitlab/group/subgroup/project
 
 # Custom organization
-sgw checkout https://git.example.com/myorg/project.git
+sgw clone https://git.example.com/myorg/project.git
 # → ~/Developer/sources/custom/myorg/project
 
 # Default (no match)
-sgw checkout https://other.com/user/repo.git
+sgw clone https://other.com/user/repo.git
 # → ~/Developer/sources/default/user/repo
 ```
 
@@ -251,9 +275,9 @@ projects:
 
 **Test Case**:
 - **Given**: Repository with `local.properties` file
-- **When**: `sgw checkout <uri>` or `sgw add <branch>`
+- **When**: `sgw clone <uri>` or `sgw add <branch>`
 - **Then**: 
-  - After checkout: `local.properties` copied from `~/sources/default-local.properties`
+  - After clone: `local.properties` copied from `~/sources/default-local.properties`
   - After worktree add: `local.properties` copied from source to worktree, then `custom-handler` executed
 
 ### Scenario 3: Migration
@@ -317,6 +341,9 @@ worktrees: ~/worktrees/branch()
 worktrees: ~/worktrees/norm_branch()
 # Evaluates to: ~/worktrees/feature-new-ui
 
+worktrees: ~/worktrees/norm_branch("_")
+# Evaluates to: ~/worktrees/feature_new_ui
+
 worktrees: ~/worktrees/prefix_worktree("-")
 # If worktree has name: ~/worktrees/-ui-work
 # If no name: ~/worktrees/
@@ -341,10 +368,10 @@ worktrees: ~/worktrees/not_function((my folder))
 
 ```bash
 # Config file has syntax error
-sgw checkout https://github.com/user/repo.git
+sgw clone https://github.com/user/repo.git
 
 # Expected output (stderr):
-# Error: Invalid YAML in config file ~/.config/sgw.yml
+# Error: Invalid YAML in config file ~/.config/sgw/config.yml
 # Line 5: unexpected character
 ```
 
@@ -352,7 +379,7 @@ sgw checkout https://github.com/user/repo.git
 
 ```bash
 # Invalid git URI
-sgw checkout not-a-uri
+sgw clone not-a-uri
 
 # Expected output (stderr):
 # Error: Invalid repository URI: not-a-uri
@@ -383,11 +410,11 @@ sgw add feature-branch  # Again
 
 ## Integration Test Scenarios
 
-### End-to-End: Checkout to Worktree
+### End-to-End: Clone to Worktree
 
 ```bash
-# 1. Checkout repository
-sgw checkout https://github.com/user/repo.git
+# 1. Clone repository
+sgw clone https://github.com/user/repo.git
 # → ~/Developer/sources/github/user/repo
 
 # 2. Add worktree
@@ -430,7 +457,7 @@ sgw remove feature-2
 
 - **Config loading**: < 50ms
 - **Template evaluation**: < 10ms per template
-- **Checkout operation**: Depends on git clone speed (typically 1-5 seconds)
+- **Clone operation**: Depends on git clone speed (typically 1-5 seconds)
 - **Worktree add**: < 1 second
 - **Worktree remove**: < 500ms
 - **Pull operation**: Depends on network (typically 1-3 seconds)

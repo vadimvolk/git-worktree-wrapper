@@ -98,7 +98,7 @@ src/
 │   │       └── init.py        # init config, init shell
 │   ├── config/
 │   │   ├── __init__.py
-│   │   ├── loader.py          # Load and parse sgw.yml
+│   │   ├── loader.py          # Load and parse config.yml
 │   │   ├── validator.py       # Validate config structure
 │   │   └── resolver.py        # Resolve paths using templates
 │   ├── template/

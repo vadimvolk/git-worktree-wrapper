@@ -20,9 +20,9 @@ sgw <command> [arguments] [options]
 
 ## Command Specifications
 
-### 1. `sgw checkout <uri>`
+### 1. `sgw clone <uri>`
 
-**Purpose**: Checkout a new repository to the appropriate source location based on configuration.
+**Purpose**: Clone a new repository to the appropriate source location based on configuration.
 
 **Arguments**:
 - `uri` (str, required): Git repository URI (HTTP, HTTPS, SSH, or file://)
@@ -30,14 +30,14 @@ sgw <command> [arguments] [options]
 **Options**: None
 
 **Behavior**:
-1. Parse URI to extract host and path segments
+1. Parse URI to extract protocol, host, port, and path segments
 2. Evaluate source rules (predicates) to find matching rule or use default
 3. Resolve `sources` template to get absolute checkout path
 4. Create directory structure if needed
 5. Execute `git clone <uri> <path>`
 6. Detect project type by evaluating project predicates
 7. Execute matching project `source_actions` in order
-8. Report success with checkout path
+8. Report success with clone path
 
 **Exit Codes**:
 - `0`: Success
@@ -45,45 +45,51 @@ sgw <command> [arguments] [options]
 - `2`: Configuration error (invalid config, template error)
 
 **Output**:
-- Success: Print checkout path to stdout
+- Success: Print clone path to stdout
 - Error: Print error message to stderr
 
 **Examples**:
 ```bash
-sgw checkout https://github.com/user/repo.git
+sgw clone https://github.com/user/repo.git
 # Output: ~/Developer/sources/github/user/repo
 
-sgw checkout git@gitlab.com:group/project.git
+sgw clone git@gitlab.com:group/project.git
 # Output: ~/Developer/sources/gitlab/group/project
 ```
 
 ---
 
-### 2. `sgw add <branch> [worktree_name]`
+### 2. `sgw add <branch> [worktree_name] [--create-branch|-c]`
 
-**Purpose**: Add a worktree for the specified branch, optionally with a name.
+**Purpose**: Add a worktree for the specified branch, optionally with a name. Can create branch from current commit if it doesn't exist.
 
 **Arguments**:
 - `branch` (str, required): Branch name to checkout in worktree
-- `worktree_name` (str, optional): Optional name for the worktree
+- `worktree_name` (str, optional): Optional name for the worktree (used only in path template, does not detach worktree)
 
-**Options**: None
+**Options**:
+- `--create-branch`, `-c`: Create branch from current commit (source or worktree) if branch doesn't exist
 
 **Behavior**:
 1. Detect current repository (source or worktree)
 2. If in worktree, resolve to source repository
-3. Verify branch exists in source repository (local or remote)
-4. Evaluate worktree template to get absolute worktree path
-5. Create directory structure if needed
-6. Execute `git worktree add -b <branch> <path>` or `git worktree add <path> <branch>`
-6. If worktree_name provided, use `git worktree add -b <branch> <path> --detach` then create named reference
-7. Detect project type by evaluating project predicates
-8. Execute matching project `worktree_actions` in order
-9. Report success with worktree path
+3. Check if branch exists in source repository (local or remote)
+4. If branch doesn't exist and `--create-branch` specified:
+   - Get current commit from source or worktree (where command was executed)
+   - Create branch from that commit: `git branch <branch> <commit>`
+5. If branch doesn't exist and `--create-branch` not specified:
+   - Print error: "Branch '<branch>' not found. Use --create-branch to create from current commit."
+   - Exit with code 1
+6. Evaluate worktree template to get absolute worktree path (worktree_name used in template if provided)
+7. Create directory structure if needed
+8. Execute `git worktree add <path> <branch>` (worktree remains attached to repository)
+9. Detect project type by evaluating project predicates
+10. Execute matching project `worktree_actions` in order
+11. Report success with worktree path
 
 **Exit Codes**:
 - `0`: Success
-- `1`: Error (not in git repo, branch not found, worktree add failed, action failed)
+- `1`: Error (not in git repo, branch not found without --create-branch, worktree add failed, action failed)
 - `2`: Configuration error
 
 **Output**:
@@ -98,6 +104,15 @@ sgw add feature-branch
 
 sgw add feature-branch my-feature
 # Output: ~/Developer/worktrees/github/user/repo/my-feature-feature-branch
+
+sgw add new-feature -c
+# Creates branch 'new-feature' from current commit, then adds worktree
+# Output: ~/Developer/worktrees/github/user/repo/new-feature
+
+cd ~/Developer/worktrees/github/user/repo/other-branch
+sgw add another-feature -c
+# Creates branch 'another-feature' from commit in 'other-branch' worktree
+# Output: ~/Developer/worktrees/github/user/repo/another-feature
 ```
 
 ---
@@ -207,8 +222,8 @@ sgw pull
 
 **Behavior**:
 1. Verify `old_repos` path exists and is a directory
-2. Scan directory for git repositories (directories containing `.git`)
-3. For each repository:
+2. Recursively scan directory tree for git repositories (directories containing `.git`)
+3. For each repository found:
    - Extract URI from remote origin (if available)
    - Calculate expected location using current config
    - Compare current location with expected location
@@ -252,7 +267,7 @@ sgw migrate ~/old-repos --move
 **Options**: None
 
 **Behavior**:
-1. Determine config file path: `$XDG_CONFIG_HOME/sgw.yml` (or platform equivalent)
+1. Determine config file path: `$XDG_CONFIG_HOME/sgw/config.yml` (or platform equivalent, following XDG and OS defaults)
 2. Check if config file already exists
 3. If exists:
    - Print warning: "Config file already exists at <path>. Not overwriting."
@@ -279,7 +294,7 @@ sgw migrate ~/old-repos --move
 **Examples**:
 ```bash
 sgw init config
-# Output: Created config file: ~/.config/sgw.yml
+# Output: Created config file: ~/.config/sgw/config.yml
 ```
 
 ---

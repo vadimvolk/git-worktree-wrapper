@@ -122,12 +122,16 @@ def user_config_dir(appname: str = "sgw") -> Path:
         else:
             base = home / ".config"
         return base / appname
+
+def get_config_path() -> Path:
+    """Return full path to config file: {user_config_dir()}/config.yml"""
+    return user_config_dir() / "config.yml"
 ```
 
 ### Behavior
-- **Linux**: Uses `$XDG_CONFIG_HOME` if set and absolute, otherwise `~/.config/sgw`
-- **macOS**: Uses `~/Library/Application Support/sgw`
-- **Windows**: Uses `%APPDATA%\sgw` (or `~/AppData/Roaming/sgw`)
+- **Linux**: Uses `$XDG_CONFIG_HOME` if set and absolute, otherwise `~/.config/sgw/config.yml`
+- **macOS**: Uses `~/Library/Application Support/sgw/config.yml`
+- **Windows**: Uses `%APPDATA%\sgw\config.yml` (or `~/AppData/Roaming/sgw/config.yml`)
 
 ### Alternatives Considered
 - **platformdirs library**: Considered but adds dependency. Rejected per minimalism principle - standard library is sufficient.
@@ -137,7 +141,8 @@ def user_config_dir(appname: str = "sgw") -> Path:
 ### Notes
 - Must validate that `XDG_CONFIG_HOME` is absolute if set
 - Fallback to `~/.config` if `XDG_CONFIG_HOME` is unset or invalid
-- Config file location: `{user_config_dir()}/sgw.yml`
+- Config file location: `{user_config_dir()}/config.yml` where `user_config_dir()` returns `{XDG_CONFIG_HOME}/sgw` or platform equivalent
+- Config is cached in memory only during `sgw` command execution (no file change detection needed)
 
 ---
 

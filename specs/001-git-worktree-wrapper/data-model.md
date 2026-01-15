@@ -9,7 +9,7 @@ This document defines the core entities, their relationships, validation rules, 
 
 ### 1. Configuration (Config)
 
-Represents the YAML configuration file (`sgw.yml`) that defines path templates, source routing rules, and project actions.
+Represents the YAML configuration file (`config.yml` in `$XDG_CONFIG_HOME/sgw/`) that defines path templates, source routing rules, and project actions.
 
 **Attributes**:
 - `default_sources` (str, required): Template string for default source checkout location
@@ -49,6 +49,8 @@ Represents a predicate-based routing rule for determining source and worktree lo
 
 **Context Variables** (available during predicate evaluation):
 - `host` (str): Hostname from URI (e.g., "github.com", "rulez.netbird.selfhosted")
+- `port` (str): Port from URI, empty string if missing (e.g., "3000", "")
+- `protocol` (str): Protocol from URI (e.g., "http", "https", "ssh", "git", "file")
 - `path` (list[str]): URI path segments (e.g., ["vadimvolk", "ansible"] from "/vadimvolk/ansible.git")
 - `uri` (str): Full URI string
 
@@ -158,8 +160,8 @@ Represents a git worktree linked to a source repository.
 
 **Validation Rules**:
 - `path` must exist and be a valid worktree
-- `branch` must exist in source repository
-- `name` must be unique within source repository if provided
+- `branch` must exist in source repository (or be created from current commit if `--create-branch` used)
+- `name` is only used for path definition in templates, does not detach worktree from repository
 - `source_repo` must be a valid source repository (not another worktree)
 
 **State Transitions**:
@@ -180,6 +182,8 @@ Context object passed to template evaluator for resolving template variables.
 **Attributes**:
 - `uri` (str, optional): Repository URI (for checkout operations)
 - `host` (str, optional): URI hostname
+- `port` (str, optional): URI port, empty string if missing
+- `protocol` (str, optional): URI protocol (http, https, ssh, git, file, etc.)
 - `path_segments` (list[str], optional): URI path segments
 - `branch` (str, optional): Git branch name
 - `worktree_name` (str, optional): Worktree name (if named)
@@ -204,7 +208,9 @@ Built-in functions available in template expressions.
 - `path(-1)`: Last path segment
 - `path(-2)`: Second-to-last path segment
 - `branch() -> str`: Current branch name (as-is)
-- `norm_branch() -> str`: Branch name with "/" replaced with "-"
+- `norm_branch(replacement: str = "-") -> str`: Branch name with "/" replaced with `replacement` (default: "-")
+  - `norm_branch()`: Branch name with "/" replaced with "-"
+  - `norm_branch("_")`: Branch name with "/" replaced with "_"
 - `worktree() -> str`: Worktree name, or "" if unnamed
 - `prefix_worktree(prefix: str) -> str`: Returns "" if no worktree name, else "prefix{name}"
 - `norm_prefix_branch() -> str`: Returns branch if no worktree name, else "prefix-branch"
@@ -239,7 +245,7 @@ TemplateContext
 ### Repository Lifecycle
 
 1. **Source Repository**:
-   - Created: `sgw checkout <uri>` → repository cloned to source location
+   - Created: `sgw clone <uri>` → repository cloned to source location
    - Updated: `sgw pull` → source repository updated if clean and on main/master
    - Removed: Manual deletion (not managed by sgw)
 
@@ -250,9 +256,9 @@ TemplateContext
 
 ### Configuration Lifecycle
 
-1. **Loaded**: On first command execution, config loaded from `$XDG_CONFIG_HOME/sgw.yml`
+1. **Loaded**: On first command execution, config loaded from `$XDG_CONFIG_HOME/sgw/config.yml` (or platform equivalent)
 2. **Validated**: Syntax and structure validated on load
-3. **Cached**: Config cached for command session (reloaded if file changes detected)
+3. **Cached**: Config cached in memory for the duration of the `sgw` command execution (no file change detection)
 4. **Modified**: Via `sgw init config` (creates new default config)
 
 ## Validation Rules Summary
