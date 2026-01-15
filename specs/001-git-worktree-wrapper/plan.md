@@ -13,9 +13,9 @@ Build a CLI tool `sgw` that wraps git worktree functionality with configurable p
 
 **Language/Version**: Python 3.11+  
 **Primary Dependencies**: 
-- `simpleeval` - for predicate and template evaluation (NEEDS CLARIFICATION: version, customization approach)
-- `pyyaml` or `ruamel.yaml` - for YAML config parsing (NEEDS CLARIFICATION: which library, why)
-- Standard library: `subprocess`, `pathlib`, `argparse`, `shutil`
+- `simpleeval` - for predicate and template evaluation (version: latest, with custom StrictSimpleEval subclass)
+- `ruamel.yaml` - for YAML config parsing with comment preservation (round-trip mode)
+- Standard library: `subprocess`, `pathlib`, `argparse`, `shutil`, `os`, `sys`
 
 **Storage**: File system (YAML config in XDG_CONFIG_HOME, git repositories)  
 **Testing**: pytest (TDD mandatory per constitution)  
@@ -51,7 +51,7 @@ Build a CLI tool `sgw` that wraps git worktree functionality with configurable p
 - **Status**: NEEDS JUSTIFICATION
 - **Dependencies to justify**:
   - `simpleeval`: Required for safe expression evaluation. Standard library `eval()` is unsafe. Alternative: custom parser (too complex).
-  - YAML library: Required for config parsing. Standard library has no YAML support. Alternative: JSON (less user-friendly, loses comments).
+  - `ruamel.yaml`: Required for config parsing with comment preservation. Standard library has no YAML support. Alternative: JSON (less user-friendly, loses comments) or PyYAML (loses comments and formatting).
 
 ### III. Single Command Interface ✅
 - **Status**: PASS
@@ -76,6 +76,7 @@ specs/001-git-worktree-wrapper/
 ├── data-model.md        # Phase 1 output (/speckit.plan command)
 ├── quickstart.md        # Phase 1 output (/speckit.plan command)
 ├── contracts/           # Phase 1 output (/speckit.plan command)
+│   └── cli-commands.md
 └── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
 ```
 
@@ -147,37 +148,66 @@ README.md
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
 | External dependency: simpleeval | Safe expression evaluation for predicates and templates | Standard library `eval()` is unsafe for user-provided config. Custom parser would be too complex and error-prone. |
-| External dependency: YAML library | User-friendly config format with comments | JSON lacks comments and is less readable. Config files need documentation inline. |
+| External dependency: ruamel.yaml | User-friendly config format with comments and formatting preservation | JSON lacks comments and is less readable. PyYAML loses comments and formatting. Config files need documentation inline and user formatting preferences preserved. |
 | Template evaluation engine | Complex path template system with function calls | Simple string substitution insufficient for path(-2), norm_branch(), etc. Need function evaluation. |
 
 ## Phase 0 Research Areas
 
-1. **simpleeval library**: 
-   - Research customization for strict type checking
-   - How to add custom functions safely
+1. **simpleeval library**: ✅ RESOLVED
+   - Decision: Use `simpleeval` with custom `StrictSimpleEval` subclass
+   - Customization for strict type checking implemented
+   - Custom functions added safely
    - Error message formatting for user-friendly errors
 
-2. **YAML library choice**:
-   - Compare `pyyaml` vs `ruamel.yaml`
-   - Which preserves comments (needed for config examples)
-   - Performance and maintenance status
+2. **YAML library choice**: ✅ RESOLVED
+   - Decision: Use `ruamel.yaml` with round-trip mode
+   - Preserves comments and formatting
+   - Performance and maintenance status verified
 
-3. **XDG_CONFIG_HOME**:
-   - Cross-platform handling (Linux vs macOS)
-   - Fallback behavior when not set
-   - Standard library support
+3. **XDG_CONFIG_HOME**: ✅ RESOLVED
+   - Decision: Use standard library only with custom function
+   - Cross-platform handling (Linux vs macOS) implemented
+   - Fallback behavior when not set defined
 
-4. **Git worktree API**:
-   - Subprocess vs libgit2 (Python bindings)
-   - Error handling patterns
-   - Detecting worktree state (clean/dirty)
+4. **Git worktree API**: ✅ RESOLVED
+   - Decision: Use `subprocess` to call `git` commands directly
+   - Error handling patterns defined
+   - Detecting worktree state (clean/dirty) implemented
 
-5. **Shell autocompletion**:
-   - Bash/zsh/fish completion formats
-   - Dynamic completion (branch names, worktree paths)
-   - Integration with argparse
+5. **Shell autocompletion**: ✅ RESOLVED
+   - Decision: Use argparse's built-in completion generation methods
+   - Bash/zsh/fish completion formats defined
+   - Dynamic completion (branch names, worktree paths) approach defined
 
-6. **Template preprocessing**:
-   - Parsing function calls vs literal parentheses
-   - Handling edge cases like `not_function((my folder))`
-   - Performance of regex vs manual parsing
+6. **Template preprocessing**: ✅ RESOLVED
+   - Decision: Use regex-based approach with simpleeval validation
+   - Parsing function calls vs literal parentheses handled
+   - Edge cases like `not_function((my folder))` handled
+
+**All research areas resolved. See `research.md` for detailed findings.**
+
+## Phase 1 Design Artifacts
+
+### Completed Artifacts
+
+1. **data-model.md**: ✅ Complete
+   - Core entities defined (Config, SourceRule, ProjectRule, Action, Repository, Worktree, TemplateContext, TemplateFunction)
+   - Relationships documented
+   - Validation rules specified
+   - State transitions defined
+
+2. **contracts/cli-commands.md**: ✅ Complete
+   - All 7 commands specified (clone, add, remove, pull, migrate, init config, init shell)
+   - Arguments, options, behavior, exit codes, output format documented
+   - Error handling patterns defined
+   - Completion support specified
+
+3. **quickstart.md**: ✅ Complete
+   - Initial setup instructions
+   - Basic workflows with test cases
+   - Advanced scenarios
+   - Template function examples
+   - Error scenarios
+   - Integration test scenarios
+
+**All Phase 1 artifacts complete. Ready for Phase 2 (task breakdown).**
