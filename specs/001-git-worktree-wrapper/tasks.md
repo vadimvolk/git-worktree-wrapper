@@ -23,12 +23,12 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create project structure per implementation plan in plan.md
-- [ ] T002 Initialize Python 3.11+ project with uv and pyproject.toml
-- [ ] T003 [P] Add dependencies: simpleeval, ruamel.yaml, pytest to pyproject.toml
-- [ ] T004 [P] Configure pytest in pyproject.toml with test discovery patterns
-- [ ] T005 [P] Setup type checking configuration (mypy or pyright) in pyproject.toml
-- [ ] T006 [P] Create README.md with project overview and installation instructions
+- [X] T001 Create project structure per implementation plan in plan.md
+- [X] T002 Initialize Python 3.11+ project with uv and pyproject.toml
+- [X] T003 [P] Add dependencies: simpleeval, ruamel.yaml, pytest to pyproject.toml
+- [X] T004 [P] Configure pytest in pyproject.toml with test discovery patterns
+- [X] T005 [P] Setup type checking configuration (mypy or pyright) in pyproject.toml
+- [X] T006 [P] Create README.md with project overview and installation instructions
 
 ---
 
@@ -38,21 +38,21 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T007 [P] Implement XDG config directory handling in src/sgw/utils/xdg.py
-- [ ] T008 [P] Implement StrictSimpleEval subclass in src/sgw/template/evaluator.py with type checking
-- [ ] T009 [P] Implement template function registry in src/sgw/template/functions.py (path, branch, norm_branch, worktree, prefix_worktree, norm_prefix_branch)
-- [ ] T010 [P] Implement template preprocessing (regex-based function call extraction, escaped parentheses handling) in src/sgw/template/evaluator.py
-- [ ] T011 [P] Implement config loader with ruamel.yaml in src/sgw/config/loader.py
-- [ ] T012 [P] Implement config validator in src/sgw/config/validator.py
-- [ ] T013 [P] Implement template resolver in src/sgw/config/resolver.py
-- [ ] T014 [P] Implement git repository detection and operations in src/sgw/git/repository.py
-- [ ] T015 [P] Implement git worktree operations wrapper in src/sgw/git/worktree.py
-- [ ] T016 [P] Implement git branch operations in src/sgw/git/branch.py
-- [ ] T017 [P] Implement URI parsing (protocol, host, port, path segments) in src/sgw/utils/uri.py
-- [ ] T018 [P] Implement project action matcher (predicate evaluation) in src/sgw/actions/matcher.py
-- [ ] T019 [P] Implement project action executor (abs_copy, rel_copy, command) in src/sgw/actions/executor.py
-- [ ] T020 [P] Implement shell completion generation utilities in src/sgw/utils/shell.py
-- [ ] T021 Create base CLI argument parser structure in src/sgw/cli/main.py
+- [X] T007 [P] Implement XDG config directory handling in src/sgw/utils/xdg.py
+- [X] T008 [P] Implement StrictSimpleEval subclass in src/sgw/template/evaluator.py with type checking
+- [X] T009 [P] Implement template function registry in src/sgw/template/functions.py (path, branch, norm_branch, worktree, prefix_worktree, norm_prefix_branch)
+- [X] T010 [P] Implement template preprocessing (regex-based function call extraction, escaped parentheses handling) in src/sgw/template/evaluator.py
+- [X] T011 [P] Implement config loader with ruamel.yaml in src/sgw/config/loader.py
+- [X] T012 [P] Implement config validator in src/sgw/config/validator.py
+- [X] T013 [P] Implement template resolver in src/sgw/config/resolver.py
+- [X] T014 [P] Implement git repository detection and operations in src/sgw/git/repository.py
+- [X] T015 [P] Implement git worktree operations wrapper in src/sgw/git/worktree.py
+- [X] T016 [P] Implement git branch operations in src/sgw/git/branch.py
+- [X] T017 [P] Implement URI parsing (protocol, host, port, path segments) in src/sgw/utils/uri.py
+- [X] T018 [P] Implement project action matcher (predicate evaluation) in src/sgw/actions/matcher.py
+- [X] T019 [P] Implement project action executor (abs_copy, rel_copy, command) in src/sgw/actions/executor.py
+- [X] T020 [P] Implement shell completion generation utilities in src/sgw/utils/shell.py
+- [X] T021 Create base CLI argument parser structure in src/sgw/cli/main.py
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -76,10 +76,10 @@
 
 ### Implementation for User Story 1
 
-- [ ] T027 [US1] Implement clone command in src/sgw/cli/commands/clone.py
-- [ ] T028 [US1] Integrate clone command into main CLI parser in src/sgw/cli/main.py
-- [ ] T029 [US1] Add error handling for invalid URIs, clone failures, and action failures in src/sgw/cli/commands/clone.py
-- [ ] T030 [US1] Add output formatting (print clone path to stdout, errors to stderr) in src/sgw/cli/commands/clone.py
+- [X] T027 [US1] Implement clone command in src/sgw/cli/commands/clone.py
+- [X] T028 [US1] Integrate clone command into main CLI parser in src/sgw/cli/main.py
+- [X] T029 [US1] Add error handling for invalid URIs, clone failures, and action failures in src/sgw/cli/commands/clone.py
+- [X] T030 [US1] Add output formatting (print clone path to stdout, errors to stderr) in src/sgw/cli/commands/clone.py
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently. Users can clone repositories with `sgw clone <uri>`.
 
@@ -102,11 +102,11 @@
 
 ### Implementation for User Story 2
 
-- [ ] T035 [US2] Implement add command in src/sgw/cli/commands/add.py
-- [ ] T036 [US2] Add --create-branch option handling in src/sgw/cli/commands/add.py
-- [ ] T037 [US2] Integrate add command into main CLI parser in src/sgw/cli/main.py
-- [ ] T038 [US2] Add error handling for branch not found, worktree add failures, and action failures in src/sgw/cli/commands/add.py
-- [ ] T039 [US2] Add output formatting (print worktree path to stdout, errors to stderr) in src/sgw/cli/commands/add.py
+- [X] T035 [US2] Implement add command in src/sgw/cli/commands/add.py
+- [X] T036 [US2] Add --create-branch option handling in src/sgw/cli/commands/add.py
+- [X] T037 [US2] Integrate add command into main CLI parser in src/sgw/cli/main.py
+- [X] T038 [US2] Add error handling for branch not found, worktree add failures, and action failures in src/sgw/cli/commands/add.py
+- [X] T039 [US2] Add output formatting (print worktree path to stdout, errors to stderr) in src/sgw/cli/commands/add.py
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently. Users can clone repositories and add worktrees.
 
@@ -128,11 +128,11 @@
 
 ### Implementation for User Story 3
 
-- [ ] T043 [US3] Implement remove command in src/sgw/cli/commands/remove.py
-- [ ] T044 [US3] Add --force option handling in src/sgw/cli/commands/remove.py
-- [ ] T045 [US3] Integrate remove command into main CLI parser in src/sgw/cli/main.py
-- [ ] T046 [US3] Add error handling for worktree not found, dirty worktree rejection, and removal failures in src/sgw/cli/commands/remove.py
-- [ ] T047 [US3] Add output formatting (print removal confirmation to stdout, errors to stderr) in src/sgw/cli/commands/remove.py
+- [X] T043 [US3] Implement remove command in src/sgw/cli/commands/remove.py
+- [X] T044 [US3] Add --force option handling in src/sgw/cli/commands/remove.py
+- [X] T045 [US3] Integrate remove command into main CLI parser in src/sgw/cli/main.py
+- [X] T046 [US3] Add error handling for worktree not found, dirty worktree rejection, and removal failures in src/sgw/cli/commands/remove.py
+- [X] T047 [US3] Add output formatting (print removal confirmation to stdout, errors to stderr) in src/sgw/cli/commands/remove.py
 
 **Checkpoint**: At this point, User Stories 1, 2, AND 3 should all work independently. Users can clone, add, and remove worktrees.
 
@@ -153,10 +153,10 @@
 
 ### Implementation for User Story 4
 
-- [ ] T050 [US4] Implement pull command in src/sgw/cli/commands/pull.py
-- [ ] T051 [US4] Integrate pull command into main CLI parser in src/sgw/cli/main.py
-- [ ] T052 [US4] Add error handling for not on main/master, dirty repository, and pull failures in src/sgw/cli/commands/pull.py
-- [ ] T053 [US4] Add output formatting (print update confirmation to stdout, errors to stderr) in src/sgw/cli/commands/pull.py
+- [X] T050 [US4] Implement pull command in src/sgw/cli/commands/pull.py
+- [X] T051 [US4] Integrate pull command into main CLI parser in src/sgw/cli/main.py
+- [X] T052 [US4] Add error handling for not on main/master, dirty repository, and pull failures in src/sgw/cli/commands/pull.py
+- [X] T053 [US4] Add output formatting (print update confirmation to stdout, errors to stderr) in src/sgw/cli/commands/pull.py
 
 **Checkpoint**: At this point, User Stories 1-4 should all work independently. Users can clone, add, remove worktrees, and update source repositories.
 
@@ -178,11 +178,11 @@
 
 ### Implementation for User Story 5
 
-- [ ] T057 [US5] Implement migrate command in src/sgw/cli/commands/migrate.py
-- [ ] T058 [US5] Add --dry-run and --move option handling in src/sgw/cli/commands/migrate.py
-- [ ] T059 [US5] Integrate migrate command into main CLI parser in src/sgw/cli/main.py
-- [ ] T060 [US5] Add error handling for invalid paths, migration failures, and worktree updates in src/sgw/cli/commands/migrate.py
-- [ ] T061 [US5] Add output formatting (print migration summary to stdout, errors to stderr) in src/sgw/cli/commands/migrate.py
+- [X] T057 [US5] Implement migrate command in src/sgw/cli/commands/migrate.py
+- [X] T058 [US5] Add --dry-run and --move option handling in src/sgw/cli/commands/migrate.py
+- [X] T059 [US5] Integrate migrate command into main CLI parser in src/sgw/cli/main.py
+- [X] T060 [US5] Add error handling for invalid paths, migration failures, and worktree updates in src/sgw/cli/commands/migrate.py
+- [X] T061 [US5] Add output formatting (print migration summary to stdout, errors to stderr) in src/sgw/cli/commands/migrate.py
 
 **Checkpoint**: At this point, User Stories 1-5 should all work independently. Users can clone, add, remove worktrees, update sources, and migrate repositories.
 
@@ -203,11 +203,11 @@
 
 ### Implementation for User Story 6
 
-- [ ] T064 [US6] Implement init config command in src/sgw/cli/commands/init.py
-- [ ] T065 [US6] Create default config template with examples and documentation in src/sgw/cli/commands/init.py
-- [ ] T066 [US6] Integrate init config command into main CLI parser in src/sgw/cli/main.py
-- [ ] T067 [US6] Add error handling for existing config file and write failures in src/sgw/cli/commands/init.py
-- [ ] T068 [US6] Add output formatting (print config file path to stdout, errors to stderr) in src/sgw/cli/commands/init.py
+- [X] T064 [US6] Implement init config command in src/sgw/cli/commands/init.py
+- [X] T065 [US6] Create default config template with examples and documentation in src/sgw/cli/commands/init.py
+- [X] T066 [US6] Integrate init config command into main CLI parser in src/sgw/cli/main.py
+- [X] T067 [US6] Add error handling for existing config file and write failures in src/sgw/cli/commands/init.py
+- [X] T068 [US6] Add output formatting (print config file path to stdout, errors to stderr) in src/sgw/cli/commands/init.py
 
 **Checkpoint**: At this point, User Stories 1-6 should all work independently. Users can initialize configuration files.
 
@@ -228,12 +228,12 @@
 
 ### Implementation for User Story 7
 
-- [ ] T071 [US7] Implement init shell command in src/sgw/cli/commands/init.py
-- [ ] T072 [US7] Add completion script generation using argparse methods in src/sgw/cli/commands/init.py
-- [ ] T073 [US7] Add dynamic completion for branches and worktrees in src/sgw/cli/main.py
-- [ ] T074 [US7] Integrate init shell command into main CLI parser in src/sgw/cli/main.py
-- [ ] T075 [US7] Add error handling for invalid shell names and write failures in src/sgw/cli/commands/init.py
-- [ ] T076 [US7] Add output formatting (print installation path and instructions to stdout, errors to stderr) in src/sgw/cli/commands/init.py
+- [X] T071 [US7] Implement init shell command in src/sgw/cli/commands/init.py
+- [X] T072 [US7] Add completion script generation using argparse methods in src/sgw/cli/commands/init.py
+- [X] T073 [US7] Add dynamic completion for branches and worktrees in src/sgw/cli/main.py
+- [X] T074 [US7] Integrate init shell command into main CLI parser in src/sgw/cli/main.py
+- [X] T075 [US7] Add error handling for invalid shell names and write failures in src/sgw/cli/commands/init.py
+- [X] T076 [US7] Add output formatting (print installation path and instructions to stdout, errors to stderr) in src/sgw/cli/commands/init.py
 
 **Checkpoint**: At this point, all user stories should work independently. Users can initialize shell completion.
 
@@ -243,9 +243,9 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T077 [P] Add comprehensive error messages with context throughout all commands
-- [ ] T078 [P] Add verbose/quiet output options to all commands in src/sgw/cli/main.py
-- [ ] T079 [P] Add help text and documentation for all commands in src/sgw/cli/main.py
+- [X] T077 [P] Add comprehensive error messages with context throughout all commands
+- [X] T078 [P] Add verbose/quiet output options to all commands in src/sgw/cli/main.py
+- [X] T079 [P] Add help text and documentation for all commands in src/sgw/cli/main.py
 - [ ] T080 [P] Performance optimization: cache config loading during command execution
 - [ ] T081 [P] Add logging infrastructure for debugging in src/sgw/utils/logging.py
 - [ ] T082 [P] Code cleanup and refactoring: ensure all functions have type hints
