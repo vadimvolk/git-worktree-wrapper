@@ -425,6 +425,38 @@ class TestResolveWorktreePath:
         path_str = str(result)
         assert "feature-test" in path_str
 
+    def test_prefix_worktree_with_default_prefix(self) -> None:
+        """Test prefix_worktree() uses default '-' prefix when no argument provided."""
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default/norm_branch()prefix_worktree()",
+            sources={},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = resolve_worktree_path(config, uri, "feature/test", worktree_name="my-work")
+
+        # Should have default "-" prefix before worktree name
+        path_str = str(result)
+        assert "feature-test" in path_str
+        assert "-my-work" in path_str
+
+    def test_prefix_worktree_with_explicit_prefix(self) -> None:
+        """Test prefix_worktree() with explicit prefix for backward compatibility."""
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default/norm_branch()prefix_worktree('/')",
+            sources={},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = resolve_worktree_path(config, uri, "feature/test", worktree_name="my-work")
+
+        # Should have explicit "/" prefix before worktree name
+        path_str = str(result)
+        assert "feature-test" in path_str
+        assert "/my-work" in path_str
+
 
 class TestGetSourcePathForWorktree:
     """Tests for get_source_path_for_worktree function."""

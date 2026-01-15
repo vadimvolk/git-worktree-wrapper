@@ -114,11 +114,11 @@ class FunctionRegistry:
         """
         return self._context.worktree_name or ""
 
-    def _prefix_worktree(self, prefix: str) -> str:
+    def _prefix_worktree(self, prefix: str = "-") -> str:
         """Get worktree name with prefix, or empty string if no name.
 
         Args:
-            prefix: Prefix to prepend to worktree name.
+            prefix: Prefix to prepend to worktree name (default: "-").
 
         Returns:
             "{prefix}{worktree_name}" if named, empty string otherwise.

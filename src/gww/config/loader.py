@@ -133,7 +133,7 @@ DEFAULT_CONFIG_TEMPLATE = """\
 #   branch()           - Current branch name
 #   norm_branch(sep)   - Branch with "/" replaced (default: "-")
 #   worktree()         - Worktree name (empty if not named)
-#   prefix_worktree(p) - Prefix + worktree name, or empty
+#   prefix_worktree(p) - Prefix + worktree name, or empty (default: "-")
 #   norm_prefix_branch() - worktree-branch or norm_branch
 
 default_sources: ~/Developer/sources/default/path(-2)/path(-1)
