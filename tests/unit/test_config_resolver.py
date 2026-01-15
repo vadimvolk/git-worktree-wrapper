@@ -457,6 +457,71 @@ class TestResolveWorktreePath:
         assert "feature-test" in path_str
         assert "/my-work" in path_str
 
+    def test_prefix_branch_with_worktree_name_and_default_prefix(self) -> None:
+        """Test prefix_branch() with worktree name and default prefix."""
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default/path(-1)/prefix_branch()",
+            sources={},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = resolve_worktree_path(config, uri, "feature/new-ui", worktree_name="my-work")
+
+        # Should have worktree name, default "-" prefix, and branch (non-normalized)
+        path_str = str(result)
+        assert "repo" in path_str
+        assert "my-work-feature/new-ui" in path_str
+
+    def test_prefix_branch_with_worktree_name_and_custom_prefix(self) -> None:
+        """Test prefix_branch() with worktree name and custom prefix."""
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default/path(-1)/prefix_branch('/')",
+            sources={},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = resolve_worktree_path(config, uri, "feature/new-ui", worktree_name="my-work")
+
+        # Should have worktree name, custom "/" prefix, and branch (non-normalized)
+        path_str = str(result)
+        assert "repo" in path_str
+        assert "my-work/feature/new-ui" in path_str
+
+    def test_prefix_branch_without_worktree_name(self) -> None:
+        """Test prefix_branch() without worktree name returns just branch."""
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default/path(-1)/prefix_branch()",
+            sources={},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = resolve_worktree_path(config, uri, "feature/new-ui", worktree_name=None)
+
+        # Should return just branch (non-normalized) when no worktree name
+        path_str = str(result)
+        assert "repo" in path_str
+        assert "feature/new-ui" in path_str
+
+    def test_prefix_branch_preserves_branch_name_as_is(self) -> None:
+        """Test prefix_branch() preserves branch name without normalization."""
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default/path(-1)/prefix_branch()",
+            sources={},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = resolve_worktree_path(config, uri, "feature/new/ui", worktree_name="my-work")
+
+        # Should preserve "/" in branch name (not normalized)
+        path_str = str(result)
+        assert "my-work-feature/new/ui" in path_str
+        # Verify it's not normalized (should have slashes, not dashes)
+        assert "feature/new/ui" in path_str or "my-work-feature/new/ui" in path_str
+
 
 class TestGetSourcePathForWorktree:
     """Tests for get_source_path_for_worktree function."""

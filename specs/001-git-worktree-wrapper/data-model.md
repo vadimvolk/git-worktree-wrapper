@@ -213,6 +213,7 @@ Built-in functions available in template expressions.
   - `norm_branch("_")`: Branch name with "/" replaced with "_"
 - `worktree() -> str`: Worktree name, or "" if unnamed
 - `prefix_worktree(prefix: str = "-") -> str`: Returns "" if no worktree name, else "prefix{name}" (default prefix: "-")
+- `prefix_branch(prefix: str = "-") -> str`: Returns branch if no worktree name, else "{worktree_name}{prefix}{branch}" (default prefix: "-")
 - `norm_prefix_branch() -> str`: Returns branch if no worktree name, else "prefix-branch"
 
 **Validation Rules**:

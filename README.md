@@ -113,6 +113,7 @@ projects:
 | `norm_branch(sep)` | Branch name with `/` replaced | `norm_branch()` → `feature-new-ui` |
 | `worktree()` | Worktree name (if named) | `my-worktree` |
 | `prefix_worktree(prefix)` | Prefix + worktree name, or empty (default prefix: "-") | `prefix_worktree()` → `-my-worktree` or `prefix_worktree("/")` → `/my-worktree` |
+| `prefix_branch(prefix)` | Worktree name + branch, or branch (default prefix: "-") | `prefix_branch()` → `my-worktree-feature/new-ui` or `prefix_branch("/")` → `my-worktree/feature/new-ui` |
 | `norm_prefix_branch()` | Worktree name + branch, or normalized branch | `my-worktree-feature-new-ui` |
 
 ## Commands

@@ -477,7 +477,7 @@ gww init config
 ```bash
 # Error: Template evaluation failed: Function 'unknown_func' not defined
 # Solution: Check config file for typos in function names
-# Valid functions: path, branch, norm_branch, worktree, prefix_worktree, norm_prefix_branch
+# Valid functions: path, branch, norm_branch, worktree, prefix_worktree, prefix_branch, norm_prefix_branch
 ```
 
 ### Git Command Failures

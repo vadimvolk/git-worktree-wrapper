@@ -45,6 +45,7 @@ class FunctionRegistry:
         self._functions["norm_branch"] = self._norm_branch
         self._functions["worktree"] = self._worktree
         self._functions["prefix_worktree"] = self._prefix_worktree
+        self._functions["prefix_branch"] = self._prefix_branch
         self._functions["norm_prefix_branch"] = self._norm_prefix_branch
 
     def get_functions(self) -> dict[str, Callable[..., str]]:
@@ -126,6 +127,27 @@ class FunctionRegistry:
         if self._context.worktree_name:
             return f"{prefix}{self._context.worktree_name}"
         return ""
+
+    def _prefix_branch(self, prefix: str = "-") -> str:
+        """Get worktree name + branch, or branch if no name.
+
+        Args:
+            prefix: Prefix to insert between worktree name and branch (default: "-").
+
+        Returns:
+            "{worktree_name}{prefix}{branch}" if named, else "{branch}".
+
+        Raises:
+            ValueError: If no branch context available.
+        """
+        if self._context.branch is None:
+            raise ValueError(
+                "No branch context available for prefix_branch() function"
+            )
+
+        if self._context.worktree_name:
+            return f"{self._context.worktree_name}{prefix}{self._context.branch}"
+        return self._context.branch
 
     def _norm_prefix_branch(self) -> str:
         """Get worktree name + branch, or normalized branch if no name.
