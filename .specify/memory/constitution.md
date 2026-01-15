@@ -1,50 +1,60 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report:
+Version: 0.0.0 → 1.0.0 (Initial constitution)
+Modified principles: N/A (new)
+Added sections: Core Principles (5 principles), Technology Stack, Development Workflow
+Removed sections: N/A
+Templates requiring updates:
+  ✅ plan-template.md - Constitution Check section aligns with TDD and minimalism principles
+  ✅ spec-template.md - No changes needed (already supports TDD via user scenarios)
+  ✅ tasks-template.md - Already includes TDD workflow and test-first approach
+Follow-up TODOs: None
+-->
+
+# Git Worktree Wrapper Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Test-Driven Development (TDD) (NON-NEGOTIABLE)
+All features MUST follow strict TDD workflow: Write tests first → User approves tests → Tests fail → Implement to pass → Refactor. Red-Green-Refactor cycle is mandatory. No implementation code is written without a failing test first. Tests serve as executable specifications and documentation.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Minimalism & Dependency Management
+Code MUST be minimalistic and focused. External dependencies MUST be kept to an absolute minimum. Every dependency addition requires justification. Prefer standard library solutions over third-party packages. When external dependencies are necessary, they MUST be minimal, well-maintained, and add significant value. Code complexity must be justified; simpler solutions are preferred.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Single Command Interface
+The application MUST expose a single command-line entry point with consistent parameter patterns across all usage scenarios. Command structure MUST be intuitive and follow predictable patterns. All functionality MUST be accessible through this unified interface. Parameters MUST be consistent in naming, positioning, and behavior across different subcommands or modes.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Python 3.11+ & uv Requirements
+The project MUST use Python 3.11 or higher. Dependency management MUST use `uv` exclusively. All project setup, installation, and dependency resolution MUST be performed through `uv`. No alternative package managers (pip, poetry, etc.) are permitted. Project configuration MUST be compatible with `uv`'s standards.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Git Worktree Focus
+The application MUST be a wrapper around git worktree functionality, providing additional convenience functions while maintaining compatibility with standard git worktree behavior. All features MUST enhance or extend git worktree capabilities without breaking existing git workflows. The wrapper MUST not interfere with native git commands or worktree operations.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Technology Stack
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+**Language**: Python 3.11+  
+**Dependency Manager**: uv (exclusive)  
+**Project Type**: Console application (CLI)  
+**Target Platform**: Unix-like systems (Linux, macOS) with git installed  
+**Testing Framework**: pytest (standard for Python TDD)  
+**Code Quality**: Minimal external tooling; prefer built-in Python tooling where possible
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## Development Workflow
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+**TDD Enforcement**: All development MUST follow TDD cycle. Tests are written first, reviewed/approved, then implementation follows.  
+**Code Review**: All changes MUST pass tests before review. Constitution compliance MUST be verified in reviews.  
+**Dependency Review**: Every new external dependency MUST be justified and approved. Minimalism principle MUST be upheld.  
+**Command Interface Review**: All new commands or parameters MUST maintain consistency with existing interface patterns.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes all other development practices and guidelines. All code, tests, and documentation MUST comply with these principles. Amendments to this constitution require:
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+1. Documentation of the rationale for change
+2. Impact assessment on existing codebase
+3. Version increment following semantic versioning (MAJOR.MINOR.PATCH)
+4. Update of dependent templates and documentation
+
+All PRs and code reviews MUST verify compliance with constitution principles. Complexity and dependency additions MUST be justified. Violations of TDD principle are non-negotiable and MUST be rejected.
+
+**Version**: 1.0.0 | **Ratified**: 2025-01-27 | **Last Amended**: 2025-01-27
