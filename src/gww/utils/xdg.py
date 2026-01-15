@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-APP_NAME = "sgw"
+APP_NAME = "gww"
 
 
 def user_config_dir(appname: str = APP_NAME) -> Path:

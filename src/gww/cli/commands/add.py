@@ -7,18 +7,18 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from sgw.actions.executor import ActionError, execute_actions
-from sgw.actions.matcher import MatcherError, get_worktree_actions
-from sgw.config.loader import ConfigLoadError, ConfigNotFoundError, load_config
-from sgw.config.resolver import ResolverError, resolve_worktree_path
-from sgw.config.validator import ConfigValidationError, validate_config
-from sgw.git.branch import (
+from gww.actions.executor import ActionError, execute_actions
+from gww.actions.matcher import MatcherError, get_worktree_actions
+from gww.config.loader import ConfigLoadError, ConfigNotFoundError, load_config
+from gww.config.resolver import ResolverError, resolve_worktree_path
+from gww.config.validator import ConfigValidationError, validate_config
+from gww.git.branch import (
     BranchExistsError,
     branch_exists,
     create_branch,
     local_branch_exists,
 )
-from sgw.git.repository import (
+from gww.git.repository import (
     GitCommandError,
     NotGitRepositoryError,
     detect_repository,
@@ -26,8 +26,8 @@ from sgw.git.repository import (
     get_remote_uri,
     get_source_repository,
 )
-from sgw.git.worktree import WorktreeExistsError, add_worktree
-from sgw.utils.uri import parse_uri
+from gww.git.worktree import WorktreeExistsError, add_worktree
+from gww.utils.uri import parse_uri
 
 
 def run_add(args: argparse.Namespace) -> int:
@@ -87,7 +87,7 @@ def run_add(args: argparse.Namespace) -> int:
         config = validate_config(raw_config)
     except ConfigNotFoundError:
         print(
-            "Error: Config file not found. Run 'sgw init config' to create one.",
+            "Error: Config file not found. Run 'gww init config' to create one.",
             file=sys.stderr,
         )
         return 2

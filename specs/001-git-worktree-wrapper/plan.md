@@ -1,4 +1,4 @@
-# Implementation Plan: Git Worktree Wrapper (sgw)
+# Implementation Plan: Git Worktree Wrapper (gww)
 
 **Branch**: `001-git-worktree-wrapper` | **Date**: 2025-01-27 | **Spec**: `architecture.md`
 **Input**: Architecture specification from `/architecture.md`
@@ -7,7 +7,7 @@
 
 ## Summary
 
-Build a CLI tool `sgw` that wraps git worktree functionality with configurable path templates, predicate-based routing, and project-specific actions. The tool uses YAML configuration with template evaluation for dynamic path generation, supports multiple git hosting providers, and provides commands for checkout, worktree management, migration, and shell autocompletion.
+Build a CLI tool `gww` that wraps git worktree functionality with configurable path templates, predicate-based routing, and project-specific actions. The tool uses YAML configuration with template evaluation for dynamic path generation, supports multiple git hosting providers, and provides commands for checkout, worktree management, migration, and shell autocompletion.
 
 ## Technical Context
 
@@ -55,7 +55,7 @@ Build a CLI tool `sgw` that wraps git worktree functionality with configurable p
 
 ### III. Single Command Interface ✅
 - **Status**: PASS
-- **Compliance**: Single entry point `sgw` with consistent subcommand pattern: `sgw <command> [args] [options]`
+- **Compliance**: Single entry point `gww` with consistent subcommand pattern: `gww <command> [args] [options]`
 
 ### IV. Python 3.11+ & uv Requirements ✅
 - **Status**: PASS
@@ -84,7 +84,7 @@ specs/001-git-worktree-wrapper/
 
 ```text
 src/
-├── sgw/
+├── gww/
 │   ├── __init__.py
 │   ├── cli/
 │   │   ├── __init__.py

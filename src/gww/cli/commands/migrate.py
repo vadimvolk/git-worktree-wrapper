@@ -10,11 +10,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from sgw.config.loader import ConfigLoadError, ConfigNotFoundError, load_config
-from sgw.config.resolver import ResolverError, resolve_source_path
-from sgw.config.validator import ConfigValidationError, validate_config
-from sgw.git.repository import get_remote_uri, is_git_repository
-from sgw.utils.uri import parse_uri
+from gww.config.loader import ConfigLoadError, ConfigNotFoundError, load_config
+from gww.config.resolver import ResolverError, resolve_source_path
+from gww.config.validator import ConfigValidationError, validate_config
+from gww.git.repository import get_remote_uri, is_git_repository
+from gww.utils.uri import parse_uri
 
 
 @dataclass
@@ -150,7 +150,7 @@ def run_migrate(args: argparse.Namespace) -> int:
         config = validate_config(raw_config)
     except ConfigNotFoundError:
         print(
-            "Error: Config file not found. Run 'sgw init config' to create one.",
+            "Error: Config file not found. Run 'gww init config' to create one.",
             file=sys.stderr,
         )
         return 2

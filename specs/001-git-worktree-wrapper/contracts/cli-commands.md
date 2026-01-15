@@ -3,13 +3,13 @@
 **Date**: 2025-01-27  
 **Plan**: `plan.md`
 
-This document defines the command-line interface contracts for all `sgw` commands.
+This document defines the command-line interface contracts for all `gww` commands.
 
 ## Command Structure
 
 All commands follow the pattern:
 ```
-sgw <command> [arguments] [options]
+gww <command> [arguments] [options]
 ```
 
 ## Common Options
@@ -20,7 +20,7 @@ sgw <command> [arguments] [options]
 
 ## Command Specifications
 
-### 1. `sgw clone <uri>`
+### 1. `gww clone <uri>`
 
 **Purpose**: Clone a new repository to the appropriate source location based on configuration.
 
@@ -50,16 +50,16 @@ sgw <command> [arguments] [options]
 
 **Examples**:
 ```bash
-sgw clone https://github.com/user/repo.git
+gww clone https://github.com/user/repo.git
 # Output: ~/Developer/sources/github/user/repo
 
-sgw clone git@gitlab.com:group/project.git
+gww clone git@gitlab.com:group/project.git
 # Output: ~/Developer/sources/gitlab/group/project
 ```
 
 ---
 
-### 2. `sgw add <branch> [worktree_name] [--create-branch|-c]`
+### 2. `gww add <branch> [worktree_name] [--create-branch|-c]`
 
 **Purpose**: Add a worktree for the specified branch, optionally with a name. Can create branch from current commit if it doesn't exist.
 
@@ -99,25 +99,25 @@ sgw clone git@gitlab.com:group/project.git
 **Examples**:
 ```bash
 cd ~/Developer/sources/github/user/repo
-sgw add feature-branch
+gww add feature-branch
 # Output: ~/Developer/worktrees/github/user/repo/feature-branch
 
-sgw add feature-branch my-feature
+gww add feature-branch my-feature
 # Output: ~/Developer/worktrees/github/user/repo/my-feature-feature-branch
 
-sgw add new-feature -c
+gww add new-feature -c
 # Creates branch 'new-feature' from current commit, then adds worktree
 # Output: ~/Developer/worktrees/github/user/repo/new-feature
 
 cd ~/Developer/worktrees/github/user/repo/other-branch
-sgw add another-feature -c
+gww add another-feature -c
 # Creates branch 'another-feature' from commit in 'other-branch' worktree
 # Output: ~/Developer/worktrees/github/user/repo/another-feature
 ```
 
 ---
 
-### 3. `sgw remove <branch_or_path> [--force]`
+### 3. `gww remove <branch_or_path> [--force]`
 
 **Purpose**: Remove a worktree by branch name or path.
 
@@ -156,16 +156,16 @@ sgw add another-feature -c
 **Examples**:
 ```bash
 cd ~/Developer/sources/github/user/repo
-sgw remove feature-branch
+gww remove feature-branch
 # Output: Removed worktree: ~/Developer/worktrees/github/user/repo/feature-branch
 
-sgw remove ~/Developer/worktrees/github/user/repo/feature-branch --force
+gww remove ~/Developer/worktrees/github/user/repo/feature-branch --force
 # Output: Removed worktree: ~/Developer/worktrees/github/user/repo/feature-branch
 ```
 
 ---
 
-### 4. `sgw pull`
+### 4. `gww pull`
 
 **Purpose**: Update the source repository by pulling from remote (if clean and on main/master).
 
@@ -199,17 +199,17 @@ sgw remove ~/Developer/worktrees/github/user/repo/feature-branch --force
 **Examples**:
 ```bash
 cd ~/Developer/sources/github/user/repo
-sgw pull
+gww pull
 # Output: Updated source repository: ~/Developer/sources/github/user/repo
 
 cd ~/Developer/worktrees/github/user/repo/feature-branch
-sgw pull
+gww pull
 # Output: Updated source repository: ~/Developer/sources/github/user/repo
 ```
 
 ---
 
-### 5. `sgw migrate <old_repos> [--dry-run] [--move]`
+### 5. `gww migrate <old_repos> [--dry-run] [--move]`
 
 **Purpose**: Scan old repositories directory and migrate them to new locations based on current configuration.
 
@@ -244,13 +244,13 @@ sgw pull
 
 **Examples**:
 ```bash
-sgw migrate ~/old-repos --dry-run
+gww migrate ~/old-repos --dry-run
 # Output:
 # Would migrate 5 repositories:
 #   ~/old-repos/repo1 -> ~/Developer/sources/github/user/repo1
 #   ...
 
-sgw migrate ~/old-repos --move
+gww migrate ~/old-repos --move
 # Output:
 # Migrated 5 repositories
 # Moved 3 worktrees
@@ -258,7 +258,7 @@ sgw migrate ~/old-repos --move
 
 ---
 
-### 6. `sgw init config`
+### 6. `gww init config`
 
 **Purpose**: Create a default configuration file with examples and documentation.
 
@@ -267,7 +267,7 @@ sgw migrate ~/old-repos --move
 **Options**: None
 
 **Behavior**:
-1. Determine config file path: `$XDG_CONFIG_HOME/sgw/config.yml` (or platform equivalent, following XDG and OS defaults)
+1. Determine config file path: `$XDG_CONFIG_HOME/gww/config.yml` (or platform equivalent, following XDG and OS defaults)
 2. Check if config file already exists
 3. If exists:
    - Print warning: "Config file already exists at <path>. Not overwriting."
@@ -293,13 +293,13 @@ sgw migrate ~/old-repos --move
 
 **Examples**:
 ```bash
-sgw init config
-# Output: Created config file: ~/.config/sgw/config.yml
+gww init config
+# Output: Created config file: ~/.config/gww/config.yml
 ```
 
 ---
 
-### 7. `sgw init shell <shell>`
+### 7. `gww init shell <shell>`
 
 **Purpose**: Generate and install shell autocompletion script.
 
@@ -315,9 +315,9 @@ sgw init config
    - `zsh`: `parser.get_zsh_complete()`
    - `fish`: `parser.get_fish_complete()`
 3. Determine installation location:
-   - `bash`: `~/.bash_completion.d/sgw` or system directory
-   - `zsh`: `~/.zsh/completions/_sgw` or `$fpath/_sgw`
-   - `fish`: `~/.config/fish/completions/sgw.fish`
+   - `bash`: `~/.bash_completion.d/gww` or system directory
+   - `zsh`: `~/.zsh/completions/_gww` or `$fpath/_gww`
+   - `fish`: `~/.config/fish/completions/gww.fish`
 4. Write completion script to installation location
 5. Print installation instructions if manual sourcing needed
 6. Report success
@@ -333,16 +333,16 @@ sgw init config
 
 **Examples**:
 ```bash
-sgw init shell bash
+gww init shell bash
 # Output:
-# Installed bash completion script: ~/.bash_completion.d/sgw
-# To activate, run: source ~/.bash_completion.d/sgw
-# Or add to ~/.bashrc: source ~/.bash_completion.d/sgw
+# Installed bash completion script: ~/.bash_completion.d/gww
+# To activate, run: source ~/.bash_completion.d/gww
+# Or add to ~/.bashrc: source ~/.bash_completion.d/gww
 
-sgw init shell fish
+gww init shell fish
 # Output:
-# Installed fish completion script: ~/.config/fish/completions/sgw.fish
-# Restart fish shell or run: source ~/.config/fish/completions/sgw.fish
+# Installed fish completion script: ~/.config/fish/completions/gww.fish
+# Restart fish shell or run: source ~/.config/fish/completions/gww.fish
 ```
 
 ---
@@ -387,4 +387,4 @@ All commands support shell completion for:
 - Options (`--force`, `--dry-run`, etc.)
 - File paths (where applicable)
 
-Completion is generated via `sgw init shell <shell>` and uses argparse's built-in completion generation.
+Completion is generated via `gww init shell <shell>` and uses argparse's built-in completion generation.

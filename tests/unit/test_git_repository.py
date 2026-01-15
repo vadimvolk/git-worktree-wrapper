@@ -1,10 +1,10 @@
-"""Unit tests for git repository operations in src/sgw/git/repository.py."""
+"""Unit tests for git repository operations in src/gww/git/repository.py."""
 
 import pytest
 import subprocess
 from pathlib import Path
 
-from sgw.git.repository import (
+from gww.git.repository import (
     GitError,
     NotGitRepositoryError,
     GitCommandError,

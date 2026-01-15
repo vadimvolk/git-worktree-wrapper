@@ -6,13 +6,13 @@ import argparse
 import sys
 from pathlib import Path
 
-from sgw.git.repository import (
+from gww.git.repository import (
     GitCommandError,
     NotGitRepositoryError,
     detect_repository,
     get_source_repository,
 )
-from sgw.git.worktree import (
+from gww.git.worktree import (
     WorktreeDirtyError,
     WorktreeNotFoundError,
     find_worktree_by_branch,

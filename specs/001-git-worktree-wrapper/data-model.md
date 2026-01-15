@@ -9,7 +9,7 @@ This document defines the core entities, their relationships, validation rules, 
 
 ### 1. Configuration (Config)
 
-Represents the YAML configuration file (`config.yml` in `$XDG_CONFIG_HOME/sgw/`) that defines path templates, source routing rules, and project actions.
+Represents the YAML configuration file (`config.yml` in `$XDG_CONFIG_HOME/gww/`) that defines path templates, source routing rules, and project actions.
 
 **Attributes**:
 - `default_sources` (str, required): Template string for default source checkout location
@@ -245,21 +245,21 @@ TemplateContext
 ### Repository Lifecycle
 
 1. **Source Repository**:
-   - Created: `sgw clone <uri>` → repository cloned to source location
-   - Updated: `sgw pull` → source repository updated if clean and on main/master
-   - Removed: Manual deletion (not managed by sgw)
+   - Created: `gww clone <uri>` → repository cloned to source location
+   - Updated: `gww pull` → source repository updated if clean and on main/master
+   - Removed: Manual deletion (not managed by gww)
 
 2. **Worktree Lifecycle**:
-   - Created: `sgw add <branch> [name]` → worktree added at computed location
-   - Removed: `sgw remove <branch|path> [--force]` → worktree removed if clean (or forced)
-   - Updated: Via `sgw pull` (updates source, which affects worktrees)
+   - Created: `gww add <branch> [name]` → worktree added at computed location
+   - Removed: `gww remove <branch|path> [--force]` → worktree removed if clean (or forced)
+   - Updated: Via `gww pull` (updates source, which affects worktrees)
 
 ### Configuration Lifecycle
 
-1. **Loaded**: On first command execution, config loaded from `$XDG_CONFIG_HOME/sgw/config.yml` (or platform equivalent)
+1. **Loaded**: On first command execution, config loaded from `$XDG_CONFIG_HOME/gww/config.yml` (or platform equivalent)
 2. **Validated**: Syntax and structure validated on load
-3. **Cached**: Config cached in memory for the duration of the `sgw` command execution (no file change detection)
-4. **Modified**: Via `sgw init config` (creates new default config)
+3. **Cached**: Config cached in memory for the duration of the `gww` command execution (no file change detection)
+4. **Modified**: Via `gww init config` (creates new default config)
 
 ## Validation Rules Summary
 

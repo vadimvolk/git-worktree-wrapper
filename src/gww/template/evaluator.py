@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 from simpleeval import EvalWithCompoundTypes, FunctionNotDefined, NameNotDefined
 
-from sgw.template.functions import TemplateContext, create_function_registry
+from gww.template.functions import TemplateContext, create_function_registry
 
 
 class TemplateError(Exception):

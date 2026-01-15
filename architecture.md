@@ -1,8 +1,8 @@
 # Git worktree wrapper with additional fuctions
-Name of console command is sgw
+Name of console command is gww
 
 # Configuration
-Works with configuration file sgw.yml located in $XDG_CONFIG_HOME compliant manner
+Works with configuration file gww.yml located in $XDG_CONFIG_HOME compliant manner
 
 ## Config example
 ```yml
@@ -55,22 +55,22 @@ projects:
 ```
 
 # Commands:
-sgw clone <uri> - find proper location for new source and checkout there. Then analyze result with projects and execute source_actions for any project with matched predicate
+gww clone <uri> - find proper location for new source and checkout there. Then analyze result with projects and execute source_actions for any project with matched predicate
 
-sgw add <branch> [worktree name] - must executed inside a source or worktree folder. Add a worktree for branch with optional name. To get destination folder uses settings file
+gww add <branch> [worktree name] - must executed inside a source or worktree folder. Add a worktree for branch with optional name. To get destination folder uses settings file
 
-sgw remove <branch|worktree folder> [--force] - remove worktree folder by branch name or folder location. If force specified ignore that worktree is not clean, otherwise show error for not clean worktrees
+gww remove <branch|worktree folder> [--force] - remove worktree folder by branch name or folder location. If force specified ignore that worktree is not clean, otherwise show error for not clean worktrees
 
-sgw pull - check that sources has main / master branch checkout, it's clean and if it is execute git pull. Can be executed from source or worktree folder. If executed from inside worktree folder will update source folder
+gww pull - check that sources has main / master branch checkout, it's clean and if it is execute git pull. Can be executed from source or worktree folder. If executed from inside worktree folder will update source folder
 
-sgw migrate <old-repos> [--dry-run] [--move] - scan old-repos folder, check it against current config and if location is incorrent copy (default) or move (if --move specified) to new position
+gww migrate <old-repos> [--dry-run] [--move] - scan old-repos folder, check it against current config and if location is incorrent copy (default) or move (if --move specified) to new position
 
-sgw init config - create default settings file, sgw.yml in $XDG_CONFIG_HOME compliant location. Came up with simple config with default_sources and default_worktrees filled and large comment block with examples covering other cases and function with documentation. 
+gww init config - create default settings file, gww.yml in $XDG_CONFIG_HOME compliant location. Came up with simple config with default_sources and default_worktrees filled and large comment block with examples covering other cases and function with documentation. 
 
-sgw init shell [fishshell|zsh|bash] generate autocompletion for specific shell. Should be able to complete params including local and remote branches, worktree folders and other params like: --force, --dry-run and so on
+gww init shell [fishshell|zsh|bash] generate autocompletion for specific shell. Should be able to complete params including local and remote branches, worktree folders and other params like: --force, --dry-run and so on
 
 # Common technical solutions:
-## Use uv for dependencies management and installing sgw script in target system
+## Use uv for dependencies management and installing gww script in target system
 ## Use type hints for all function arguments and return values
 ## Use simpleeval library for predicate and templates evaluation
 ## Customize simpleeval for strict check of function argument count and it's types. Show readable error message if failed

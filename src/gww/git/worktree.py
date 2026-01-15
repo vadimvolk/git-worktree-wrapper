@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from sgw.git.repository import GitCommandError, _run_git, get_repository_root, is_worktree
+from gww.git.repository import GitCommandError, _run_git, get_repository_root, is_worktree
 
 
 class WorktreeError(Exception):

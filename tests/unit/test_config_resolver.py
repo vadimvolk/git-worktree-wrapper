@@ -1,18 +1,18 @@
-"""Unit tests for configuration resolver in src/sgw/config/resolver.py."""
+"""Unit tests for configuration resolver in src/gww/config/resolver.py."""
 
 import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-from sgw.config.resolver import (
+from gww.config.resolver import (
     ResolverError,
     find_matching_source_rule,
     resolve_source_path,
     resolve_worktree_path,
     get_source_path_for_worktree,
 )
-from sgw.config.validator import Config, SourceRule
-from sgw.utils.uri import parse_uri
+from gww.config.validator import Config, SourceRule
+from gww.utils.uri import parse_uri
 
 
 class TestFindMatchingSourceRule:

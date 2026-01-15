@@ -1,11 +1,11 @@
-# Specification: Git Worktree Wrapper (sgw)
+# Specification: Git Worktree Wrapper (gww)
 
 **Date**: 2025-01-27  
 **Input**: Architecture specification from `/architecture.md` and CLI contracts from `/contracts/cli-commands.md`
 
 ## Overview
 
-Build a CLI tool `sgw` that wraps git worktree functionality with configurable path templates, predicate-based routing, and project-specific actions. The tool uses YAML configuration with template evaluation for dynamic path generation, supports multiple git hosting providers, and provides commands for cloning, worktree management, migration, and shell autocompletion.
+Build a CLI tool `gww` that wraps git worktree functionality with configurable path templates, predicate-based routing, and project-specific actions. The tool uses YAML configuration with template evaluation for dynamic path generation, supports multiple git hosting providers, and provides commands for cloning, worktree management, migration, and shell autocompletion.
 
 ## Functional Requirements
 
@@ -15,7 +15,7 @@ Build a CLI tool `sgw` that wraps git worktree functionality with configurable p
 Users can clone repositories to configurable source locations based on URI predicates, with project-specific actions executed after clone.
 
 **Acceptance Criteria**:
-- Command: `sgw clone <uri>`
+- Command: `gww clone <uri>`
 - Parse URI to extract protocol, host, port, and path segments
 - Evaluate source rules (predicates) to find matching rule or use default
 - Resolve `sources` template to get absolute checkout path
@@ -28,10 +28,10 @@ Users can clone repositories to configurable source locations based on URI predi
 
 **Examples**:
 ```bash
-sgw clone https://github.com/user/repo.git
+gww clone https://github.com/user/repo.git
 # Output: ~/Developer/sources/github/user/repo
 
-sgw clone git@gitlab.com:group/project.git
+gww clone git@gitlab.com:group/project.git
 # Output: ~/Developer/sources/gitlab/group/project
 ```
 
@@ -43,7 +43,7 @@ sgw clone git@gitlab.com:group/project.git
 Users can add worktrees for branches with configurable paths, optional names, and project-specific actions executed after worktree creation.
 
 **Acceptance Criteria**:
-- Command: `sgw add <branch> [worktree_name] [--create-branch|-c]`
+- Command: `gww add <branch> [worktree_name] [--create-branch|-c]`
 - Detect current repository (source or worktree)
 - If in worktree, resolve to source repository
 - Check if branch exists in source repository (local or remote)
@@ -58,13 +58,13 @@ Users can add worktrees for branches with configurable paths, optional names, an
 **Examples**:
 ```bash
 cd ~/Developer/sources/github/user/repo
-sgw add feature-branch
+gww add feature-branch
 # Output: ~/Developer/worktrees/github/user/repo/feature-branch
 
-sgw add feature-branch my-feature
+gww add feature-branch my-feature
 # Output: ~/Developer/worktrees/github/user/repo/my-feature-feature-branch
 
-sgw add new-feature -c
+gww add new-feature -c
 # Creates branch 'new-feature' from current commit, then adds worktree
 ```
 
@@ -76,7 +76,7 @@ sgw add new-feature -c
 Users can remove worktrees by branch name or path, with safety checks for dirty worktrees and force option.
 
 **Acceptance Criteria**:
-- Command: `sgw remove <branch_or_path> [--force]`
+- Command: `gww remove <branch_or_path> [--force]`
 - Accept branch name or absolute path to worktree
 - If branch name: detect current repository and find worktree for branch
 - If absolute path: verify path is a valid worktree
@@ -91,10 +91,10 @@ Users can remove worktrees by branch name or path, with safety checks for dirty 
 **Examples**:
 ```bash
 cd ~/Developer/sources/github/user/repo
-sgw remove feature-branch
+gww remove feature-branch
 # Output: Removed worktree: ~/Developer/worktrees/github/user/repo/feature-branch
 
-sgw remove ~/Developer/worktrees/github/user/repo/feature-branch --force
+gww remove ~/Developer/worktrees/github/user/repo/feature-branch --force
 ```
 
 ---
@@ -105,7 +105,7 @@ sgw remove ~/Developer/worktrees/github/user/repo/feature-branch --force
 Users can update source repositories by pulling from remote, with safety checks for branch (main/master) and clean state.
 
 **Acceptance Criteria**:
-- Command: `sgw pull`
+- Command: `gww pull`
 - Detect current repository (source or worktree)
 - If in worktree, resolve to source repository
 - Verify source repository is on `main` or `master` branch
@@ -120,11 +120,11 @@ Users can update source repositories by pulling from remote, with safety checks 
 **Examples**:
 ```bash
 cd ~/Developer/sources/github/user/repo
-sgw pull
+gww pull
 # Output: Updated source repository: ~/Developer/sources/github/user/repo
 
 cd ~/Developer/worktrees/github/user/repo/feature-branch
-sgw pull
+gww pull
 # Output: Updated source repository: ~/Developer/sources/github/user/repo
 ```
 
@@ -136,7 +136,7 @@ sgw pull
 Users can migrate existing repositories from old locations to new locations based on current configuration.
 
 **Acceptance Criteria**:
-- Command: `sgw migrate <old_repos> [--dry-run] [--move]`
+- Command: `gww migrate <old_repos> [--dry-run] [--move]`
 - Verify `old_repos` path exists and is a directory
 - Recursively scan directory tree for git repositories
 - For each repository found:
@@ -153,13 +153,13 @@ Users can migrate existing repositories from old locations to new locations base
 
 **Examples**:
 ```bash
-sgw migrate ~/old-repos --dry-run
+gww migrate ~/old-repos --dry-run
 # Output:
 # Would migrate 5 repositories:
 #   ~/old-repos/repo1 -> ~/Developer/sources/github/user/repo1
 #   ...
 
-sgw migrate ~/old-repos --move
+gww migrate ~/old-repos --move
 # Output:
 # Migrated 5 repositories
 # Moved 3 worktrees
@@ -173,8 +173,8 @@ sgw migrate ~/old-repos --move
 Users can create a default configuration file with examples and documentation.
 
 **Acceptance Criteria**:
-- Command: `sgw init config`
-- Determine config file path: `$XDG_CONFIG_HOME/sgw/config.yml` (or platform equivalent)
+- Command: `gww init config`
+- Determine config file path: `$XDG_CONFIG_HOME/gww/config.yml` (or platform equivalent)
 - Check if config file already exists
 - If exists: print warning and exit with code 1
 - Create config directory if needed
@@ -191,8 +191,8 @@ Users can create a default configuration file with examples and documentation.
 
 **Examples**:
 ```bash
-sgw init config
-# Output: Created config file: ~/.config/sgw/config.yml
+gww init config
+# Output: Created config file: ~/.config/gww/config.yml
 ```
 
 ---
@@ -203,13 +203,13 @@ sgw init config
 Users can generate and install shell autocompletion scripts for bash, zsh, and fish.
 
 **Acceptance Criteria**:
-- Command: `sgw init shell <shell>`
+- Command: `gww init shell <shell>`
 - Validate shell name (must be bash, zsh, or fish)
 - Generate completion script using argparse's built-in methods
 - Determine installation location per shell:
-  - `bash`: `~/.bash_completion.d/sgw`
-  - `zsh`: `~/.zsh/completions/_sgw` or `$fpath/_sgw`
-  - `fish`: `~/.config/fish/completions/sgw.fish`
+  - `bash`: `~/.bash_completion.d/gww`
+  - `zsh`: `~/.zsh/completions/_gww` or `$fpath/_gww`
+  - `fish`: `~/.config/fish/completions/gww.fish`
 - Write completion script to installation location
 - Print installation instructions if manual sourcing needed
 - Support dynamic completion for:
@@ -224,11 +224,11 @@ Users can generate and install shell autocompletion scripts for bash, zsh, and f
 
 **Examples**:
 ```bash
-sgw init shell bash
+gww init shell bash
 # Output:
-# Installed bash completion script: ~/.bash_completion.d/sgw
-# To activate, run: source ~/.bash_completion.d/sgw
-# Or add to ~/.bashrc: source ~/.bash_completion.d/sgw
+# Installed bash completion script: ~/.bash_completion.d/gww
+# To activate, run: source ~/.bash_completion.d/gww
+# Or add to ~/.bashrc: source ~/.bash_completion.d/gww
 ```
 
 ---
@@ -254,7 +254,7 @@ sgw init shell bash
 - Target platform: Unix-like systems (Linux, macOS) with git installed
 
 ### NFR5: Configuration
-- Configuration file: `sgw.yml` in `$XDG_CONFIG_HOME/sgw/` (or platform equivalent)
+- Configuration file: `gww.yml` in `$XDG_CONFIG_HOME/gww/` (or platform equivalent)
 - Support for configurable path templates with function evaluation
 - Support for predicate-based routing for multiple git hosting providers
 - Support for project-specific action hooks
@@ -270,7 +270,7 @@ sgw init shell bash
 
 ### EC2: Missing Configuration
 - Handle missing config file gracefully
-- Provide clear error message directing user to run `sgw init config`
+- Provide clear error message directing user to run `gww init config`
 
 ### EC3: Dirty Worktrees
 - Prevent removal of dirty worktrees without `--force`

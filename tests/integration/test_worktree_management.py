@@ -5,9 +5,9 @@ import subprocess
 import os
 from pathlib import Path
 
-from sgw.cli.commands.add import run_add
-from sgw.cli.commands.remove import run_remove
-from sgw.cli.commands.pull import run_pull
+from gww.cli.commands.add import run_add
+from gww.cli.commands.remove import run_remove
+from gww.cli.commands.pull import run_pull
 
 
 @pytest.fixture
@@ -54,11 +54,11 @@ def git_repo_with_remote(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path
 def config_dir(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create a temporary config directory and patch get_config_path."""
     config_path = tmp_path_factory.mktemp("config")
-    test_config_file = config_path / "sgw" / "config.yml"
+    test_config_file = config_path / "gww" / "config.yml"
     
     # Patch get_config_path in all modules that import it
-    monkeypatch.setattr("sgw.utils.xdg.get_config_path", lambda appname="sgw": test_config_file)
-    monkeypatch.setattr("sgw.config.loader.get_config_path", lambda: test_config_file)
+    monkeypatch.setattr("gww.utils.xdg.get_config_path", lambda appname="gww": test_config_file)
+    monkeypatch.setattr("gww.config.loader.get_config_path", lambda: test_config_file)
     
     return config_path
 
@@ -83,7 +83,7 @@ class TestAddWorktreeCommand:
         local, _ = git_repo_with_remote
 
         # Create config
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: ~/sources
@@ -118,7 +118,7 @@ default_worktrees: {worktree_dir}/norm_branch()
         """Test adding worktree with branch creation."""
         local, _ = git_repo_with_remote
 
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: ~/sources
@@ -150,7 +150,7 @@ default_worktrees: {worktree_dir}/norm_branch()
         """Test adding named worktree."""
         local, _ = git_repo_with_remote
 
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: ~/sources
@@ -183,7 +183,7 @@ default_worktrees: {worktree_dir}/norm_prefix_branch()
         """Test that add fails for nonexistent branch without --create-branch."""
         local, _ = git_repo_with_remote
 
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: ~/sources
@@ -211,7 +211,7 @@ default_worktrees: {worktree_dir}/norm_branch()
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test that add fails when not in a git repository."""
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: ~/sources

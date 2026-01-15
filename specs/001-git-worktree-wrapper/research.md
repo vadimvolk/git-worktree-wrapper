@@ -70,9 +70,9 @@ yaml = YAML(typ='rt')  # round-trip mode
 yaml.preserve_quotes = True
 yaml.indent(mapping=2, sequence=4, offset=2)
 
-data = yaml.load(open('sgw.yml'))
+data = yaml.load(open('gww.yml'))
 # ... modify data ...
-yaml.dump(data, open('sgw.yml', 'w'))
+yaml.dump(data, open('gww.yml', 'w'))
 ```
 
 ### Alternatives Considered
@@ -104,7 +104,7 @@ import os
 from pathlib import Path
 import sys
 
-def user_config_dir(appname: str = "sgw") -> Path:
+def user_config_dir(appname: str = "gww") -> Path:
     """Return cross-platform config directory following XDG/OS conventions."""
     home = Path.home()
     
@@ -129,9 +129,9 @@ def get_config_path() -> Path:
 ```
 
 ### Behavior
-- **Linux**: Uses `$XDG_CONFIG_HOME` if set and absolute, otherwise `~/.config/sgw/config.yml`
-- **macOS**: Uses `~/Library/Application Support/sgw/config.yml`
-- **Windows**: Uses `%APPDATA%\sgw\config.yml` (or `~/AppData/Roaming/sgw/config.yml`)
+- **Linux**: Uses `$XDG_CONFIG_HOME` if set and absolute, otherwise `~/.config/gww/config.yml`
+- **macOS**: Uses `~/Library/Application Support/gww/config.yml`
+- **Windows**: Uses `%APPDATA%\gww\config.yml` (or `~/AppData/Roaming/gww/config.yml`)
 
 ### Alternatives Considered
 - **platformdirs library**: Considered but adds dependency. Rejected per minimalism principle - standard library is sufficient.
@@ -141,8 +141,8 @@ def get_config_path() -> Path:
 ### Notes
 - Must validate that `XDG_CONFIG_HOME` is absolute if set
 - Fallback to `~/.config` if `XDG_CONFIG_HOME` is unset or invalid
-- Config file location: `{user_config_dir()}/config.yml` where `user_config_dir()` returns `{XDG_CONFIG_HOME}/sgw` or platform equivalent
-- Config is cached in memory only during `sgw` command execution (no file change detection needed)
+- Config file location: `{user_config_dir()}/config.yml` where `user_config_dir()` returns `{XDG_CONFIG_HOME}/gww` or platform equivalent
+- Config is cached in memory only during `gww` command execution (no file change detection needed)
 
 ---
 
@@ -217,7 +217,7 @@ Use argparse's built-in completion generation methods (`get_bash_complete()`, `g
 - **No external dependency**: Built into argparse (Python 3.8+)
 - **Multi-shell support**: Native support for bash, zsh, fish
 - **Static + dynamic**: Can generate static scripts and add dynamic completers
-- **Simple integration**: `sgw init shell` command can generate and install scripts
+- **Simple integration**: `gww init shell` command can generate and install scripts
 - **Maintainable**: Standard approach, well-documented
 
 ### Implementation Approach
@@ -242,9 +242,9 @@ def generate_completion(shell: str) -> str:
    - Ensure completers are fast (minimal imports, cache if needed)
 
 3. **Installation**:
-   - Bash: `~/.bash_completion.d/sgw` or system directory
-   - Zsh: `$fpath/_sgw` or `~/.zsh/completions/_sgw`
-   - Fish: `~/.config/fish/completions/sgw.fish`
+   - Bash: `~/.bash_completion.d/gww` or system directory
+   - Zsh: `$fpath/_gww` or `~/.zsh/completions/_gww`
+   - Fish: `~/.config/fish/completions/gww.fish`
 
 ### Comparison with Alternatives
 

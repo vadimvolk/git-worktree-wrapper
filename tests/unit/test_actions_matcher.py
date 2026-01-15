@@ -1,16 +1,16 @@
-"""Unit tests for project action matching and execution in src/sgw/actions/matcher.py."""
+"""Unit tests for project action matching and execution in src/gww/actions/matcher.py."""
 
 import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-from sgw.actions.matcher import (
+from gww.actions.matcher import (
     MatcherError,
     find_matching_projects,
     get_source_actions,
     get_worktree_actions,
 )
-from sgw.config.validator import Action, ProjectRule
+from gww.config.validator import Action, ProjectRule
 
 
 class TestFindMatchingProjects:

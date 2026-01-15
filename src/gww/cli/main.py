@@ -6,7 +6,7 @@ import argparse
 import sys
 from typing import Optional, Sequence
 
-from sgw import __version__
+from gww import __version__
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -16,9 +16,9 @@ def create_parser() -> argparse.ArgumentParser:
         Configured ArgumentParser.
     """
     parser = argparse.ArgumentParser(
-        prog="sgw",
+        prog="gww",
         description="Git Worktree Wrapper - manage git worktrees with configurable paths",
-        epilog="Run 'sgw <command> --help' for more information on a specific command.",
+        epilog="Run 'gww <command> --help' for more information on a specific command.",
     )
 
     parser.add_argument(
@@ -159,7 +159,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    """Main entry point for sgw CLI.
+    """Main entry point for gww CLI.
 
     Args:
         argv: Command line arguments (defaults to sys.argv[1:]).
@@ -177,23 +177,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # Import and run command handlers
     try:
         if args.command == "clone":
-            from sgw.cli.commands.clone import run_clone
+            from gww.cli.commands.clone import run_clone
             return run_clone(args)
 
         elif args.command == "add":
-            from sgw.cli.commands.add import run_add
+            from gww.cli.commands.add import run_add
             return run_add(args)
 
         elif args.command == "remove":
-            from sgw.cli.commands.remove import run_remove
+            from gww.cli.commands.remove import run_remove
             return run_remove(args)
 
         elif args.command == "pull":
-            from sgw.cli.commands.pull import run_pull
+            from gww.cli.commands.pull import run_pull
             return run_pull(args)
 
         elif args.command == "migrate":
-            from sgw.cli.commands.migrate import run_migrate
+            from gww.cli.commands.migrate import run_migrate
             return run_migrate(args)
 
         elif args.command == "init":
@@ -203,11 +203,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 return 0
 
             if args.init_command == "config":
-                from sgw.cli.commands.init import run_init_config
+                from gww.cli.commands.init import run_init_config
                 return run_init_config(args)
 
             elif args.init_command == "shell":
-                from sgw.cli.commands.init import run_init_shell
+                from gww.cli.commands.init import run_init_shell
                 return run_init_shell(args)
 
         else:

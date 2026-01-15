@@ -1,1 +1,1 @@
-"""Test suite for sgw."""
+"""Test suite for gww."""

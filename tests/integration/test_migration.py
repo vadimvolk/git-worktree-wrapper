@@ -5,7 +5,7 @@ import subprocess
 import os
 from pathlib import Path
 
-from sgw.cli.commands.migrate import run_migrate
+from gww.cli.commands.migrate import run_migrate
 
 
 @pytest.fixture
@@ -92,11 +92,11 @@ def old_repos_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
 def config_dir(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create a temporary config directory and patch get_config_path."""
     config_path = tmp_path_factory.mktemp("config")
-    test_config_file = config_path / "sgw" / "config.yml"
+    test_config_file = config_path / "gww" / "config.yml"
     
     # Patch get_config_path in all modules that import it
-    monkeypatch.setattr("sgw.utils.xdg.get_config_path", lambda appname="sgw": test_config_file)
-    monkeypatch.setattr("sgw.config.loader.get_config_path", lambda: test_config_file)
+    monkeypatch.setattr("gww.utils.xdg.get_config_path", lambda appname="gww": test_config_file)
+    monkeypatch.setattr("gww.config.loader.get_config_path", lambda: test_config_file)
     
     return config_path
 
@@ -118,7 +118,7 @@ class TestMigrateCommand:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test that dry run shows migration plan without making changes."""
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: {target_dir}/default/path(-2)/path(-1)
@@ -156,7 +156,7 @@ sources:
         target_dir: Path,
     ) -> None:
         """Test that migrate copies repositories to new locations."""
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: {target_dir}/default/path(-2)/path(-1)
@@ -195,7 +195,7 @@ sources:
         target_dir: Path,
     ) -> None:
         """Test that migrate with --move moves repositories."""
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: {target_dir}/default/path(-2)/path(-1)
@@ -235,7 +235,7 @@ sources:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test that migrate skips repositories without remote."""
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: {target_dir}/default/path(-1)
@@ -262,7 +262,7 @@ default_worktrees: {target_dir}/worktrees
         target_dir: Path,
     ) -> None:
         """Test that migrate fails for nonexistent source path."""
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: {target_dir}/sources
@@ -307,7 +307,7 @@ default_worktrees: {target_dir}/worktrees
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test that migrate handles empty directory gracefully."""
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: {target_dir}/sources
@@ -335,7 +335,7 @@ default_worktrees: {target_dir}/worktrees
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test migrate with verbose output."""
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: {target_dir}/default/path(-2)/path(-1)

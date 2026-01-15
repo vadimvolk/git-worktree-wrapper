@@ -1,8 +1,8 @@
-"""Unit tests for URI parsing in src/sgw/utils/uri.py."""
+"""Unit tests for URI parsing in src/gww/utils/uri.py."""
 
 import pytest
 
-from sgw.utils.uri import ParsedURI, parse_uri, get_repo_name, get_owner
+from gww.utils.uri import ParsedURI, parse_uri, get_repo_name, get_owner
 
 
 class TestParseURI:

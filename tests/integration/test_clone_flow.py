@@ -6,9 +6,9 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-from sgw.cli.commands.clone import run_clone
-from sgw.config.loader import save_config
-from sgw.utils.xdg import get_config_path
+from gww.cli.commands.clone import run_clone
+from gww.config.loader import save_config
+from gww.utils.xdg import get_config_path
 
 
 @pytest.fixture
@@ -49,11 +49,11 @@ def bare_repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
 def config_dir(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create a temporary config directory and patch get_config_path."""
     config_path = tmp_path_factory.mktemp("config")
-    test_config_file = config_path / "sgw" / "config.yml"
+    test_config_file = config_path / "gww" / "config.yml"
     
     # Patch get_config_path in all modules that import it
-    monkeypatch.setattr("sgw.utils.xdg.get_config_path", lambda appname="sgw": test_config_file)
-    monkeypatch.setattr("sgw.config.loader.get_config_path", lambda: test_config_file)
+    monkeypatch.setattr("gww.utils.xdg.get_config_path", lambda appname="gww": test_config_file)
+    monkeypatch.setattr("gww.config.loader.get_config_path", lambda: test_config_file)
     
     return config_path
 
@@ -75,7 +75,7 @@ class TestCloneCommand:
     ) -> None:
         """Test cloning a repository to the configured location."""
         # Create config
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: {target_dir}/sources/path(-1)
@@ -105,7 +105,7 @@ default_worktrees: {target_dir}/worktrees
     ) -> None:
         """Test cloning with a source rule matching the URI."""
         # Create config with source rule
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: {target_dir}/default/path(-1)
@@ -135,7 +135,7 @@ sources:
         target_dir: Path,
     ) -> None:
         """Test that clone fails for invalid URI."""
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: {target_dir}/sources
@@ -158,7 +158,7 @@ default_worktrees: {target_dir}/worktrees
         target_dir: Path,
     ) -> None:
         """Test that clone fails when destination already exists."""
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: {target_dir}/sources/path(-1)
@@ -203,7 +203,7 @@ default_worktrees: {target_dir}/worktrees
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test clone with verbose output."""
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: {target_dir}/sources/path(-1)
@@ -229,7 +229,7 @@ default_worktrees: {target_dir}/worktrees
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test clone with quiet output."""
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: {target_dir}/sources/path(-1)
@@ -264,7 +264,7 @@ class TestCloneWithProjectActions:
         marker_file = tmp_path / "marker.txt"
         marker_file.write_text("marker content")
 
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
 default_sources: {target_dir}/sources/path(-1)

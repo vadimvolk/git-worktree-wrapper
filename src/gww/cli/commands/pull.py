@@ -6,8 +6,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from sgw.git.branch import is_main_branch
-from sgw.git.repository import (
+from gww.git.branch import is_main_branch
+from gww.git.repository import (
     GitCommandError,
     NotGitRepositoryError,
     detect_repository,

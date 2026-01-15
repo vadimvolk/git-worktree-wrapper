@@ -1,10 +1,10 @@
-"""Unit tests for git worktree operations in src/sgw/git/worktree.py."""
+"""Unit tests for git worktree operations in src/gww/git/worktree.py."""
 
 import pytest
 import subprocess
 from pathlib import Path
 
-from sgw.git.worktree import (
+from gww.git.worktree import (
     WorktreeError,
     WorktreeNotFoundError,
     WorktreeDirtyError,

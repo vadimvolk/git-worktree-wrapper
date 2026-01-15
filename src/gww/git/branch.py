@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from sgw.git.repository import GitCommandError, _run_git
+from gww.git.repository import GitCommandError, _run_git
 
 
 class BranchError(Exception):

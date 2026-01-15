@@ -1,9 +1,9 @@
-"""Unit tests for shell completion generation in src/sgw/utils/shell.py."""
+"""Unit tests for shell completion generation in src/gww/utils/shell.py."""
 
 import pytest
 from pathlib import Path
 
-from sgw.utils.shell import (
+from gww.utils.shell import (
     get_completion_path,
     generate_bash_completion,
     generate_zsh_completion,
@@ -22,7 +22,7 @@ class TestGetCompletionPath:
         path = get_completion_path("bash")
         
         assert ".bash_completion.d" in str(path)
-        assert "sgw" in str(path)
+        assert "gww" in str(path)
 
     def test_returns_zsh_completion_path(self) -> None:
         """Test getting zsh completion path."""
@@ -30,14 +30,14 @@ class TestGetCompletionPath:
         
         assert ".zsh" in str(path)
         assert "completions" in str(path)
-        assert "_sgw" in str(path)
+        assert "_gww" in str(path)
 
     def test_returns_fish_completion_path(self) -> None:
         """Test getting fish completion path."""
         path = get_completion_path("fish")
         
         assert ".config/fish/completions" in str(path)
-        assert "sgw.fish" in str(path)
+        assert "gww.fish" in str(path)
 
     def test_raises_error_for_unsupported_shell(self) -> None:
         """Test that unsupported shell raises ValueError."""
@@ -56,7 +56,7 @@ class TestGenerateBashCompletion:
     def test_includes_completion_function(self) -> None:
         """Test that script includes completion function."""
         script = generate_bash_completion()
-        assert "_sgw_completions" in script
+        assert "_gww_completions" in script
 
     def test_includes_complete_command(self) -> None:
         """Test that script includes complete command."""
@@ -64,7 +64,7 @@ class TestGenerateBashCompletion:
         assert "complete" in script
 
     def test_includes_main_commands(self) -> None:
-        """Test that script includes main sgw commands."""
+        """Test that script includes main gww commands."""
         script = generate_bash_completion()
         assert "clone" in script
         assert "add" in script
@@ -112,10 +112,10 @@ class TestGenerateZshCompletion:
         script = generate_zsh_completion()
         assert "#compdef" in script
 
-    def test_includes_sgw_function(self) -> None:
-        """Test that script includes _sgw function."""
+    def test_includes_gww_function(self) -> None:
+        """Test that script includes _gww function."""
         script = generate_zsh_completion()
-        assert "_sgw" in script
+        assert "_gww" in script
 
     def test_includes_command_descriptions(self) -> None:
         """Test that script includes command descriptions."""
@@ -148,7 +148,7 @@ class TestGenerateFishCompletion:
     def test_includes_complete_commands(self) -> None:
         """Test that script uses fish complete command."""
         script = generate_fish_completion()
-        assert "complete -c sgw" in script
+        assert "complete -c gww" in script
 
     def test_includes_subcommand_completions(self) -> None:
         """Test that script includes subcommand completions."""
@@ -181,7 +181,7 @@ class TestGenerateCompletion:
     def test_generates_bash_completion(self) -> None:
         """Test generating bash completion."""
         script = generate_completion("bash")
-        assert "_sgw_completions" in script
+        assert "_gww_completions" in script
 
     def test_generates_zsh_completion(self) -> None:
         """Test generating zsh completion."""
@@ -191,7 +191,7 @@ class TestGenerateCompletion:
     def test_generates_fish_completion(self) -> None:
         """Test generating fish completion."""
         script = generate_completion("fish")
-        assert "complete -c sgw" in script
+        assert "complete -c gww" in script
 
     def test_raises_error_for_unsupported_shell(self) -> None:
         """Test that unsupported shell raises ValueError."""
@@ -204,18 +204,18 @@ class TestInstallCompletion:
 
     def test_installs_completion_script(self, tmp_path: Path) -> None:
         """Test installing completion script to custom path."""
-        custom_path = tmp_path / "completions" / "sgw"
+        custom_path = tmp_path / "completions" / "gww"
 
         result = install_completion("bash", custom_path)
 
         assert result == custom_path
         assert custom_path.exists()
         content = custom_path.read_text()
-        assert "_sgw_completions" in content
+        assert "_gww_completions" in content
 
     def test_creates_parent_directories(self, tmp_path: Path) -> None:
         """Test that install_completion creates parent directories."""
-        deep_path = tmp_path / "deep" / "nested" / "completions" / "sgw"
+        deep_path = tmp_path / "deep" / "nested" / "completions" / "gww"
 
         result = install_completion("bash", deep_path)
 
@@ -227,7 +227,7 @@ class TestInstallCompletion:
         # Test bash
         bash_path = tmp_path / "bash_completion"
         install_completion("bash", bash_path)
-        assert "_sgw_completions" in bash_path.read_text()
+        assert "_gww_completions" in bash_path.read_text()
 
         # Test zsh
         zsh_path = tmp_path / "zsh_completion"
@@ -237,7 +237,7 @@ class TestInstallCompletion:
         # Test fish
         fish_path = tmp_path / "fish_completion"
         install_completion("fish", fish_path)
-        assert "complete -c sgw" in fish_path.read_text()
+        assert "complete -c gww" in fish_path.read_text()
 
 
 class TestGetInstallationInstructions:
@@ -245,7 +245,7 @@ class TestGetInstallationInstructions:
 
     def test_bash_instructions(self, tmp_path: Path) -> None:
         """Test getting bash installation instructions."""
-        path = tmp_path / "sgw"
+        path = tmp_path / "gww"
         instructions = get_installation_instructions("bash", path)
 
         assert "bash" in instructions.lower()
@@ -254,7 +254,7 @@ class TestGetInstallationInstructions:
 
     def test_zsh_instructions(self, tmp_path: Path) -> None:
         """Test getting zsh installation instructions."""
-        path = tmp_path / "_sgw"
+        path = tmp_path / "_gww"
         instructions = get_installation_instructions("zsh", path)
 
         assert "zsh" in instructions.lower()
@@ -263,7 +263,7 @@ class TestGetInstallationInstructions:
 
     def test_fish_instructions(self, tmp_path: Path) -> None:
         """Test getting fish installation instructions."""
-        path = tmp_path / "sgw.fish"
+        path = tmp_path / "gww.fish"
         instructions = get_installation_instructions("fish", path)
 
         assert "fish" in instructions.lower()

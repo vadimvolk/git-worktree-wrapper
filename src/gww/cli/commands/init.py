@@ -5,14 +5,14 @@ from __future__ import annotations
 import argparse
 import sys
 
-from sgw.config.loader import config_exists, get_default_config, save_config
-from sgw.utils.shell import (
+from gww.config.loader import config_exists, get_default_config, save_config
+from gww.utils.shell import (
     generate_completion,
     get_completion_path,
     get_installation_instructions,
     install_completion,
 )
-from sgw.utils.xdg import get_config_path
+from gww.utils.xdg import get_config_path
 
 
 def run_init_config(args: argparse.Namespace) -> int:

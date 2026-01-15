@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-from sgw.config.validator import ProjectRule
-from sgw.template.evaluator import TemplateError, evaluate_predicate
+from gww.config.validator import ProjectRule
+from gww.template.evaluator import TemplateError, evaluate_predicate
 
 
 class MatcherError(Exception):

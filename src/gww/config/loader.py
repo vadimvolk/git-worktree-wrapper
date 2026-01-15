@@ -8,7 +8,7 @@ from typing import Any, Optional
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 
-from sgw.utils.xdg import get_config_path
+from gww.utils.xdg import get_config_path
 
 
 class ConfigLoadError(Exception):
@@ -124,7 +124,7 @@ DEFAULT_CONFIG_TEMPLATE = """\
 # SGW (Git Worktree Wrapper) Configuration
 # =========================================
 #
-# This file configures how sgw manages your git repositories and worktrees.
+# This file configures how gww manages your git repositories and worktrees.
 # Location: {config_path}
 
 # Default paths for sources (cloned repositories) and worktrees

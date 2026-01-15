@@ -1,1 +1,1 @@
-"""Unit tests for sgw."""
+"""Unit tests for gww."""

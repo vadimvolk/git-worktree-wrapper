@@ -1,4 +1,4 @@
-# SGW - Git Worktree Wrapper
+# GWW - Git Worktree Wrapper
 
 A CLI tool that wraps git worktree functionality with configurable path templates, predicate-based routing, and project-specific actions.
 
@@ -27,15 +27,15 @@ cd git-worktree-wrapper
 # Install with uv
 uv sync
 
-# Run sgw
-uv run sgw --help
+# Run gww
+uv run gww --help
 ```
 
 ### Using pip
 
 ```bash
 pip install .
-sgw --help
+gww --help
 ```
 
 ## Quick Start
@@ -43,15 +43,15 @@ sgw --help
 ### 1. Initialize Configuration
 
 ```bash
-sgw init config
+gww init config
 ```
 
-This creates a default configuration file at `~/.config/sgw/config.yml` (Linux) or `~/Library/Application Support/sgw/config.yml` (macOS).
+This creates a default configuration file at `~/.config/gww/config.yml` (Linux) or `~/Library/Application Support/gww/config.yml` (macOS).
 
 ### 2. Clone a Repository
 
 ```bash
-sgw clone https://github.com/user/repo.git
+gww clone https://github.com/user/repo.git
 # Output: ~/Developer/sources/github/user/repo
 ```
 
@@ -59,21 +59,21 @@ sgw clone https://github.com/user/repo.git
 
 ```bash
 cd ~/Developer/sources/github/user/repo
-sgw add feature-branch
+gww add feature-branch
 # Output: ~/Developer/worktrees/github/user/repo/feature-branch
 ```
 
 ### 4. Remove a Worktree
 
 ```bash
-sgw remove feature-branch
+gww remove feature-branch
 # Output: Removed worktree: ~/Developer/worktrees/github/user/repo/feature-branch
 ```
 
 ### 5. Update Source Repository
 
 ```bash
-sgw pull
+gww pull
 # Output: Updated source repository: ~/Developer/sources/github/user/repo
 ```
 
@@ -119,13 +119,13 @@ projects:
 
 | Command | Description |
 |---------|-------------|
-| `sgw clone <uri>` | Clone repository to configured location |
-| `sgw add <branch> [name] [-c]` | Add worktree for branch (optionally create branch) |
-| `sgw remove <branch\|path> [-f]` | Remove worktree |
-| `sgw pull` | Update source repository |
-| `sgw migrate <path> [--dry-run] [--move]` | Migrate repositories to new locations |
-| `sgw init config` | Create default configuration file |
-| `sgw init shell <shell>` | Install shell completion (bash/zsh/fish) |
+| `gww clone <uri>` | Clone repository to configured location |
+| `gww add <branch> [name] [-c]` | Add worktree for branch (optionally create branch) |
+| `gww remove <branch\|path> [-f]` | Remove worktree |
+| `gww pull` | Update source repository |
+| `gww migrate <path> [--dry-run] [--move]` | Migrate repositories to new locations |
+| `gww init config` | Create default configuration file |
+| `gww init shell <shell>` | Install shell completion (bash/zsh/fish) |
 
 ## Development
 
@@ -148,7 +148,7 @@ uv run pytest tests/integration/
 ### Type Checking
 
 ```bash
-uv run mypy src/sgw
+uv run mypy src/gww
 ```
 
 ## License

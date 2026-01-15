@@ -1,10 +1,10 @@
-"""Unit tests for git branch operations in src/sgw/git/branch.py."""
+"""Unit tests for git branch operations in src/gww/git/branch.py."""
 
 import pytest
 import subprocess
 from pathlib import Path
 
-from sgw.git.branch import (
+from gww.git.branch import (
     BranchError,
     BranchExistsError,
     BranchNotFoundError,

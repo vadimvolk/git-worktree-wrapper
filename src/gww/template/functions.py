@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
-from sgw.utils.uri import ParsedURI
+from gww.utils.uri import ParsedURI
 
 
 @dataclass

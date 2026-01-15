@@ -1,9 +1,9 @@
-"""Unit tests for configuration loading in src/sgw/config/loader.py."""
+"""Unit tests for configuration loading in src/gww/config/loader.py."""
 
 import pytest
 from pathlib import Path
 
-from sgw.config.loader import (
+from gww.config.loader import (
     ConfigLoadError,
     ConfigNotFoundError,
     load_config,

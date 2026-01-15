@@ -1,1 +1,1 @@
-"""Integration tests for sgw."""
+"""Integration tests for gww."""

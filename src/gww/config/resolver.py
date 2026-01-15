@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from sgw.config.validator import Config, SourceRule
-from sgw.template.evaluator import TemplateError, evaluate_predicate, evaluate_template
-from sgw.template.functions import TemplateContext
-from sgw.utils.uri import ParsedURI
+from gww.config.validator import Config, SourceRule
+from gww.template.evaluator import TemplateError, evaluate_predicate, evaluate_template
+from gww.template.functions import TemplateContext
+from gww.utils.uri import ParsedURI
 
 
 class ResolverError(Exception):

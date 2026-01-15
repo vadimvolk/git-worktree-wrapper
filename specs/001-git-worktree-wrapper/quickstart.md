@@ -3,7 +3,7 @@
 **Date**: 2025-01-27  
 **Plan**: `plan.md`
 
-This document provides practical examples, test scenarios, and usage patterns for the `sgw` tool.
+This document provides practical examples, test scenarios, and usage patterns for the `gww` tool.
 
 ## Initial Setup
 
@@ -11,10 +11,10 @@ This document provides practical examples, test scenarios, and usage patterns fo
 
 ```bash
 # Create default configuration file
-sgw init config
+gww init config
 
 # Output:
-# Created config file: ~/.config/sgw/config.yml
+# Created config file: ~/.config/gww/config.yml
 ```
 
 The default config will be created with:
@@ -24,7 +24,7 @@ The default config will be created with:
 
 ### 2. Customize Configuration (Optional)
 
-Edit `~/.config/sgw/config.yml` to add your source routing rules:
+Edit `~/.config/gww/config.yml` to add your source routing rules:
 
 ```yaml
 default_sources: ~/Developer/sources/default/path(-2)/path(-1)
@@ -46,15 +46,15 @@ sources:
 
 ```bash
 # Install bash completion
-sgw init shell bash
-# Then add to ~/.bashrc: source ~/.bash_completion.d/sgw
+gww init shell bash
+# Then add to ~/.bashrc: source ~/.bash_completion.d/gww
 
 # Install zsh completion
-sgw init shell zsh
+gww init shell zsh
 # Then add to ~/.zshrc: fpath=(~/.zsh/completions $fpath)
 
 # Install fish completion
-sgw init shell fish
+gww init shell fish
 # Restart fish shell
 ```
 
@@ -66,7 +66,7 @@ sgw init shell fish
 
 ```bash
 # Clone repository
-sgw clone https://github.com/vadimvolk/ansible.git
+gww clone https://github.com/vadimvolk/ansible.git
 
 # Expected output:
 # ~/Developer/sources/github/vadimvolk/ansible
@@ -78,7 +78,7 @@ git status
 
 **Test Case**:
 - **Given**: No existing repository at expected location
-- **When**: `sgw clone https://github.com/vadimvolk/ansible.git`
+- **When**: `gww clone https://github.com/vadimvolk/ansible.git`
 - **Then**: Repository cloned to `~/Developer/sources/github/vadimvolk/ansible`
 
 ### Workflow 2: Add a Worktree
@@ -90,7 +90,7 @@ git status
 cd ~/Developer/sources/github/vadimvolk/ansible
 
 # Add worktree for feature branch
-sgw add feature/new-ui
+gww add feature/new-ui
 
 # Expected output:
 # ~/Developer/worktrees/github/vadimvolk/ansible/feature-new-ui
@@ -103,7 +103,7 @@ git branch
 
 **Test Case**:
 - **Given**: Source repository at `~/Developer/sources/github/vadimvolk/ansible`
-- **When**: `sgw add feature/new-ui`
+- **When**: `gww add feature/new-ui`
 - **Then**: Worktree created at `~/Developer/worktrees/github/vadimvolk/ansible/feature-new-ui` with branch `feature/new-ui` checked out
 
 ### Workflow 3: Add Named Worktree
@@ -114,7 +114,7 @@ git branch
 cd ~/Developer/sources/github/vadimvolk/ansible
 
 # Add named worktree
-sgw add feature/new-ui ui-work
+gww add feature/new-ui ui-work
 
 # Expected output:
 # ~/Developer/worktrees/github/vadimvolk/ansible/ui-work-feature-new-ui
@@ -126,7 +126,7 @@ git worktree list
 
 **Test Case**:
 - **Given**: Source repository
-- **When**: `sgw add feature/new-ui ui-work`
+- **When**: `gww add feature/new-ui ui-work`
 - **Then**: Worktree created at path using worktree_name in template (worktree remains attached to repository)
 
 ### Workflow 3a: Create Branch from Current Commit
@@ -137,20 +137,20 @@ git worktree list
 cd ~/Developer/sources/github/vadimvolk/ansible
 
 # Create branch from current commit and add worktree
-sgw add new-feature -c
+gww add new-feature -c
 
 # Expected output:
 # ~/Developer/worktrees/github/vadimvolk/ansible/new-feature
 
 # Or from a worktree
 cd ~/Developer/worktrees/github/vadimvolk/ansible/other-branch
-sgw add another-feature -c
+gww add another-feature -c
 # Creates branch from commit in current worktree
 ```
 
 **Test Case**:
 - **Given**: Source repository on commit abc123
-- **When**: `sgw add new-feature -c`
+- **When**: `gww add new-feature -c`
 - **Then**: Branch 'new-feature' created from abc123, worktree added
 
 ### Workflow 4: Remove Worktree
@@ -160,28 +160,28 @@ sgw add another-feature -c
 ```bash
 # Remove by branch name
 cd ~/Developer/sources/github/vadimvolk/ansible
-sgw remove feature/new-ui
+gww remove feature/new-ui
 
 # Expected output:
 # Removed worktree: ~/Developer/worktrees/github/vadimvolk/ansible/feature-new-ui
 
 # Or remove by path
-sgw remove ~/Developer/worktrees/github/vadimvolk/ansible/feature-new-ui
+gww remove ~/Developer/worktrees/github/vadimvolk/ansible/feature-new-ui
 ```
 
 **Test Case - Clean Worktree**:
 - **Given**: Clean worktree at path
-- **When**: `sgw remove feature/new-ui`
+- **When**: `gww remove feature/new-ui`
 - **Then**: Worktree removed successfully
 
 **Test Case - Dirty Worktree**:
 - **Given**: Worktree with uncommitted changes
-- **When**: `sgw remove feature/new-ui` (without --force)
+- **When**: `gww remove feature/new-ui` (without --force)
 - **Then**: Error: "Worktree has uncommitted changes. Use --force to remove anyway."
 
 **Test Case - Force Remove**:
 - **Given**: Dirty worktree
-- **When**: `sgw remove feature/new-ui --force`
+- **When**: `gww remove feature/new-ui --force`
 - **Then**: Worktree removed despite uncommitted changes
 
 ### Workflow 5: Update Source Repository
@@ -191,14 +191,14 @@ sgw remove ~/Developer/worktrees/github/vadimvolk/ansible/feature-new-ui
 ```bash
 # From source repository
 cd ~/Developer/sources/github/vadimvolk/ansible
-sgw pull
+gww pull
 
 # Expected output:
 # Updated source repository: ~/Developer/sources/github/vadimvolk/ansible
 
 # Or from worktree (updates source)
 cd ~/Developer/worktrees/github/vadimvolk/ansible/feature-new-ui
-sgw pull
+gww pull
 
 # Expected output:
 # Updated source repository: ~/Developer/sources/github/vadimvolk/ansible
@@ -206,17 +206,17 @@ sgw pull
 
 **Test Case - Clean on Main**:
 - **Given**: Source repository on `main` branch, clean working directory
-- **When**: `sgw pull`
+- **When**: `gww pull`
 - **Then**: `git pull` executed successfully
 
 **Test Case - Not on Main**:
 - **Given**: Source repository on `develop` branch
-- **When**: `sgw pull`
+- **When**: `gww pull`
 - **Then**: Error: "Source repository must be on 'main' or 'master' branch"
 
 **Test Case - Dirty Repository**:
 - **Given**: Source repository with uncommitted changes
-- **When**: `sgw pull`
+- **When**: `gww pull`
 - **Then**: Error: "Source repository has uncommitted changes. Commit or stash changes first."
 
 ## Advanced Scenarios
@@ -243,19 +243,19 @@ sources:
 **Test Cases**:
 ```bash
 # GitHub repository
-sgw clone https://github.com/user/repo.git
+gww clone https://github.com/user/repo.git
 # → ~/Developer/sources/github/user/repo
 
 # GitLab repository
-sgw clone https://gitlab.com/group/subgroup/project.git
+gww clone https://gitlab.com/group/subgroup/project.git
 # → ~/Developer/sources/gitlab/group/subgroup/project
 
 # Custom organization
-sgw clone https://git.example.com/myorg/project.git
+gww clone https://git.example.com/myorg/project.git
 # → ~/Developer/sources/custom/myorg/project
 
 # Default (no match)
-sgw clone https://other.com/user/repo.git
+gww clone https://other.com/user/repo.git
 # → ~/Developer/sources/default/user/repo
 ```
 
@@ -275,7 +275,7 @@ projects:
 
 **Test Case**:
 - **Given**: Repository with `local.properties` file
-- **When**: `sgw clone <uri>` or `sgw add <branch>`
+- **When**: `gww clone <uri>` or `gww add <branch>`
 - **Then**: 
   - After clone: `local.properties` copied from `~/sources/default-local.properties`
   - After worktree add: `local.properties` copied from source to worktree, then `custom-handler` executed
@@ -286,7 +286,7 @@ projects:
 
 ```bash
 # Dry run to see what would be migrated
-sgw migrate ~/old-repos --dry-run
+gww migrate ~/old-repos --dry-run
 
 # Expected output:
 # Would migrate 3 repositories:
@@ -295,20 +295,20 @@ sgw migrate ~/old-repos --dry-run
 #   ~/old-repos/repo3 -> ~/Developer/sources/default/org/repo3
 
 # Actual migration (copy)
-sgw migrate ~/old-repos
+gww migrate ~/old-repos
 
 # Or move instead of copy
-sgw migrate ~/old-repos --move
+gww migrate ~/old-repos --move
 ```
 
 **Test Case**:
 - **Given**: Old repositories in `~/old-repos` with various origins
-- **When**: `sgw migrate ~/old-repos --dry-run`
+- **When**: `gww migrate ~/old-repos --dry-run`
 - **Then**: List of repositories that would be migrated with old and new paths
 
 **Test Case**:
 - **Given**: Old repositories
-- **When**: `sgw migrate ~/old-repos`
+- **When**: `gww migrate ~/old-repos`
 - **Then**: Repositories copied to new locations based on current config
 
 ## Template Function Examples
@@ -368,10 +368,10 @@ worktrees: ~/worktrees/not_function((my folder))
 
 ```bash
 # Config file has syntax error
-sgw clone https://github.com/user/repo.git
+gww clone https://github.com/user/repo.git
 
 # Expected output (stderr):
-# Error: Invalid YAML in config file ~/.config/sgw/config.yml
+# Error: Invalid YAML in config file ~/.config/gww/config.yml
 # Line 5: unexpected character
 ```
 
@@ -379,7 +379,7 @@ sgw clone https://github.com/user/repo.git
 
 ```bash
 # Invalid git URI
-sgw clone not-a-uri
+gww clone not-a-uri
 
 # Expected output (stderr):
 # Error: Invalid repository URI: not-a-uri
@@ -390,7 +390,7 @@ sgw clone not-a-uri
 ```bash
 # Branch doesn't exist
 cd ~/Developer/sources/github/user/repo
-sgw add nonexistent-branch
+gww add nonexistent-branch
 
 # Expected output (stderr):
 # Error: Branch 'nonexistent-branch' not found in repository
@@ -401,8 +401,8 @@ sgw add nonexistent-branch
 ```bash
 # Worktree for branch already exists
 cd ~/Developer/sources/github/user/repo
-sgw add feature-branch
-sgw add feature-branch  # Again
+gww add feature-branch
+gww add feature-branch  # Again
 
 # Expected output (stderr):
 # Error: Worktree for branch 'feature-branch' already exists at <path>
@@ -414,12 +414,12 @@ sgw add feature-branch  # Again
 
 ```bash
 # 1. Clone repository
-sgw clone https://github.com/user/repo.git
+gww clone https://github.com/user/repo.git
 # → ~/Developer/sources/github/user/repo
 
 # 2. Add worktree
 cd ~/Developer/sources/github/user/repo
-sgw add feature-branch
+gww add feature-branch
 # → ~/Developer/worktrees/github/user/repo/feature-branch
 
 # 3. Work in worktree
@@ -427,12 +427,12 @@ cd ~/Developer/worktrees/github/user/repo/feature-branch
 # ... make changes, commit ...
 
 # 4. Update source
-sgw pull
+gww pull
 # Updates source repository
 
 # 5. Remove worktree when done
 cd ~/Developer/sources/github/user/repo
-sgw remove feature-branch
+gww remove feature-branch
 # Worktree removed
 ```
 
@@ -442,15 +442,15 @@ sgw remove feature-branch
 cd ~/Developer/sources/github/user/repo
 
 # Create multiple worktrees
-sgw add feature-1
-sgw add feature-2
-sgw add feature-3
+gww add feature-1
+gww add feature-2
+gww add feature-3
 
 # List worktrees
 git worktree list
 
 # Remove specific worktree
-sgw remove feature-2
+gww remove feature-2
 ```
 
 ## Performance Expectations
@@ -468,8 +468,8 @@ sgw remove feature-2
 
 ```bash
 # Error: Config file not found
-# Solution: Run sgw init config
-sgw init config
+# Solution: Run gww init config
+gww init config
 ```
 
 ### Template Evaluation Error

@@ -5,21 +5,21 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-from sgw.cli.commands.init import run_init_config, run_init_shell
-from sgw.config.loader import load_config
-from sgw.utils.xdg import get_config_path
+from gww.cli.commands.init import run_init_config, run_init_shell
+from gww.config.loader import load_config
+from gww.utils.xdg import get_config_path
 
 
 @pytest.fixture
 def config_dir(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create a temporary config directory and patch get_config_path."""
     config_path = tmp_path_factory.mktemp("config")
-    test_config_file = config_path / "sgw" / "config.yml"
+    test_config_file = config_path / "gww" / "config.yml"
     
     # Patch get_config_path to return our test path
-    monkeypatch.setattr("sgw.utils.xdg.get_config_path", lambda appname="sgw": test_config_file)
-    monkeypatch.setattr("sgw.config.loader.get_config_path", lambda: test_config_file)
-    monkeypatch.setattr("sgw.cli.commands.init.get_config_path", lambda: test_config_file)
+    monkeypatch.setattr("gww.utils.xdg.get_config_path", lambda appname="gww": test_config_file)
+    monkeypatch.setattr("gww.config.loader.get_config_path", lambda: test_config_file)
+    monkeypatch.setattr("gww.cli.commands.init.get_config_path", lambda: test_config_file)
     
     return config_path
 
@@ -41,7 +41,7 @@ class TestInitConfigCommand:
 
         assert result == 0
         # Verify config was created
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         assert config_path.exists()
 
         # Verify output
@@ -59,7 +59,7 @@ class TestInitConfigCommand:
 
         run_init_config(Args())
 
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         # Should be loadable
         config = load_config(config_path)
         assert "default_sources" in config
@@ -76,7 +76,7 @@ class TestInitConfigCommand:
 
         run_init_config(Args())
 
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         content = config_path.read_text()
 
         # Should contain documentation
@@ -91,7 +91,7 @@ class TestInitConfigCommand:
     ) -> None:
         """Test that init config fails when config already exists."""
         # Create config first
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True)
         config_path.write_text("existing: config")
 
@@ -126,7 +126,7 @@ class TestInitConfigCommand:
         config_dir: Path,
     ) -> None:
         """Test that init config creates parent directories."""
-        # Config dir exists but sgw subdirectory doesn't
+        # Config dir exists but gww subdirectory doesn't
         class Args:
             verbose = 0
             quiet = False
@@ -134,7 +134,7 @@ class TestInitConfigCommand:
         result = run_init_config(Args())
 
         assert result == 0
-        config_path = config_dir / "sgw" / "config.yml"
+        config_path = config_dir / "gww" / "config.yml"
         assert config_path.exists()
 
 
@@ -258,11 +258,11 @@ class TestInitShellCommand:
         run_init_shell(Args())
 
         # Find and read the completion file
-        completion_file = tmp_path / ".bash_completion.d" / "sgw"
+        completion_file = tmp_path / ".bash_completion.d" / "gww"
         assert completion_file.exists()
 
         content = completion_file.read_text()
-        assert "_sgw_completions" in content
+        assert "_gww_completions" in content
         assert "complete" in content
 
     def test_zsh_completion_content_is_valid(
@@ -281,12 +281,12 @@ class TestInitShellCommand:
         run_init_shell(Args())
 
         # Find and read the completion file
-        completion_file = tmp_path / ".zsh" / "completions" / "_sgw"
+        completion_file = tmp_path / ".zsh" / "completions" / "_gww"
         assert completion_file.exists()
 
         content = completion_file.read_text()
         assert "#compdef" in content
-        assert "_sgw" in content
+        assert "_gww" in content
 
     def test_fish_completion_content_is_valid(
         self,
@@ -304,11 +304,11 @@ class TestInitShellCommand:
         run_init_shell(Args())
 
         # Find and read the completion file
-        completion_file = tmp_path / ".config" / "fish" / "completions" / "sgw.fish"
+        completion_file = tmp_path / ".config" / "fish" / "completions" / "gww.fish"
         assert completion_file.exists()
 
         content = completion_file.read_text()
-        assert "complete -c sgw" in content
+        assert "complete -c gww" in content
 
     def test_shows_installation_instructions(
         self,
