@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from gww.utils.uri import ParsedURI
@@ -15,14 +15,14 @@ class TemplateContext:
     Attributes:
         uri: Parsed URI object (for clone operations).
         branch: Git branch name (for worktree operations).
-        worktree_name: Optional worktree name.
         source_path: Source repository path (for worktree operations).
+        tags: Dictionary of tag key-value pairs.
     """
 
     uri: Optional[ParsedURI] = None
     branch: Optional[str] = None
-    worktree_name: Optional[str] = None
     source_path: Optional[str] = None
+    tags: dict[str, str] = field(default_factory=dict)
 
 
 class FunctionRegistry:
@@ -43,10 +43,8 @@ class FunctionRegistry:
         self._functions["path"] = self._path
         self._functions["branch"] = self._branch
         self._functions["norm_branch"] = self._norm_branch
-        self._functions["worktree"] = self._worktree
-        self._functions["prefix_worktree"] = self._prefix_worktree
-        self._functions["prefix_branch"] = self._prefix_branch
-        self._functions["norm_prefix_branch"] = self._norm_prefix_branch
+        self._functions["tag"] = self._tag
+        self._functions["tag_exist"] = self._tag_exist
 
     def get_functions(self) -> dict[str, Callable[..., str]]:
         """Return dictionary of all registered functions.
@@ -107,66 +105,27 @@ class FunctionRegistry:
             raise ValueError("No branch context available for norm_branch() function")
         return self._context.branch.replace("/", replacement)
 
-    def _worktree(self) -> str:
-        """Get worktree name.
-
-        Returns:
-            Worktree name, or empty string if not named.
-        """
-        return self._context.worktree_name or ""
-
-    def _prefix_worktree(self, prefix: str = "-") -> str:
-        """Get worktree name with prefix, or empty string if no name.
+    def _tag(self, name: str) -> str:
+        """Get tag value by name.
 
         Args:
-            prefix: Prefix to prepend to worktree name (default: "-").
+            name: Tag name.
 
         Returns:
-            "{prefix}{worktree_name}" if named, empty string otherwise.
+            Tag value if tag exists with a value, empty string otherwise.
         """
-        if self._context.worktree_name:
-            return f"{prefix}{self._context.worktree_name}"
-        return ""
+        return self._context.tags.get(name, "")
 
-    def _prefix_branch(self, prefix: str = "-") -> str:
-        """Get worktree name + branch, or branch if no name.
+    def _tag_exist(self, name: str) -> bool:
+        """Check if tag exists.
 
         Args:
-            prefix: Prefix to insert between worktree name and branch (default: "-").
+            name: Tag name.
 
         Returns:
-            "{worktree_name}{prefix}{branch}" if named, else "{branch}".
-
-        Raises:
-            ValueError: If no branch context available.
+            True if tag exists (with or without value), False otherwise.
         """
-        if self._context.branch is None:
-            raise ValueError(
-                "No branch context available for prefix_branch() function"
-            )
-
-        if self._context.worktree_name:
-            return f"{self._context.worktree_name}{prefix}{self._context.branch}"
-        return self._context.branch
-
-    def _norm_prefix_branch(self) -> str:
-        """Get worktree name + branch, or normalized branch if no name.
-
-        Returns:
-            "{worktree_name}-{norm_branch}" if named, else "{norm_branch}".
-
-        Raises:
-            ValueError: If no branch context available.
-        """
-        if self._context.branch is None:
-            raise ValueError(
-                "No branch context available for norm_prefix_branch() function"
-            )
-
-        norm = self._context.branch.replace("/", "-")
-        if self._context.worktree_name:
-            return f"{self._context.worktree_name}-{norm}"
-        return norm
+        return name in self._context.tags
 
 
 def create_function_registry(context: TemplateContext) -> dict[str, Callable[..., Any]]:

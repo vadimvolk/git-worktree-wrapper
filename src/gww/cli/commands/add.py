@@ -40,10 +40,10 @@ def run_add(args: argparse.Namespace) -> int:
         Exit code (0 for success, 1 for error, 2 for config error).
     """
     branch = args.branch
-    worktree_name: Optional[str] = getattr(args, "worktree_name", None)
     create_branch_flag = getattr(args, "create_branch", False)
     verbose = getattr(args, "verbose", 0)
     quiet = getattr(args, "quiet", False)
+    tags = getattr(args, "tags", {})
 
     # Get current directory
     cwd = Path.cwd()
@@ -123,7 +123,7 @@ def run_add(args: argparse.Namespace) -> int:
 
     # Resolve worktree path
     try:
-        worktree_path = resolve_worktree_path(config, uri, branch, worktree_name)
+        worktree_path = resolve_worktree_path(config, uri, branch, tags)
     except ResolverError as e:
         print(f"Error resolving worktree path: {e}", file=sys.stderr)
         return 2
@@ -144,7 +144,7 @@ def run_add(args: argparse.Namespace) -> int:
     # Execute worktree actions if any project rules match
     if config.projects:
         try:
-            actions = get_worktree_actions(config.projects, source_path)
+            actions = get_worktree_actions(config.projects, source_path, tags)
             if actions:
                 if verbose > 0 and not quiet:
                     print(

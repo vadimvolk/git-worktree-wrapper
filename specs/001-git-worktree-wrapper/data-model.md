@@ -129,14 +129,12 @@ Represents a git repository (source or worktree).
 - `uri` (str, optional): Original checkout URI (for source repositories)
 - `branch` (str, optional): Current checked-out branch
 - `is_worktree` (bool, required): Whether this is a worktree (not main repository)
-- `worktree_name` (str, optional): Name of worktree (if named)
 - `is_clean` (bool, computed): Whether repository has uncommitted changes
 
 **Validation Rules**:
 - `path` must exist and be a valid git repository
 - `path` must be absolute
 - `is_worktree` must be consistent with `.git` file vs directory
-- `worktree_name` only valid if `is_worktree` is True
 
 **State Transitions**:
 - **Clean → Dirty**: When files are modified, staged, or untracked files added
@@ -154,14 +152,12 @@ Represents a git worktree linked to a source repository.
 **Attributes**:
 - `path` (Path, required): Absolute path to worktree root
 - `branch` (str, required): Branch checked out in worktree
-- `name` (str, optional): Optional worktree name
 - `source_repo` (Path, required): Path to source repository
 - `is_clean` (bool, computed): Whether worktree has uncommitted changes
 
 **Validation Rules**:
 - `path` must exist and be a valid worktree
 - `branch` must exist in source repository (or be created from current commit if `--create-branch` used)
-- `name` is only used for path definition in templates, does not detach worktree from repository
 - `source_repo` must be a valid source repository (not another worktree)
 
 **State Transitions**:
@@ -180,19 +176,20 @@ Represents a git worktree linked to a source repository.
 Context object passed to template evaluator for resolving template variables.
 
 **Attributes**:
-- `uri` (str, optional): Repository URI (for checkout operations)
-- `host` (str, optional): URI hostname
-- `port` (str, optional): URI port, empty string if missing
-- `protocol` (str, optional): URI protocol (http, https, ssh, git, file, etc.)
-- `path_segments` (list[str], optional): URI path segments
-- `branch` (str, optional): Git branch name
-- `worktree_name` (str, optional): Worktree name (if named)
+- `uri` (ParsedURI, optional): Parsed URI object (for checkout operations)
+- `host` (str, optional): URI hostname (derived from `uri` object)
+- `port` (str, optional): URI port, empty string if missing (derived from `uri` object)
+- `protocol` (str, optional): URI protocol (http, https, ssh, git, file, etc.) (derived from `uri` object)
+- `path_segments` (list[str], optional): URI path segments (derived from `uri` object)
+- `branch` (str, optional): Git branch name (for worktree operations)
 - `source_path` (Path, optional): Source repository path (for worktree operations)
+- `tags` (dict[str, str], optional): Dictionary of tag key-value pairs passed via `--tag` CLI option
 
 **Validation Rules**:
 - If `uri` provided, `host` and `path_segments` should be derivable
 - `branch` required for worktree template evaluation
 - `source_path` required for worktree template evaluation
+- Tags are optional and can be empty dictionary
 
 **Relationships**:
 - Used by template evaluator (no persistent relationship)
@@ -205,21 +202,35 @@ Built-in functions available in template expressions.
 
 **Functions**:
 - `path(index: int) -> str`: Get URI path segment by index (0-based, negative for reverse)
-- `path(-1)`: Last path segment
-- `path(-2)`: Second-to-last path segment
+  - `path(-1)`: Last path segment
+  - `path(-2)`: Second-to-last path segment
+  - `path(0)`: First path segment
 - `branch() -> str`: Current branch name (as-is)
 - `norm_branch(replacement: str = "-") -> str`: Branch name with "/" replaced with `replacement` (default: "-")
   - `norm_branch()`: Branch name with "/" replaced with "-"
   - `norm_branch("_")`: Branch name with "/" replaced with "_"
-- `worktree() -> str`: Worktree name, or "" if unnamed
-- `prefix_worktree(prefix: str = "-") -> str`: Returns "" if no worktree name, else "prefix{name}" (default prefix: "-")
-- `prefix_branch(prefix: str = "-") -> str`: Returns branch if no worktree name, else "{worktree_name}{prefix}{branch}" (default prefix: "-")
-- `norm_prefix_branch() -> str`: Returns branch if no worktree name, else "prefix-branch"
+- `tag(name: str) -> str`: Get tag value by name. Returns empty string if tag doesn't exist or has no value
+  - `tag("env")`: Returns value of tag "env" (e.g., "prod", "dev")
+  - `tag("project")`: Returns value of tag "project" if set, empty string otherwise
+- `tag_exist(name: str) -> bool`: Check if tag exists (with or without value). Returns True if tag exists, False otherwise
+  - `tag_exist("env")`: Returns True if tag "env" was provided via `--tag env` or `--tag env=value`
+  - Useful in predicates: `tag_exist("env") and tag("env") == "prod"`
+
+**Context Variables** (available during predicate evaluation):
+- `host` (str): Hostname from URI (e.g., "github.com", "rulez.netbird.selfhosted")
+- `port` (str): Port from URI, empty string if missing (e.g., "3000", "")
+- `protocol` (str): Protocol from URI (e.g., "http", "https", "ssh", "git", "file")
+- `path` (list[str]): URI path segments (e.g., ["vadimvolk", "ansible"] from "/vadimvolk/ansible.git")
+- `uri` (str): Full URI string
+- `tag(name: str) -> str`: Get tag value by name (same as template function)
+- `tag_exist(name: str) -> bool`: Check if tag exists (same as template function)
 
 **Validation Rules**:
 - Function names must be valid identifiers
 - Argument types must match function signatures (enforced by StrictSimpleEval)
 - Argument count must match function signatures
+- `tag()` returns empty string for non-existent tags (never raises error)
+- `tag_exist()` returns boolean (never raises error)
 
 **Relationships**:
 - Used by template evaluator (no persistent relationship)

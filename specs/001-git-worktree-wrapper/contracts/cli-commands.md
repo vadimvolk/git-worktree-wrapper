@@ -17,27 +17,30 @@ gww <command> [arguments] [options]
 - `--help`, `-h`: Show command help
 - `--verbose`, `-v`: Increase verbosity (may be repeated)
 - `--quiet`, `-q`: Suppress non-error output
+- `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times). Tags are available in template evaluation and predicate evaluation.
 
 ## Command Specifications
 
-### 1. `gww clone <uri>`
+### 1. `gww clone <uri> [--tag key=value]...`
 
 **Purpose**: Clone a new repository to the appropriate source location based on configuration.
 
 **Arguments**:
 - `uri` (str, required): Git repository URI (HTTP, HTTPS, SSH, or file://)
 
-**Options**: None
+**Options**:
+- `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times). Tags are available in template evaluation and predicate evaluation.
 
 **Behavior**:
 1. Parse URI to extract protocol, host, port, and path segments
-2. Evaluate source rules (predicates) to find matching rule or use default
-3. Resolve `sources` template to get absolute checkout path
-4. Create directory structure if needed
-5. Execute `git clone <uri> <path>`
-6. Detect project type by evaluating project predicates
-7. Execute matching project `source_actions` in order
-8. Report success with clone path
+2. Parse tags from `--tag` options into dictionary (format: `key=value` or `key` for tags without values)
+3. Evaluate source rules (predicates) to find matching rule or use default (tags available via `tag()` and `tag_exist()` functions)
+4. Resolve `sources` template to get absolute checkout path (tags available via `tag()` function)
+5. Create directory structure if needed
+6. Execute `git clone <uri> <path>`
+7. Detect project type by evaluating project predicates (tags available via `tag()` and `tag_exist()` functions)
+8. Execute matching project `source_actions` in order
+9. Report success with clone path
 
 **Exit Codes**:
 - `0`: Success
@@ -55,13 +58,18 @@ gww clone https://github.com/user/repo.git
 
 gww clone git@gitlab.com:group/project.git
 # Output: ~/Developer/sources/gitlab/group/project
+
+gww clone https://github.com/user/repo.git --tag env=prod --tag project=backend
+# Tags available: tag("env") returns "prod", tag("project") returns "backend"
+# Can be used in templates: ~/Developer/sources/tag("env")/path(-1)
+# Can be used in predicates: tag_exist("env") and tag("env") == "prod"
 ```
 
 ---
 
-### 2. `gww add <branch> [worktree_name] [--create-branch|-c]`
+### 2. `gww add <branch> [worktree_name] [--create-branch|-c] [--tag key=value]...`
 
-**Purpose**: Add a worktree for the specified branch, optionally with a name. Can create branch from current commit if it doesn't exist.
+**Purpose**: Add a worktree for the specified branch. Can create branch from current commit if it doesn't exist.
 
 **Arguments**:
 - `branch` (str, required): Branch name to checkout in worktree
@@ -69,23 +77,25 @@ gww clone git@gitlab.com:group/project.git
 
 **Options**:
 - `--create-branch`, `-c`: Create branch from current commit (source or worktree) if branch doesn't exist
+- `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times). Tags are available in template evaluation and predicate evaluation.
 
 **Behavior**:
 1. Detect current repository (source or worktree)
 2. If in worktree, resolve to source repository
-3. Check if branch exists in source repository (local or remote)
-4. If branch doesn't exist and `--create-branch` specified:
+3. Parse tags from `--tag` options into dictionary (format: `key=value` or `key` for tags without values)
+4. Check if branch exists in source repository (local or remote)
+5. If branch doesn't exist and `--create-branch` specified:
    - Get current commit from source or worktree (where command was executed)
    - Create branch from that commit: `git branch <branch> <commit>`
-5. If branch doesn't exist and `--create-branch` not specified:
+6. If branch doesn't exist and `--create-branch` not specified:
    - Print error: "Branch '<branch>' not found. Use --create-branch to create from current commit."
    - Exit with code 1
-6. Evaluate worktree template to get absolute worktree path (worktree_name used in template if provided)
-7. Create directory structure if needed
-8. Execute `git worktree add <path> <branch>` (worktree remains attached to repository)
-9. Detect project type by evaluating project predicates
-10. Execute matching project `worktree_actions` in order
-11. Report success with worktree path
+7. Evaluate worktree template to get absolute worktree path (tags available via `tag()` function)
+8. Create directory structure if needed
+9. Execute `git worktree add <path> <branch>` (worktree remains attached to repository)
+10. Detect project type by evaluating project predicates (tags available via `tag()` and `tag_exist()` functions)
+11. Execute matching project `worktree_actions` in order
+12. Report success with worktree path
 
 **Exit Codes**:
 - `0`: Success
@@ -102,9 +112,6 @@ cd ~/Developer/sources/github/user/repo
 gww add feature-branch
 # Output: ~/Developer/worktrees/github/user/repo/feature-branch
 
-gww add feature-branch my-feature
-# Output: ~/Developer/worktrees/github/user/repo/my-feature-feature-branch
-
 gww add new-feature -c
 # Creates branch 'new-feature' from current commit, then adds worktree
 # Output: ~/Developer/worktrees/github/user/repo/new-feature
@@ -113,6 +120,10 @@ cd ~/Developer/worktrees/github/user/repo/other-branch
 gww add another-feature -c
 # Creates branch 'another-feature' from commit in 'other-branch' worktree
 # Output: ~/Developer/worktrees/github/user/repo/another-feature
+
+gww add feature-branch --tag env=dev --tag team=frontend
+# Tags available: tag("env") returns "dev", tag("team") returns "frontend"
+# Can be used in templates: ~/Developer/worktrees/tag("team")/path(-1)/branch()
 ```
 
 ---

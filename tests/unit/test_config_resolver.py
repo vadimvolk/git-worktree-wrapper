@@ -215,6 +215,249 @@ class TestFindMatchingSourceRule:
         assert result3 is not None
         assert result3.name == "non_github2"
 
+    def test_matches_with_tag_exist_predicate(self) -> None:
+        """Test matching source rule with tag_exist() predicate."""
+        rule = SourceRule(
+            name="tagged",
+            predicate='tag_exist("env")',
+        )
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default",
+            sources={"tagged": rule},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = find_matching_source_rule(config, uri, tags={"env": "production"})
+
+        assert result is not None
+        assert result.name == "tagged"
+
+    def test_no_match_when_tag_not_exists(self) -> None:
+        """Test no match when tag_exist() returns False."""
+        rule = SourceRule(
+            name="tagged",
+            predicate='tag_exist("env")',
+        )
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default",
+            sources={"tagged": rule},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = find_matching_source_rule(config, uri, tags={"other": "value"})
+
+        assert result is None
+
+    def test_matches_with_tag_value_predicate(self) -> None:
+        """Test matching source rule with tag() value comparison."""
+        rule = SourceRule(
+            name="production",
+            predicate='tag("env") == "production"',
+        )
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default",
+            sources={"production": rule},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = find_matching_source_rule(config, uri, tags={"env": "production"})
+
+        assert result is not None
+        assert result.name == "production"
+
+    def test_no_match_with_different_tag_value(self) -> None:
+        """Test no match when tag value doesn't match predicate."""
+        rule = SourceRule(
+            name="production",
+            predicate='tag("env") == "production"',
+        )
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default",
+            sources={"production": rule},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = find_matching_source_rule(config, uri, tags={"env": "development"})
+
+        assert result is None
+
+    def test_tag_returns_empty_string_when_not_exists(self) -> None:
+        """Test tag() returns empty string when tag doesn't exist."""
+        rule = SourceRule(
+            name="empty",
+            predicate='tag("missing") == ""',
+        )
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default",
+            sources={"empty": rule},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = find_matching_source_rule(config, uri, tags={})
+
+        assert result is not None
+        assert result.name == "empty"
+
+    def test_tag_exist_with_empty_value(self) -> None:
+        """Test tag_exist() returns True even when tag has empty value."""
+        rule = SourceRule(
+            name="flagged",
+            predicate='tag_exist("flag")',
+        )
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default",
+            sources={"flagged": rule},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = find_matching_source_rule(config, uri, tags={"flag": ""})
+
+        assert result is not None
+        assert result.name == "flagged"
+
+    def test_tag_with_empty_value_in_predicate(self) -> None:
+        """Test tag() with empty value in predicate."""
+        rule = SourceRule(
+            name="empty_flag",
+            predicate='tag("flag") == ""',
+        )
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default",
+            sources={"empty_flag": rule},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = find_matching_source_rule(config, uri, tags={"flag": ""})
+
+        assert result is not None
+        assert result.name == "empty_flag"
+
+    def test_tag_functions_with_uri_and_tag_predicate(self) -> None:
+        """Test tag functions combined with URI predicates."""
+        rule = SourceRule(
+            name="github_prod",
+            predicate='"github" in host and tag("env") == "production"',
+        )
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default",
+            sources={"github_prod": rule},
+        )
+        github_uri = parse_uri("https://github.com/user/repo.git")
+
+        # Should match with production tag
+        result1 = find_matching_source_rule(
+            config, github_uri, tags={"env": "production"}
+        )
+        assert result1 is not None
+        assert result1.name == "github_prod"
+
+        # Should not match with development tag
+        result2 = find_matching_source_rule(
+            config, github_uri, tags={"env": "development"}
+        )
+        assert result2 is None
+
+        # Should not match non-GitHub URI even with production tag
+        gitlab_uri = parse_uri("https://gitlab.com/user/repo.git")
+        result3 = find_matching_source_rule(
+            config, gitlab_uri, tags={"env": "production"}
+        )
+        assert result3 is None
+
+    def test_multiple_tags_in_predicate(self) -> None:
+        """Test using multiple tags in predicate."""
+        rule = SourceRule(
+            name="multi_tag",
+            predicate='tag_exist("env") and tag("env") == "production" and tag_exist("version")',
+        )
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default",
+            sources={"multi_tag": rule},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = find_matching_source_rule(
+            config, uri, tags={"env": "production", "version": "1.0"}
+        )
+
+        assert result is not None
+        assert result.name == "multi_tag"
+
+    def test_tag_functions_with_complex_predicate(self) -> None:
+        """Test tag functions in complex predicate with logical operators."""
+        rule = SourceRule(
+            name="complex",
+            predicate='tag_exist("env") and (tag("env") == "production" or tag("env") == "staging")',
+        )
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default",
+            sources={"complex": rule},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        # Test with production
+        result1 = find_matching_source_rule(config, uri, tags={"env": "production"})
+        assert result1 is not None
+        assert result1.name == "complex"
+
+        # Test with staging
+        result2 = find_matching_source_rule(config, uri, tags={"env": "staging"})
+        assert result2 is not None
+        assert result2.name == "complex"
+
+        # Test with development (should not match)
+        result3 = find_matching_source_rule(config, uri, tags={"env": "development"})
+        assert result3 is None
+
+    def test_tag_functions_with_no_tags_provided(self) -> None:
+        """Test tag functions when no tags are provided."""
+        rule = SourceRule(
+            name="tagged",
+            predicate='tag_exist("env")',
+        )
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default",
+            sources={"tagged": rule},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = find_matching_source_rule(config, uri)
+
+        assert result is None
+
+    def test_tag_functions_with_partial_tags(self) -> None:
+        """Test tag functions when only some tags are provided."""
+        rule1 = SourceRule(
+            name="env_rule",
+            predicate='tag_exist("env")',
+        )
+        rule2 = SourceRule(
+            name="version_rule",
+            predicate='tag_exist("version")',
+        )
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default",
+            sources={"env_rule": rule1, "version_rule": rule2},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = find_matching_source_rule(config, uri, tags={"env": "production"})
+
+        assert result is not None
+        assert result.name == "env_rule"
+
 
 class TestResolveSourcePath:
     """Tests for resolve_source_path function."""
@@ -327,20 +570,6 @@ class TestResolveWorktreePath:
         assert "repo" in str(result)
         assert "feature-new-ui" in str(result)
 
-    def test_resolves_worktree_path_with_worktree_name(self) -> None:
-        """Test resolving worktree path with worktree name."""
-        config = Config(
-            default_sources="~/sources/default",
-            default_worktrees="~/worktrees/default/path(-1)/norm_prefix_branch()",
-            sources={},
-        )
-        uri = parse_uri("https://github.com/user/repo.git")
-
-        result = resolve_worktree_path(config, uri, "feature/new-ui", "my-feature")
-
-        assert "repo" in str(result)
-        assert "my-feature-feature-new-ui" in str(result)
-
     def test_uses_matching_rule_worktrees(self) -> None:
         """Test that matching rule's worktrees template is used."""
         github_rule = SourceRule(
@@ -395,132 +624,6 @@ class TestResolveWorktreePath:
         result = resolve_worktree_path(config, uri, "feature/new/ui")
 
         assert "feature_new_ui" in str(result)
-
-    def test_worktree_function_returns_empty_when_no_name(self) -> None:
-        """Test worktree() returns empty string when no name provided."""
-        config = Config(
-            default_sources="~/sources/default",
-            default_worktrees="~/worktrees/default/worktree()norm_branch()",
-            sources={},
-        )
-        uri = parse_uri("https://github.com/user/repo.git")
-
-        result = resolve_worktree_path(config, uri, "main", worktree_name=None)
-
-        # Should not have double slashes or issues from empty worktree()
-        assert "main" in str(result)
-
-    def test_prefix_worktree_returns_empty_when_no_name(self) -> None:
-        """Test prefix_worktree() returns empty when no worktree name."""
-        config = Config(
-            default_sources="~/sources/default",
-            default_worktrees="~/worktrees/default/prefix_worktree('-')norm_branch()",
-            sources={},
-        )
-        uri = parse_uri("https://github.com/user/repo.git")
-
-        result = resolve_worktree_path(config, uri, "feature/test", worktree_name=None)
-
-        # Should not have prefix, just norm_branch
-        path_str = str(result)
-        assert "feature-test" in path_str
-
-    def test_prefix_worktree_with_default_prefix(self) -> None:
-        """Test prefix_worktree() uses default '-' prefix when no argument provided."""
-        config = Config(
-            default_sources="~/sources/default",
-            default_worktrees="~/worktrees/default/norm_branch()prefix_worktree()",
-            sources={},
-        )
-        uri = parse_uri("https://github.com/user/repo.git")
-
-        result = resolve_worktree_path(config, uri, "feature/test", worktree_name="my-work")
-
-        # Should have default "-" prefix before worktree name
-        path_str = str(result)
-        assert "feature-test" in path_str
-        assert "-my-work" in path_str
-
-    def test_prefix_worktree_with_explicit_prefix(self) -> None:
-        """Test prefix_worktree() with explicit prefix for backward compatibility."""
-        config = Config(
-            default_sources="~/sources/default",
-            default_worktrees="~/worktrees/default/norm_branch()prefix_worktree('/')",
-            sources={},
-        )
-        uri = parse_uri("https://github.com/user/repo.git")
-
-        result = resolve_worktree_path(config, uri, "feature/test", worktree_name="my-work")
-
-        # Should have explicit "/" prefix before worktree name
-        path_str = str(result)
-        assert "feature-test" in path_str
-        assert "/my-work" in path_str
-
-    def test_prefix_branch_with_worktree_name_and_default_prefix(self) -> None:
-        """Test prefix_branch() with worktree name and default prefix."""
-        config = Config(
-            default_sources="~/sources/default",
-            default_worktrees="~/worktrees/default/path(-1)/prefix_branch()",
-            sources={},
-        )
-        uri = parse_uri("https://github.com/user/repo.git")
-
-        result = resolve_worktree_path(config, uri, "feature/new-ui", worktree_name="my-work")
-
-        # Should have worktree name, default "-" prefix, and branch (non-normalized)
-        path_str = str(result)
-        assert "repo" in path_str
-        assert "my-work-feature/new-ui" in path_str
-
-    def test_prefix_branch_with_worktree_name_and_custom_prefix(self) -> None:
-        """Test prefix_branch() with worktree name and custom prefix."""
-        config = Config(
-            default_sources="~/sources/default",
-            default_worktrees="~/worktrees/default/path(-1)/prefix_branch('/')",
-            sources={},
-        )
-        uri = parse_uri("https://github.com/user/repo.git")
-
-        result = resolve_worktree_path(config, uri, "feature/new-ui", worktree_name="my-work")
-
-        # Should have worktree name, custom "/" prefix, and branch (non-normalized)
-        path_str = str(result)
-        assert "repo" in path_str
-        assert "my-work/feature/new-ui" in path_str
-
-    def test_prefix_branch_without_worktree_name(self) -> None:
-        """Test prefix_branch() without worktree name returns just branch."""
-        config = Config(
-            default_sources="~/sources/default",
-            default_worktrees="~/worktrees/default/path(-1)/prefix_branch()",
-            sources={},
-        )
-        uri = parse_uri("https://github.com/user/repo.git")
-
-        result = resolve_worktree_path(config, uri, "feature/new-ui", worktree_name=None)
-
-        # Should return just branch (non-normalized) when no worktree name
-        path_str = str(result)
-        assert "repo" in path_str
-        assert "feature/new-ui" in path_str
-
-    def test_prefix_branch_preserves_branch_name_as_is(self) -> None:
-        """Test prefix_branch() preserves branch name without normalization."""
-        config = Config(
-            default_sources="~/sources/default",
-            default_worktrees="~/worktrees/default/path(-1)/prefix_branch()",
-            sources={},
-        )
-        uri = parse_uri("https://github.com/user/repo.git")
-
-        result = resolve_worktree_path(config, uri, "feature/new/ui", worktree_name="my-work")
-
-        # Should preserve "/" in branch name (not normalized)
-        path_str = str(result)
-        assert "my-work-feature/new/ui" in path_str
-        # Verify it's not normalized (should have slashes, not dashes)
-        assert "feature/new/ui" in path_str or "my-work-feature/new/ui" in path_str
 
 
 class TestGetSourcePathForWorktree:
@@ -604,3 +707,132 @@ class TestMigrationPathCalculation:
         assert "default" in str(result)
         assert "myorg" in str(result)
         assert "myproject" in str(result)
+
+    def test_resolve_source_path_with_tag_in_template(self) -> None:
+        """Test resolve_source_path with tag() function in template."""
+        config = Config(
+            default_sources="~/sources/tag('env')/path(-2)/path(-1)",
+            default_worktrees="~/worktrees/default",
+            sources={},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = resolve_source_path(config, uri, tags={"env": "production"})
+
+        assert "production" in str(result)
+        assert "user" in str(result)
+        assert "repo" in str(result)
+
+    def test_resolve_source_path_with_tag_in_rule_template(self) -> None:
+        """Test resolve_source_path with tag() in rule's sources template."""
+        rule = SourceRule(
+            name="github",
+            predicate='"github" in host',
+            sources="~/sources/tag('env')/github/path(-2)/path(-1)",
+        )
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default",
+            sources={"github": rule},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = resolve_source_path(config, uri, tags={"env": "dev"})
+
+        assert "dev" in str(result)
+        assert "github" in str(result)
+        assert "user" in str(result)
+        assert "repo" in str(result)
+
+    def test_resolve_source_path_with_multiple_tags_in_template(self) -> None:
+        """Test resolve_source_path with multiple tag() functions in template."""
+        config = Config(
+            default_sources="~/sources/tag('env')/tag('version')/path(-1)",
+            default_worktrees="~/worktrees/default",
+            sources={},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = resolve_source_path(
+            config, uri, tags={"env": "production", "version": "1.0"}
+        )
+
+        assert "production" in str(result)
+        assert "1.0" in str(result)
+        assert "repo" in str(result)
+
+    def test_resolve_source_path_with_missing_tag_in_template(self) -> None:
+        """Test resolve_source_path with missing tag() returns empty string."""
+        config = Config(
+            default_sources="~/sources/tag('missing')/path(-1)",
+            default_worktrees="~/worktrees/default",
+            sources={},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = resolve_source_path(config, uri, tags={})
+
+        # Should still work, tag('missing') returns empty string
+        assert "repo" in str(result)
+
+    def test_resolve_worktree_path_with_tag_in_template(self) -> None:
+        """Test resolve_worktree_path with tag() function in template."""
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/tag('env')/path(-1)/norm_branch()",
+            sources={},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = resolve_worktree_path(
+            config, uri, "feature/test", tags={"env": "production"}
+        )
+
+        assert "production" in str(result)
+        assert "repo" in str(result)
+        assert "feature-test" in str(result)
+
+    def test_resolve_worktree_path_with_tag_in_rule_template(self) -> None:
+        """Test resolve_worktree_path with tag() in rule's worktrees template."""
+        rule = SourceRule(
+            name="github",
+            predicate='"github" in host',
+            sources="~/sources/github",
+            worktrees="~/worktrees/tag('env')/github/path(-1)/norm_branch()",
+        )
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/default",
+            sources={"github": rule},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = resolve_worktree_path(
+            config, uri, "feature/new-ui", tags={"env": "dev"}
+        )
+
+        assert "dev" in str(result)
+        assert "github" in str(result)
+        assert "repo" in str(result)
+        assert "feature-new-ui" in str(result)
+
+    def test_resolve_worktree_path_with_multiple_tags(self) -> None:
+        """Test resolve_worktree_path with multiple tag() functions."""
+        config = Config(
+            default_sources="~/sources/default",
+            default_worktrees="~/worktrees/tag('env')/tag('version')/path(-1)/norm_branch()",
+            sources={},
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+
+        result = resolve_worktree_path(
+            config,
+            uri,
+            "main",
+            tags={"env": "production", "version": "2.0"},
+        )
+
+        assert "production" in str(result)
+        assert "2.0" in str(result)
+        assert "repo" in str(result)
+        assert "main" in str(result)

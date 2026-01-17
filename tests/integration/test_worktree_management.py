@@ -95,7 +95,6 @@ default_worktrees: {worktree_dir}/norm_branch()
 
         class Args:
             branch = "feature-test"
-            worktree_name = None
             create_branch = False
             verbose = 0
             quiet = False
@@ -129,7 +128,6 @@ default_worktrees: {worktree_dir}/norm_branch()
 
         class Args:
             branch = "new-feature"
-            worktree_name = None
             create_branch = True
             verbose = 0
             quiet = False
@@ -138,39 +136,6 @@ default_worktrees: {worktree_dir}/norm_branch()
 
         assert result == 0
         expected_path = worktree_dir / "new-feature"
-        assert expected_path.exists()
-
-    def test_add_worktree_with_name(
-        self,
-        git_repo_with_remote: tuple[Path, Path],
-        config_dir: Path,
-        worktree_dir: Path,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """Test adding named worktree."""
-        local, _ = git_repo_with_remote
-
-        config_path = config_dir / "gww" / "config.yml"
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(f"""
-default_sources: ~/sources
-default_worktrees: {worktree_dir}/norm_prefix_branch()
-""")
-
-        monkeypatch.chdir(local)
-
-        class Args:
-            branch = "feature-test"
-            worktree_name = "my-work"
-            create_branch = False
-            verbose = 0
-            quiet = False
-
-        result = run_add(Args())
-
-        assert result == 0
-        # With worktree name, path should include it
-        expected_path = worktree_dir / "my-work-feature-test"
         assert expected_path.exists()
 
     def test_add_fails_for_nonexistent_branch(
@@ -194,7 +159,6 @@ default_worktrees: {worktree_dir}/norm_branch()
 
         class Args:
             branch = "nonexistent-branch"
-            worktree_name = None
             create_branch = False
             verbose = 0
             quiet = False
@@ -222,7 +186,6 @@ default_worktrees: {worktree_dir}/norm_branch()
 
         class Args:
             branch = "feature"
-            worktree_name = None
             create_branch = False
             verbose = 0
             quiet = False

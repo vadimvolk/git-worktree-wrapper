@@ -179,7 +179,8 @@ def evaluate_predicate(
 
     Args:
         predicate: Predicate expression string.
-        variables: Dictionary of variables for evaluation.
+        variables: Dictionary of variables and functions for evaluation.
+                   Callable values are treated as functions, others as variables.
 
     Returns:
         Boolean result of predicate evaluation.
@@ -187,7 +188,17 @@ def evaluate_predicate(
     Raises:
         TemplateError: If evaluation fails or result is not boolean.
     """
-    evaluator = StrictSimpleEval(names=variables)
+    # Separate functions from variables
+    functions: dict[str, Callable[..., Any]] = {}
+    names: dict[str, Any] = {}
+    
+    for key, value in variables.items():
+        if callable(value):
+            functions[key] = value
+        else:
+            names[key] = value
+    
+    evaluator = StrictSimpleEval(functions=functions, names=names)
 
     try:
         result = evaluator.eval(predicate)

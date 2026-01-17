@@ -31,16 +31,17 @@ def _expand_home(path: str) -> str:
     return path
 
 
-def _build_uri_context(uri: ParsedURI) -> dict[str, object]:
+def _build_uri_context(uri: ParsedURI, tags: dict[str, str] = {}) -> dict[str, object]:
     """Build evaluation context for URI predicates.
 
     Args:
         uri: Parsed URI object.
+        tags: Optional dictionary of tag key-value pairs.
 
     Returns:
         Dictionary of context variables for predicate evaluation.
     """
-    return {
+    context: dict[str, object] = {
         "host": uri.host,
         "port": uri.port,
         "protocol": uri.protocol,
@@ -48,16 +49,33 @@ def _build_uri_context(uri: ParsedURI) -> dict[str, object]:
         "uri": uri.uri,
     }
 
+    # Add tag functions
+
+    def tag(name: str) -> str:
+        """Get tag value by name."""
+        return tags.get(name, "")
+
+    def tag_exist(name: str) -> bool:
+        """Check if tag exists."""
+        return name in tags
+
+    context["tag"] = tag
+    context["tag_exist"] = tag_exist
+
+    return context
+
 
 def find_matching_source_rule(
     config: Config,
     uri: ParsedURI,
+    tags: dict[str, str] = {},
 ) -> Optional[SourceRule]:
     """Find the first matching source rule for a URI.
 
     Args:
         config: Validated configuration.
         uri: Parsed URI to match against.
+        tags: Optional dictionary of tag key-value pairs.
 
     Returns:
         Matching SourceRule, or None if no match.
@@ -65,7 +83,7 @@ def find_matching_source_rule(
     Raises:
         ResolverError: If predicate evaluation fails.
     """
-    context = _build_uri_context(uri)
+    context = _build_uri_context(uri, tags)
 
     for name, rule in config.sources.items():
         try:
@@ -82,12 +100,14 @@ def find_matching_source_rule(
 def resolve_source_path(
     config: Config,
     uri: ParsedURI,
+    tags: dict[str, str] = {},
 ) -> Path:
     """Resolve the source checkout path for a URI.
 
     Args:
         config: Validated configuration.
         uri: Parsed URI for the repository.
+        tags: Optional dictionary of tag key-value pairs.
 
     Returns:
         Absolute path where repository should be cloned.
@@ -96,7 +116,7 @@ def resolve_source_path(
         ResolverError: If path resolution fails.
     """
     # Find matching rule or use default
-    rule = find_matching_source_rule(config, uri)
+    rule = find_matching_source_rule(config, uri, tags)
 
     if rule and rule.sources:
         template = rule.sources
@@ -104,7 +124,7 @@ def resolve_source_path(
         template = config.default_sources
 
     # Create context and evaluate template
-    context = TemplateContext(uri=uri)
+    context = TemplateContext(uri=uri, tags=tags)
 
     try:
         path_str = evaluate_template(template, context)
@@ -120,7 +140,7 @@ def resolve_worktree_path(
     config: Config,
     uri: ParsedURI,
     branch: str,
-    worktree_name: Optional[str] = None,
+    tags: dict[str, str] = {},
 ) -> Path:
     """Resolve the worktree path for a branch.
 
@@ -128,7 +148,7 @@ def resolve_worktree_path(
         config: Validated configuration.
         uri: Parsed URI for the repository.
         branch: Branch name for the worktree.
-        worktree_name: Optional worktree name.
+        tags: Optional dictionary of tag key-value pairs.
 
     Returns:
         Absolute path where worktree should be created.
@@ -137,7 +157,7 @@ def resolve_worktree_path(
         ResolverError: If path resolution fails.
     """
     # Find matching rule or use default
-    rule = find_matching_source_rule(config, uri)
+    rule = find_matching_source_rule(config, uri, tags)
 
     if rule and rule.worktrees:
         template = rule.worktrees
@@ -148,7 +168,7 @@ def resolve_worktree_path(
     context = TemplateContext(
         uri=uri,
         branch=branch,
-        worktree_name=worktree_name,
+        tags=tags,
     )
 
     try:
@@ -164,6 +184,7 @@ def resolve_worktree_path(
 def get_source_path_for_worktree(
     config: Config,
     uri: ParsedURI,
+    tags: dict[str, str] = {},
 ) -> Path:
     """Get the source path that corresponds to a worktree's repository.
 
@@ -172,6 +193,7 @@ def get_source_path_for_worktree(
     Args:
         config: Validated configuration.
         uri: Parsed URI for the repository.
+        tags: Optional dictionary of tag key-value pairs.
 
     Returns:
         Absolute path to the source repository.
@@ -179,4 +201,4 @@ def get_source_path_for_worktree(
     Raises:
         ResolverError: If path resolution fails.
     """
-    return resolve_source_path(config, uri)
+    return resolve_source_path(config, uri, tags)

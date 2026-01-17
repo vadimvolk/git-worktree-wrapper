@@ -7,7 +7,7 @@ Works with configuration file gww.yml located in $XDG_CONFIG_HOME compliant mann
 ## Config example
 ```yml
 default_sources: ~/Developer/sources/default/path(-2)/path(-1)
-default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()prefix_worktree("-")
+default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 # where:
 # default_sources - template used to get checkout folder if no bellow sources predicates matched
 # default_worktrees - template used to get worktree folder if no bellow sources predicates matched
@@ -16,20 +16,19 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 # path(-1) - last path segment
 # path(-2) - segment before last
 # norm_branch() - normalized git branch with "/" replaced with "-"
-# prefix_worktree(prefix) - empty if worktree has no name, prefix and worktree name if has
 sources:
     github:
         predicate: "github" in host # host if host part of uri, e.g "http://rulez.netbird.selfhosted:3000/vadimvolk/ansible.git" -> rulez.netbird.selfhosted
         sources: ~/Developer/sources/github/path(-2)/path(-1)
-        worktrees: ~/Developer/worktrees/github/path(-2)/path(-1)/branch()prefix_worktree("/")
+        worktrees: ~/Developer/worktrees/github/path(-2)/path(-1)/branch()
     gitlab:
         predicate: "gitlab" in host and !contains(host, "scp") # !contains mean not contains
         sources: ~/Developer/sources/gitlab/path(-3)/path(-2)/path(-1)
-        worktrees: ~/Developer/worktrees/gitlab/path(-3)/path(-2)/path(-1)-branch()prefix_worktree("/")
+        worktrees: ~/Developer/worktrees/gitlab/path(-3)/path(-2)/path(-1)-branch()
     my_sources:
         predicate: path(0) == "username"
         sources: ~/Developer/sources/mine/path(-2)/path(-1)
-        worktrees: ~/Developer/worktrees/mine/path(-2)/path(-1)/worktree()norm_prefix_branch("-")
+        worktrees: ~/Developer/worktrees/mine/path(-2)/path(-1)/norm_branch("-")
 # where:
 # sources - predicate based checkout and worktrees locations
 # github, gitlab, my_sources - names of locations sections
@@ -37,8 +36,6 @@ sources:
 # sources - optional value, if missing default_sources used, if present evalueate to get checkout folder
 # worktrees - optional value, if missing default_worktrees used, if present evaluate to get worktrees folder
 # branch() - git branch name as is
-# worktree() - worktree name, return "" if worktree nas no name
-# norm_prefix_branch() - branch if worktree has no name, prefix and branch if worktree has name
 projects:
     - predicate: file_exists(local.properties)
       source_actions: 
@@ -57,7 +54,7 @@ projects:
 # Commands:
 gww clone <uri> - find proper location for new source and checkout there. Then analyze result with projects and execute source_actions for any project with matched predicate
 
-gww add <branch> [worktree name] - must executed inside a source or worktree folder. Add a worktree for branch with optional name. To get destination folder uses settings file
+gww add <branch> - must executed inside a source or worktree folder. Add a worktree for branch. To get destination folder uses settings file
 
 gww remove <branch|worktree folder> [--force] - remove worktree folder by branch name or folder location. If force specified ignore that worktree is not clean, otherwise show error for not clean worktrees
 

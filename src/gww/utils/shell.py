@@ -163,8 +163,7 @@ _{APP_NAME}() {{
                     _arguments \\
                         '-c[Create branch if not exists]' \\
                         '--create-branch[Create branch if not exists]' \\
-                        '1:branch:_git_branch_names' \\
-                        '2:worktree name:'
+                        '1:branch:_git_branch_names'
                     ;;
                 remove)
                     _arguments \\

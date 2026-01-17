@@ -15,12 +15,13 @@ Build a CLI tool `gww` that wraps git worktree functionality with configurable p
 Users can clone repositories to configurable source locations based on URI predicates, with project-specific actions executed after clone.
 
 **Acceptance Criteria**:
-- Command: `gww clone <uri>`
+- Command: `gww clone <uri> [--tag key=value]...`
 - Parse URI to extract protocol, host, port, and path segments
-- Evaluate source rules (predicates) to find matching rule or use default
-- Resolve `sources` template to get absolute checkout path
+- Parse optional tags from `--tag` options (format: `key=value` or `key`)
+- Evaluate source rules (predicates) to find matching rule or use default (tags available in predicate context)
+- Resolve `sources` template to get absolute checkout path (tags available in template context)
 - Execute `git clone <uri> <path>`
-- Detect project type by evaluating project predicates
+- Detect project type by evaluating project predicates (tags available in predicate context)
 - Execute matching project `source_actions` in order
 - Report success with clone path to stdout
 - Handle errors: invalid URI, clone failures, action failures (exit code 1)
@@ -33,6 +34,9 @@ gww clone https://github.com/user/repo.git
 
 gww clone git@gitlab.com:group/project.git
 # Output: ~/Developer/sources/gitlab/group/project
+
+gww clone https://github.com/user/repo.git --tag env=prod --tag project=backend
+# Tags available in templates and predicates: tag("env") returns "prod", tag("project") returns "backend"
 ```
 
 ---
@@ -40,17 +44,18 @@ gww clone git@gitlab.com:group/project.git
 ### FR2: Worktree Addition
 **Priority**: P1 (MVP)
 
-Users can add worktrees for branches with configurable paths, optional names, and project-specific actions executed after worktree creation.
+Users can add worktrees for branches with configurable paths and project-specific actions executed after worktree creation.
 
 **Acceptance Criteria**:
-- Command: `gww add <branch> [worktree_name] [--create-branch|-c]`
+- Command: `gww add <branch> [worktree_name] [--create-branch|-c] [--tag key=value]...`
 - Detect current repository (source or worktree)
 - If in worktree, resolve to source repository
+- Parse optional tags from `--tag` options (format: `key=value` or `key`)
 - Check if branch exists in source repository (local or remote)
 - If branch doesn't exist and `--create-branch` specified: create branch from current commit
-- Evaluate worktree template to get absolute worktree path
+- Evaluate worktree template to get absolute worktree path (tags available in template context)
 - Execute `git worktree add <path> <branch>`
-- Detect project type and execute matching project `worktree_actions` in order
+- Detect project type and execute matching project `worktree_actions` in order (tags available in predicate context)
 - Report success with worktree path to stdout
 - Handle errors: not in git repo, branch not found without --create-branch, worktree add failed, action failed (exit code 1)
 - Handle configuration errors (exit code 2)
@@ -66,6 +71,9 @@ gww add feature-branch my-feature
 
 gww add new-feature -c
 # Creates branch 'new-feature' from current commit, then adds worktree
+
+gww add feature-branch --tag env=dev --tag team=frontend
+# Tags available in templates: tag("env") returns "dev", tag("team") returns "frontend"
 ```
 
 ---

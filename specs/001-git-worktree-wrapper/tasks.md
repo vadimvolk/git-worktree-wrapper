@@ -40,7 +40,7 @@
 
 - [X] T007 [P] Implement XDG config directory handling in src/gww/utils/xdg.py
 - [X] T008 [P] Implement StrictSimpleEval subclass in src/gww/template/evaluator.py with type checking
-- [X] T009 [P] Implement template function registry in src/gww/template/functions.py (path, branch, norm_branch, worktree, prefix_worktree, norm_prefix_branch)
+- [X] T009 [P] Implement template function registry in src/gww/template/functions.py (path, branch, norm_branch)
 - [X] T010 [P] Implement template preprocessing (regex-based function call extraction, escaped parentheses handling) in src/gww/template/evaluator.py
 - [X] T011 [P] Implement config loader with ruamel.yaml in src/gww/config/loader.py
 - [X] T012 [P] Implement config validator in src/gww/config/validator.py
@@ -87,7 +87,7 @@
 
 ## Phase 4: User Story 2 - Add Worktrees (Priority: P1) 🎯 MVP
 
-**Goal**: Users can add worktrees for branches with configurable paths, optional names, and project-specific actions executed after worktree creation.
+**Goal**: Users can add worktrees for branches with configurable paths and project-specific actions executed after worktree creation.
 
 **Independent Test**: From a cloned repository, run `gww add feature-branch` and verify worktree is created at expected location based on config, branch is checked out, and worktree_actions are executed if project predicate matches.
 
@@ -95,7 +95,7 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [X] T031 [P] [US2] Unit test for worktree template resolution with branch and worktree_name context in tests/unit/test_config_resolver.py
+- [X] T031 [P] [US2] Unit test for worktree template resolution with branch context in tests/unit/test_config_resolver.py
 - [X] T032 [P] [US2] Unit test for branch existence checking and creation in tests/unit/test_git_branch.py
 - [X] T033 [P] [US2] Unit test for source repository detection from worktree in tests/unit/test_git_repository.py
 - [X] T034 [P] [US2] Integration test for add command end-to-end in tests/integration/test_worktree_management.py
@@ -311,7 +311,7 @@ Task T026: "Integration test for clone command end-to-end in tests/integration/t
 
 ```bash
 # Launch all tests for User Story 2 together:
-Task T031: "Unit test for worktree template resolution with branch and worktree_name context in tests/unit/test_config_resolver.py"
+Task T031: "Unit test for worktree template resolution with branch context in tests/unit/test_config_resolver.py"
 Task T032: "Unit test for branch existence checking and creation in tests/unit/test_git_branch.py"
 Task T033: "Unit test for source repository detection from worktree in tests/unit/test_git_repository.py"
 Task T034: "Integration test for add command end-to-end in tests/integration/test_worktree_management.py"

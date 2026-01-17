@@ -122,6 +122,149 @@ class TestFindMatchingProjects:
         # source_path is set, so predicate should be True
         assert len(result) == 1
 
+    def test_matches_with_tag_exist_predicate(self, tmp_path: Path) -> None:
+        """Test matching project with tag_exist() predicate."""
+        rule = ProjectRule(
+            predicate='tag_exist("env")',
+            source_actions=[Action(action_type="command", args=["echo"])],
+        )
+
+        result = find_matching_projects([rule], tmp_path, tags={"env": "production"})
+
+        assert len(result) == 1
+        assert result[0] == rule
+
+    def test_no_match_when_tag_not_exists(self, tmp_path: Path) -> None:
+        """Test no match when tag_exist() returns False."""
+        rule = ProjectRule(
+            predicate='tag_exist("env")',
+            source_actions=[Action(action_type="command", args=["echo"])],
+        )
+
+        result = find_matching_projects([rule], tmp_path, tags={"other": "value"})
+
+        assert len(result) == 0
+
+    def test_matches_with_tag_value_predicate(self, tmp_path: Path) -> None:
+        """Test matching project with tag() value comparison."""
+        rule = ProjectRule(
+            predicate='tag("env") == "production"',
+            source_actions=[Action(action_type="command", args=["echo"])],
+        )
+
+        result = find_matching_projects([rule], tmp_path, tags={"env": "production"})
+
+        assert len(result) == 1
+
+    def test_no_match_with_different_tag_value(self, tmp_path: Path) -> None:
+        """Test no match when tag value doesn't match predicate."""
+        rule = ProjectRule(
+            predicate='tag("env") == "production"',
+            source_actions=[Action(action_type="command", args=["echo"])],
+        )
+
+        result = find_matching_projects([rule], tmp_path, tags={"env": "development"})
+
+        assert len(result) == 0
+
+    def test_tag_returns_empty_string_when_not_exists(self, tmp_path: Path) -> None:
+        """Test tag() returns empty string when tag doesn't exist."""
+        rule = ProjectRule(
+            predicate='tag("missing") == ""',
+            source_actions=[Action(action_type="command", args=["echo"])],
+        )
+
+        result = find_matching_projects([rule], tmp_path, tags={})
+
+        assert len(result) == 1
+
+    def test_tag_exist_with_empty_value(self, tmp_path: Path) -> None:
+        """Test tag_exist() returns True even when tag has empty value."""
+        rule = ProjectRule(
+            predicate='tag_exist("flag")',
+            source_actions=[Action(action_type="command", args=["echo"])],
+        )
+
+        result = find_matching_projects([rule], tmp_path, tags={"flag": ""})
+
+        assert len(result) == 1
+
+    def test_tag_with_empty_value_in_predicate(self, tmp_path: Path) -> None:
+        """Test tag() with empty value in predicate."""
+        rule = ProjectRule(
+            predicate='tag("flag") == ""',
+            source_actions=[Action(action_type="command", args=["echo"])],
+        )
+
+        result = find_matching_projects([rule], tmp_path, tags={"flag": ""})
+
+        assert len(result) == 1
+
+    def test_multiple_tags_in_predicate(self, tmp_path: Path) -> None:
+        """Test using multiple tags in predicate."""
+        rule = ProjectRule(
+            predicate='tag_exist("env") and tag("env") == "production"',
+            source_actions=[Action(action_type="command", args=["echo"])],
+        )
+
+        result = find_matching_projects(
+            [rule], tmp_path, tags={"env": "production", "version": "1.0"}
+        )
+
+        assert len(result) == 1
+
+    def test_tag_functions_with_complex_predicate(self, tmp_path: Path) -> None:
+        """Test tag functions in complex predicate with logical operators."""
+        rule = ProjectRule(
+            predicate='tag_exist("env") and (tag("env") == "production" or tag("env") == "staging")',
+            source_actions=[Action(action_type="command", args=["echo"])],
+        )
+
+        # Test with production
+        result1 = find_matching_projects(
+            [rule], tmp_path, tags={"env": "production"}
+        )
+        assert len(result1) == 1
+
+        # Test with staging
+        result2 = find_matching_projects([rule], tmp_path, tags={"env": "staging"})
+        assert len(result2) == 1
+
+        # Test with development (should not match)
+        result3 = find_matching_projects(
+            [rule], tmp_path, tags={"env": "development"}
+        )
+        assert len(result3) == 0
+
+    def test_tag_functions_with_no_tags_provided(self, tmp_path: Path) -> None:
+        """Test tag functions when no tags are provided."""
+        rule = ProjectRule(
+            predicate='tag_exist("env")',
+            source_actions=[Action(action_type="command", args=["echo"])],
+        )
+
+        result = find_matching_projects([rule], tmp_path)
+
+        assert len(result) == 0
+
+    def test_tag_functions_with_partial_tags(self, tmp_path: Path) -> None:
+        """Test tag functions when only some tags are provided."""
+        rule1 = ProjectRule(
+            predicate='tag_exist("env")',
+            source_actions=[Action(action_type="command", args=["action1"])],
+        )
+        rule2 = ProjectRule(
+            predicate='tag_exist("version")',
+            source_actions=[Action(action_type="command", args=["action2"])],
+        )
+
+        result = find_matching_projects(
+            [rule1, rule2], tmp_path, tags={"env": "production"}
+        )
+
+        assert len(result) == 1
+        assert result[0] == rule1
+
 
 class TestGetSourceActions:
     """Tests for get_source_actions function."""

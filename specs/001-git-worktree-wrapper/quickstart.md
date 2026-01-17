@@ -28,18 +28,18 @@ Edit `~/.config/gww/config.yml` to add your source routing rules:
 
 ```yaml
 default_sources: ~/Developer/sources/default/path(-2)/path(-1)
-default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()prefix_worktree("-")
+default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 
 sources:
     github:
         predicate: "github" in host
         sources: ~/Developer/sources/github/path(-2)/path(-1)
-        worktrees: ~/Developer/worktrees/github/path(-2)/path(-1)/branch()prefix_worktree("/")
+        worktrees: ~/Developer/worktrees/github/path(-2)/path(-1)/branch()
     
     gitlab:
         predicate: "gitlab" in host and !contains(host, "scp")
         sources: ~/Developer/sources/gitlab/path(-3)/path(-2)/path(-1)
-        worktrees: ~/Developer/worktrees/gitlab/path(-3)/path(-2)/path(-1)-branch()prefix_worktree("/")
+        worktrees: ~/Developer/worktrees/gitlab/path(-3)/path(-2)/path(-1)-branch()
 ```
 
 ### 3. Install Shell Completion (Optional)
@@ -106,30 +106,7 @@ git branch
 - **When**: `gww add feature/new-ui`
 - **Then**: Worktree created at `~/Developer/worktrees/github/vadimvolk/ansible/feature-new-ui` with branch `feature/new-ui` checked out
 
-### Workflow 3: Add Named Worktree
-
-**Scenario**: Create a named worktree (name used in path template only)
-
-```bash
-cd ~/Developer/sources/github/vadimvolk/ansible
-
-# Add named worktree
-gww add feature/new-ui ui-work
-
-# Expected output:
-# ~/Developer/worktrees/github/vadimvolk/ansible/ui-work-feature-new-ui
-
-# Verify worktree (name is part of path, worktree remains attached)
-git worktree list
-# Output shows worktree at computed path
-```
-
-**Test Case**:
-- **Given**: Source repository
-- **When**: `gww add feature/new-ui ui-work`
-- **Then**: Worktree created at path using worktree_name in template (worktree remains attached to repository)
-
-### Workflow 3a: Create Branch from Current Commit
+### Workflow 3: Create Branch from Current Commit
 
 **Scenario**: Create a new branch from current commit and add worktree
 
@@ -280,6 +257,73 @@ projects:
   - After clone: `local.properties` copied from `~/sources/default-local.properties`
   - After worktree add: `local.properties` copied from source to worktree, then `custom-handler` executed
 
+### Scenario 3: Tag-Based Routing
+
+**Setup**: Config with tag-based source routing
+
+```yaml
+sources:
+  production:
+    predicate: 'tag_exist("env") and tag("env") == "prod"'
+    sources: ~/Developer/sources/prod/path(-2)/path(-1)
+    worktrees: ~/Developer/worktrees/prod/path(-2)/path(-1)/norm_branch()
+  
+  development:
+    predicate: 'tag_exist("env") and tag("env") == "dev"'
+    sources: ~/Developer/sources/dev/path(-2)/path(-1)
+    worktrees: ~/Developer/worktrees/dev/path(-2)/path(-1)/norm_branch()
+  
+  project_backend:
+    predicate: 'tag_exist("project") and tag("project") == "backend"'
+    sources: ~/Developer/sources/backend/path(-2)/path(-1)
+    worktrees: ~/Developer/worktrees/backend/path(-2)/path(-1)/norm_branch()
+```
+
+**Test Cases**:
+```bash
+# Production environment
+gww clone https://github.com/user/repo.git --tag env=prod
+# → ~/Developer/sources/prod/user/repo
+
+# Development environment
+gww clone https://github.com/user/repo.git --tag env=dev
+# → ~/Developer/sources/dev/user/repo
+
+# Backend project
+gww clone https://github.com/user/repo.git --tag project=backend
+# → ~/Developer/sources/backend/user/repo
+
+# Multiple tags
+gww add feature-branch --tag env=dev --tag team=frontend
+# Tags available in worktree path template
+```
+
+### Scenario 4: Tag-Based Path Templates
+
+**Setup**: Config using tags in path templates
+
+```yaml
+default_sources: ~/Developer/sources/tag("env")/path(-2)/path(-1)
+default_worktrees: ~/Developer/worktrees/tag("team")/path(-2)/path(-1)/norm_branch()
+```
+
+**Test Cases**:
+```bash
+# Clone with environment tag
+gww clone https://github.com/user/repo.git --tag env=prod
+# → ~/Developer/sources/prod/user/repo
+
+# Add worktree with team tag
+cd ~/Developer/sources/prod/user/repo
+gww add feature-branch --tag team=frontend
+# → ~/Developer/worktrees/frontend/user/repo/feature-branch
+
+# Tags without values (tag_exist() returns True, tag() returns "")
+gww clone https://github.com/user/repo.git --tag experimental
+# tag_exist("experimental") returns True
+# tag("experimental") returns ""
+```
+
 ### Scenario 3: Migration
 
 **Setup**: Old repositories in `~/old-repos` need to be migrated
@@ -333,7 +377,6 @@ default_sources: ~/Developer/sources/path(-1)
 
 ```yaml
 # Branch: "feature/new-ui"
-# Worktree name: "ui-work"
 
 worktrees: ~/worktrees/branch()
 # Evaluates to: ~/worktrees/feature/new-ui
@@ -343,14 +386,40 @@ worktrees: ~/worktrees/norm_branch()
 
 worktrees: ~/worktrees/norm_branch("_")
 # Evaluates to: ~/worktrees/feature_new_ui
+```
 
-worktrees: ~/worktrees/prefix_worktree("-")
-# If worktree has name: ~/worktrees/-ui-work
-# If no name: ~/worktrees/
+### Tag Functions
 
-worktrees: ~/worktrees/norm_prefix_branch()
-# If worktree has name: ~/worktrees/ui-work-feature-new-ui
-# If no name: ~/worktrees/feature-new-ui
+```yaml
+# Tags provided: --tag env=prod --tag project=backend
+
+# Using tag() in path templates
+sources: ~/Developer/sources/tag("env")/path(-2)/path(-1)
+# Evaluates to: ~/Developer/sources/prod/vadimvolk/ansible
+
+worktrees: ~/Developer/worktrees/tag("project")/path(-1)/branch()
+# Evaluates to: ~/Developer/worktrees/backend/ansible/feature-branch
+
+# Using tag_exist() in predicates
+sources:
+  production:
+    predicate: 'tag_exist("env") and tag("env") == "prod"'
+    sources: ~/Developer/sources/prod/path(-2)/path(-1)
+  
+  development:
+    predicate: 'tag_exist("env") and tag("env") == "dev"'
+    sources: ~/Developer/sources/dev/path(-2)/path(-1)
+```
+
+**Examples with tags**:
+```bash
+# Clone with tags
+gww clone https://github.com/user/repo.git --tag env=prod --tag project=backend
+# Tags available in templates and predicates
+
+# Add worktree with tags
+gww add feature-branch --tag env=dev --tag team=frontend
+# Tags can be used in worktree path templates
 ```
 
 ### Escaping Parentheses
@@ -477,7 +546,7 @@ gww init config
 ```bash
 # Error: Template evaluation failed: Function 'unknown_func' not defined
 # Solution: Check config file for typos in function names
-# Valid functions: path, branch, norm_branch, worktree, prefix_worktree, prefix_branch, norm_prefix_branch
+# Valid functions: path, branch, norm_branch
 ```
 
 ### Git Command Failures

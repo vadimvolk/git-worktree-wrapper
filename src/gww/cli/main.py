@@ -40,6 +40,14 @@ def create_parser() -> argparse.ArgumentParser:
         help="Suppress non-error output",
     )
 
+    parser.add_argument(
+        "-t", "--tag",
+        action="append",
+        default=[],
+        help="Tag in format key=value or just key (can be specified multiple times)",
+        metavar="TAG",
+    )
+
     # Create subparsers for commands
     subparsers = parser.add_subparsers(
         dest="command",
@@ -62,16 +70,11 @@ def create_parser() -> argparse.ArgumentParser:
     add_parser = subparsers.add_parser(
         "add",
         help="Add a worktree for a branch",
-        description="Add a worktree for the specified branch with optional name.",
+        description="Add a worktree for the specified branch.",
     )
     add_parser.add_argument(
         "branch",
         help="Branch name to checkout in worktree",
-    )
-    add_parser.add_argument(
-        "worktree_name",
-        nargs="?",
-        help="Optional name for the worktree (used in path template)",
     )
     add_parser.add_argument(
         "-c", "--create-branch",
@@ -158,6 +161,25 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _parse_tags(tag_args: list[str]) -> dict[str, str]:
+    """Parse tag arguments into a dictionary.
+
+    Args:
+        tag_args: List of tag strings in format "key=value" or "key".
+
+    Returns:
+        Dictionary mapping tag keys to values (empty string if no value).
+    """
+    tags: dict[str, str] = {}
+    for tag_arg in tag_args:
+        if "=" in tag_arg:
+            key, value = tag_arg.split("=", 1)
+            tags[key] = value
+        else:
+            tags[tag_arg] = ""
+    return tags
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Main entry point for gww CLI.
 
@@ -169,6 +191,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     """
     parser = create_parser()
     args = parser.parse_args(argv)
+
+    # Parse tags into dictionary
+    args.tags = _parse_tags(args.tag)
 
     if args.command is None:
         parser.print_help()

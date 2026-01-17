@@ -121,21 +121,39 @@ def config_exists(config_path: Optional[Path] = None) -> bool:
 
 
 DEFAULT_CONFIG_TEMPLATE = """\
-# SGW (Git Worktree Wrapper) Configuration
+# GWW (Git Worktree Wrapper) Configuration
 # =========================================
 #
 # This file configures how gww manages your git repositories and worktrees.
 # Location: {config_path}
 
-# Default paths for sources (cloned repositories) and worktrees
-# Template functions available:
-#   path(n)            - URI path segment (0-based, negative for reverse)
-#   branch()           - Current branch name
-#   norm_branch(sep)   - Branch with "/" replaced (default: "-")
-#   worktree()         - Worktree name (empty if not named)
-#   prefix_worktree(p) - Prefix + worktree name, or empty (default: "-")
-#   norm_prefix_branch() - worktree-branch or norm_branch
+# Template Functions Available
+# ============================
+# All functions can be used in path templates and predicates:
+#
+#   path(n)              - Get URI path segment by index
+#                         - path(0): first segment
+#                         - path(-1): last segment
+#                         - path(-2): second-to-last segment
+#                         Example: path(-2)/path(-1) from "github.com/user/repo" → "user/repo"
+#
+#   branch()             - Current branch name (as-is)
+#                         Example: branch() from "feature/new-ui" → "feature/new-ui"
+#
+#   norm_branch(sep)     - Branch name with "/" replaced
+#                         - norm_branch(): replaces "/" with "-"
+#                         - norm_branch("_"): replaces "/" with "_"
+#                         Example: norm_branch() from "feature/new-ui" → "feature-new-ui"
+#
+#   tag(name)            - Get tag value by name (returns empty string if not set)
+#                         Tags are passed via --tag option: gww clone <uri> --tag env=prod
+#                         Example: tag("env") returns "prod" if --tag env=prod was used
+#
+#   tag_exist(name)      - Check if tag exists (returns True/False)
+#                         Useful in predicates for conditional routing
+#                         Example: tag_exist("env") returns True if --tag env was used
 
+# Default paths for sources (cloned repositories) and worktrees
 default_sources: ~/Developer/sources/default/path(-2)/path(-1)
 default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 
@@ -157,6 +175,29 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 #   custom:
 #     predicate: 'path(0) == "myorg"'
 #     sources: ~/Developer/sources/custom/path(-2)/path(-1)
+#
+#   # Tag-based routing examples:
+#   production:
+#     predicate: 'tag_exist("env") and tag("env") == "prod"'
+#     sources: ~/Developer/sources/prod/path(-2)/path(-1)
+#     worktrees: ~/Developer/worktrees/prod/path(-2)/path(-1)/norm_branch()
+#
+#   development:
+#     predicate: 'tag_exist("env") and tag("env") == "dev"'
+#     sources: ~/Developer/sources/dev/path(-2)/path(-1)
+#     worktrees: ~/Developer/worktrees/dev/path(-2)/path(-1)/norm_branch()
+#
+#   # Tag-based path templates:
+#   tagged_sources:
+#     predicate: 'tag_exist("project")'
+#     sources: ~/Developer/sources/tag("project")/path(-2)/path(-1)
+#     worktrees: ~/Developer/worktrees/tag("project")/path(-2)/path(-1)/branch()
+#
+#   # Combined tag and URI routing:
+#   backend_prod:
+#     predicate: 'tag("env") == "prod" and tag("project") == "backend"'
+#     sources: ~/Developer/sources/backend-prod/path(-2)/path(-1)
+#     worktrees: ~/Developer/worktrees/backend-prod/path(-2)/path(-1)/norm_branch()
 
 # Project rules (optional)
 # Execute actions after clone or worktree creation based on project detection
@@ -169,6 +210,13 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 #     worktree_actions:
 #       - rel_copy: ["local.properties"]
 #       - command: ["./setup-env.sh"]
+#
+#   # Tag-based project detection:
+#   - predicate: 'tag_exist("env") and tag("env") == "prod"'
+#     source_actions:
+#       - command: ["./setup-prod.sh"]
+#     worktree_actions:
+#       - command: ["./configure-prod.sh"]
 """
 
 

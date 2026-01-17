@@ -27,6 +27,7 @@ def run_clone(args: argparse.Namespace) -> int:
     uri_str = args.uri
     verbose = getattr(args, "verbose", 0)
     quiet = getattr(args, "quiet", False)
+    tags = getattr(args, "tags", {})
 
     # Parse URI
     try:
@@ -54,7 +55,7 @@ def run_clone(args: argparse.Namespace) -> int:
 
     # Resolve source path
     try:
-        source_path = resolve_source_path(config, uri)
+        source_path = resolve_source_path(config, uri, tags)
     except ResolverError as e:
         print(f"Error resolving source path: {e}", file=sys.stderr)
         return 2
@@ -77,7 +78,7 @@ def run_clone(args: argparse.Namespace) -> int:
     # Execute source actions if any project rules match
     if config.projects:
         try:
-            actions = get_source_actions(config.projects, source_path)
+            actions = get_source_actions(config.projects, source_path, tags)
             if actions:
                 if verbose > 0 and not quiet:
                     print(f"Executing {len(actions)} source action(s)...", file=sys.stderr)

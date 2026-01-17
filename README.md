@@ -4,8 +4,9 @@ A CLI tool that wraps git worktree functionality with configurable path template
 
 ## Features
 
-- **Configurable path templates**: Dynamic path generation using templates with functions like `path()`, `branch()`, `norm_branch()`
-- **Predicate-based routing**: Route repositories to different locations based on URI predicates (host, path, protocol)
+- **Configurable path templates**: Dynamic path generation using templates with functions like `path()`, `branch()`, `norm_branch()`, `tag()`
+- **Predicate-based routing**: Route repositories to different locations based on URI predicates (host, path, protocol, tags)
+- **Tag support**: Pass custom tags via `--tag` option for conditional routing and path organization
 - **Project actions**: Execute custom actions (file copies, commands) after clone or worktree creation
 - **Shell completion**: Bash, Zsh, and Fish completion support
 
@@ -111,22 +112,40 @@ projects:
 | `path(n)` | Get URI path segment by index (0-based, negative for reverse) | `path(-1)` → last segment |
 | `branch()` | Current branch name | `feature/new-ui` |
 | `norm_branch(sep)` | Branch name with `/` replaced | `norm_branch()` → `feature-new-ui` |
-| `worktree()` | Worktree name (if named) | `my-worktree` |
-| `prefix_worktree(prefix)` | Prefix + worktree name, or empty (default prefix: "-") | `prefix_worktree()` → `-my-worktree` or `prefix_worktree("/")` → `/my-worktree` |
-| `prefix_branch(prefix)` | Worktree name + branch, or branch (default prefix: "-") | `prefix_branch()` → `my-worktree-feature/new-ui` or `prefix_branch("/")` → `my-worktree/feature/new-ui` |
-| `norm_prefix_branch()` | Worktree name + branch, or normalized branch | `my-worktree-feature-new-ui` |
+| `tag(name)` | Get tag value by name (returns empty string if not set) | `tag("env")` → `"prod"` |
+| `tag_exist(name)` | Check if tag exists (returns boolean) | `tag_exist("env")` → `True` |
+
+**Tag Usage Example**:
+```yaml
+sources:
+  production:
+    predicate: 'tag_exist("env") and tag("env") == "prod"'
+    sources: ~/Developer/sources/prod/path(-2)/path(-1)
+    worktrees: ~/Developer/worktrees/prod/path(-2)/path(-1)/norm_branch()
+```
+
+```bash
+# Clone with tags
+gww clone https://github.com/user/repo.git --tag env=prod --tag project=backend
+
+# Add worktree with tags
+gww add feature-branch --tag env=dev --tag team=frontend
+```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `gww clone <uri>` | Clone repository to configured location |
-| `gww add <branch> [name] [-c]` | Add worktree for branch (optionally create branch) |
+| `gww clone <uri> [--tag key=value]...` | Clone repository to configured location (tags available in templates/predicates) |
+| `gww add <branch> [-c] [--tag key=value]...` | Add worktree for branch (optionally create branch, tags available in templates/predicates) |
 | `gww remove <branch\|path> [-f]` | Remove worktree |
 | `gww pull` | Update source repository |
 | `gww migrate <path> [--dry-run] [--move]` | Migrate repositories to new locations |
 | `gww init config` | Create default configuration file |
 | `gww init shell <shell>` | Install shell completion (bash/zsh/fish) |
+
+**Common Options**:
+- `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times)
 
 ## Development
 
