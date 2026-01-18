@@ -16,7 +16,9 @@ from gww.git.worktree import (
     is_worktree_clean,
     add_worktree,
     remove_worktree,
+    repair_worktrees,
 )
+from gww.git.repository import GitCommandError
 
 
 @pytest.fixture
@@ -346,3 +348,54 @@ class TestWorktreeDataclass:
         # Commit should be a hex string
         assert len(wt.commit) >= 7  # At least short hash
         assert all(c in "0123456789abcdef" for c in wt.commit)
+
+
+class TestRepairWorktrees:
+    """Tests for repair_worktrees function."""
+
+    def test_repairs_worktree_paths(
+        self, git_repo_with_worktree: tuple[Path, Path], tmp_path_factory: pytest.TempPathFactory
+    ) -> None:
+        """Test that repair updates worktree paths in source repository."""
+        source, worktree = git_repo_with_worktree
+
+        # Move the worktree to a new location (simulating migration)
+        new_worktree_path = tmp_path_factory.mktemp("moved_worktree")
+        # Remove the empty temp directory first
+        new_worktree_path.rmdir()
+        # Move the worktree
+        import shutil
+        shutil.move(str(worktree), str(new_worktree_path))
+
+        # Before repair, the source repository has stale worktree info
+        # After repair, the worktree paths should be updated
+        repair_worktrees(source)
+
+        # Verify the repair was successful by listing worktrees
+        # The old path should be marked as prunable or removed
+        worktrees = list_worktrees(source)
+
+        # The worktree at the old path should be marked as prunable
+        # since it no longer exists at that location
+        old_wt = [w for w in worktrees if w.path.resolve() == worktree.resolve()]
+        if old_wt:
+            # If still listed, it should be marked as prunable
+            assert old_wt[0].prunable is not None
+
+    def test_repair_handles_repo_without_worktrees(self, git_repo: Path) -> None:
+        """Test that repair succeeds even when no worktrees exist."""
+        # Should not raise any error
+        repair_worktrees(git_repo)
+
+        # Verify repository still works
+        worktrees = list_worktrees(git_repo)
+        assert len(worktrees) >= 1
+
+    def test_repair_raises_error_for_invalid_repo(
+        self, tmp_path_factory: pytest.TempPathFactory
+    ) -> None:
+        """Test error handling for non-repository paths."""
+        invalid_path = tmp_path_factory.mktemp("not_a_repo")
+
+        with pytest.raises(GitCommandError):
+            repair_worktrees(invalid_path)

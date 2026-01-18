@@ -307,3 +307,18 @@ def prune_worktrees(repo_path: Path, dry_run: bool = False) -> list[str]:
             pruned.append(line.strip())
 
     return pruned
+
+
+def repair_worktrees(repo_path: Path) -> None:
+    """Repair worktree administrative files after worktrees have been moved.
+
+    This updates the worktree paths stored in the source repository's
+    .git/worktrees directory to reflect the current locations of worktrees.
+
+    Args:
+        repo_path: Path to repository (source or worktree).
+
+    Raises:
+        GitCommandError: If repair command fails.
+    """
+    _run_git(["worktree", "repair"], cwd=repo_path, check=True)

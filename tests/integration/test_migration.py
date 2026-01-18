@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 from gww.cli.commands.migrate import run_migrate
+from gww.git.worktree import list_worktrees
 
 
 @pytest.fixture
@@ -105,6 +106,68 @@ def config_dir(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.Mon
 def target_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Create a temporary target directory for migrations."""
     return tmp_path_factory.mktemp("new_repos")
+
+
+@pytest.fixture
+def repo_with_worktree(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path, Path]:
+    """Create a source repository with a worktree for migration testing.
+    
+    Returns:
+        Tuple of (worktrees_dir, source_repo_path, worktree_path)
+    """
+    worktrees_dir = tmp_path_factory.mktemp("worktrees_to_migrate")
+    
+    # Create source repository (this stays in place, not migrated)
+    source_repo = tmp_path_factory.mktemp("source_repo")
+    subprocess.run(["git", "init"], cwd=source_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=source_repo,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=source_repo,
+        check=True,
+        capture_output=True,
+    )
+    (source_repo / "README.md").write_text("# Source Repo")
+    subprocess.run(["git", "add", "."], cwd=source_repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=source_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/user/source-repo.git"],
+        cwd=source_repo,
+        check=True,
+        capture_output=True,
+    )
+    
+    # Create a branch for the worktree
+    subprocess.run(
+        ["git", "branch", "feature-branch"],
+        cwd=source_repo,
+        check=True,
+        capture_output=True,
+    )
+    
+    # Create worktree in the worktrees_dir (this will be migrated)
+    worktree_path = worktrees_dir / "feature-worktree"
+    subprocess.run(
+        ["git", "worktree", "add", str(worktree_path), "feature-branch"],
+        cwd=source_repo,
+        check=True,
+        capture_output=True,
+    )
+    
+    # Add remote to worktree so it can be migrated
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", "https://github.com/user/feature-worktree.git"],
+        cwd=worktree_path,
+        check=True,
+        capture_output=True,
+    )
+    
+    return worktrees_dir, source_repo, worktree_path
 
 
 class TestMigrateCommand:
@@ -359,3 +422,123 @@ sources:
         assert result == 0
         captured = capsys.readouterr()
         assert "Scanning" in captured.err or "Copying" in captured.err
+
+    def test_migrate_repairs_worktree_after_move(
+        self,
+        repo_with_worktree: tuple[Path, Path, Path],
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that moving a worktree triggers repair on the source repository."""
+        worktrees_dir, source_repo, worktree_path = repo_with_worktree
+
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/github/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+""")
+
+        class Args:
+            old_repos = str(worktrees_dir)
+            dry_run = False
+            move = True
+            verbose = 1
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        captured = capsys.readouterr()
+
+        # Verify worktree was moved
+        assert not worktree_path.exists()
+        new_worktree_path = target_dir / "github" / "user" / "feature-worktree"
+        assert new_worktree_path.exists()
+
+        # Verify repair was called (check verbose output)
+        assert "Repairing worktree paths" in captured.err
+
+        # Verify the source repository still knows about worktrees
+        # (repair should have updated the paths)
+        worktrees = list_worktrees(source_repo)
+        assert len(worktrees) >= 1  # At least the main worktree
+
+    def test_migrate_repairs_worktree_after_copy(
+        self,
+        repo_with_worktree: tuple[Path, Path, Path],
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that copying a worktree triggers repair on the source repository."""
+        worktrees_dir, source_repo, worktree_path = repo_with_worktree
+
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/github/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+""")
+
+        class Args:
+            old_repos = str(worktrees_dir)
+            dry_run = False
+            move = False  # Copy, not move
+            verbose = 1
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        captured = capsys.readouterr()
+
+        # Verify original worktree still exists (copy, not move)
+        assert worktree_path.exists()
+        # Verify copy was created
+        new_worktree_path = target_dir / "github" / "user" / "feature-worktree"
+        assert new_worktree_path.exists()
+
+        # Verify repair was called
+        assert "Repairing worktree paths" in captured.err
+
+    def test_migrate_does_not_repair_source_repositories(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that repair is NOT called when migrating source repositories (not worktrees)."""
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    predicate: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = str(old_repos_dir)
+            dry_run = False
+            move = True
+            verbose = 1
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        captured = capsys.readouterr()
+
+        # Verify repositories were migrated
+        assert (target_dir / "github" / "user" / "project1").exists()
+
+        # Verify repair was NOT called (source repos don't need repair)
+        assert "Repairing worktree paths" not in captured.err
+        # Output should NOT mention "Repaired" since no worktrees were involved
+        assert "Repaired" not in captured.out

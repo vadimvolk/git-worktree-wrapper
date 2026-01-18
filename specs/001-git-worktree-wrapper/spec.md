@@ -154,7 +154,8 @@ Users can migrate existing repositories from old locations to new locations base
   - If different:
     - If `--dry-run`: Print migration plan
     - Else: Copy or move repository to expected location
-    - Update worktrees if any exist
+    - If repository is a worktree: After moving/copying, call `git worktree repair` on the source repository to update worktree paths
+    - If repository is a source repository: No repair needed (worktrees are not migrated with source)
 - Report summary: repositories scanned, migrated, skipped
 - Handle errors: invalid path, migration failed (exit code 1)
 - Handle configuration errors (exit code 2)
@@ -169,8 +170,8 @@ gww migrate ~/old-repos --dry-run
 
 gww migrate ~/old-repos --move
 # Output:
-# Migrated 5 repositories
-# Moved 3 worktrees
+# Moved 5 repositories
+# Repaired 2 worktrees
 ```
 
 ---

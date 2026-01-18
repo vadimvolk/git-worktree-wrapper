@@ -13,7 +13,14 @@ from typing import Optional
 from gww.config.loader import ConfigLoadError, ConfigNotFoundError, load_config
 from gww.config.resolver import ResolverError, resolve_source_path
 from gww.config.validator import ConfigValidationError, validate_config
-from gww.git.repository import get_remote_uri, is_git_repository
+from gww.git.repository import (
+    GitCommandError,
+    get_remote_uri,
+    get_source_repository,
+    is_git_repository,
+    is_worktree,
+)
+from gww.git.worktree import repair_worktrees
 from gww.utils.uri import parse_uri
 
 
@@ -192,11 +199,22 @@ def run_migrate(args: argparse.Namespace) -> int:
     # Execute migrations
     migrated = 0
     failed = 0
+    repaired = 0
 
     for plan in valid_plans:
         try:
             # Ensure parent directory exists
             plan.new_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Check if this is a worktree before moving (need source repo path)
+            is_wt = is_worktree(plan.old_path)
+            source_repo: Optional[Path] = None
+            if is_wt:
+                try:
+                    source_repo = get_source_repository(plan.old_path)
+                except Exception:
+                    # If we can't get source repo, we'll skip repair
+                    pass
 
             if move:
                 if verbose > 0 and not quiet:
@@ -207,6 +225,22 @@ def run_migrate(args: argparse.Namespace) -> int:
                     print(f"Copying {plan.old_path} -> {plan.new_path}", file=sys.stderr)
                 shutil.copytree(str(plan.old_path), str(plan.new_path))
 
+            # If this was a worktree, repair the source repository
+            if is_wt and source_repo is not None:
+                try:
+                    if verbose > 0 and not quiet:
+                        print(
+                            f"Repairing worktree paths in {source_repo}",
+                            file=sys.stderr,
+                        )
+                    repair_worktrees(source_repo)
+                    repaired += 1
+                except GitCommandError as e:
+                    print(
+                        f"Warning: Failed to repair worktree paths for {plan.new_path}: {e}",
+                        file=sys.stderr,
+                    )
+
             migrated += 1
         except OSError as e:
             print(f"Error migrating {plan.old_path}: {e}", file=sys.stderr)
@@ -216,6 +250,8 @@ def run_migrate(args: argparse.Namespace) -> int:
     if not quiet:
         action = "Moved" if move else "Migrated"
         print(f"{action} {migrated} repositories")
+        if repaired:
+            print(f"Repaired {repaired} worktrees")
         if skipped_plans:
             print(f"Skipped {len(skipped_plans)} repositories")
         if failed:

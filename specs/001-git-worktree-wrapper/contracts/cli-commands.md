@@ -241,8 +241,11 @@ gww pull
    - If different:
      - If `--dry-run`: Print migration plan
      - Else: Copy or move repository to expected location
-     - Update worktrees if any exist
-4. Report summary: repositories scanned, migrated, skipped
+     - If the repository being migrated is a worktree:
+       - After moving/copying, call `git worktree repair` on the source repository to update the worktree path
+       - Handle repair errors gracefully (log warning, don't fail migration)
+     - If the repository is a source repository: No repair action needed
+4. Report summary: repositories scanned, migrated, repaired, skipped
 
 **Exit Codes**:
 - `0`: Success
@@ -263,8 +266,8 @@ gww migrate ~/old-repos --dry-run
 
 gww migrate ~/old-repos --move
 # Output:
-# Migrated 5 repositories
-# Moved 3 worktrees
+# Moved 5 repositories
+# Repaired 2 worktrees
 ```
 
 ---
