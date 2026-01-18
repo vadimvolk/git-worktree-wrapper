@@ -47,12 +47,12 @@ Represents a predicate-based routing rule for determining source and worktree lo
 - `sources` and `worktrees` (if present) must be valid template strings
 - At least one source rule must match for any valid URI (or default is used)
 
-**Context Variables** (available during predicate evaluation):
-- `host` (str): Hostname from URI (e.g., "github.com", "rulez.netbird.selfhosted")
-- `port` (str): Port from URI, empty string if missing (e.g., "3000", "")
-- `protocol` (str): Protocol from URI (e.g., "http", "https", "ssh", "git", "file")
-- `path` (list[str]): URI path segments (e.g., ["vadimvolk", "ansible"] from "/vadimvolk/ansible.git")
-- `uri` (str): Full URI string
+**Context Functions** (available during predicate evaluation):
+- `host() -> str`: Hostname from URI (e.g., "github.com", "rulez.netbird.selfhosted")
+- `port() -> str`: Port from URI, empty string if missing (e.g., "3000", "")
+- `protocol() -> str`: Protocol from URI (e.g., "http", "https", "ssh", "git", "file")
+- `path() -> list[str]`: URI path segments (e.g., ["vadimvolk", "ansible"] from "/vadimvolk/ansible.git")
+- `uri() -> str`: Full URI string
 
 **Relationships**:
 - Belongs to `Config` (many-to-one)
@@ -74,8 +74,8 @@ Represents a project type detection rule with associated actions to execute duri
 - `source_actions` and `worktree_actions` must be valid action lists
 - At least one action type must be specified
 
-**Context Variables** (available during predicate evaluation):
-- `source_path` (Path): Absolute path to source repository
+**Context Functions** (available during predicate evaluation):
+- `source_path() -> str`: Absolute path to source repository
 - File system functions: `file_exists(path)`, `dir_exists(path)`, etc.
 
 **Relationships**:
@@ -216,12 +216,12 @@ Built-in functions available in template expressions.
   - `tag_exist("env")`: Returns True if tag "env" was provided via `--tag env` or `--tag env=value`
   - Useful in predicates: `tag_exist("env") and tag("env") == "prod"`
 
-**Context Variables** (available during predicate evaluation):
-- `host` (str): Hostname from URI (e.g., "github.com", "rulez.netbird.selfhosted")
-- `port` (str): Port from URI, empty string if missing (e.g., "3000", "")
-- `protocol` (str): Protocol from URI (e.g., "http", "https", "ssh", "git", "file")
-- `path` (list[str]): URI path segments (e.g., ["vadimvolk", "ansible"] from "/vadimvolk/ansible.git")
-- `uri` (str): Full URI string
+**Context Functions** (available during predicate evaluation):
+- `host() -> str`: Hostname from URI (e.g., "github.com", "rulez.netbird.selfhosted")
+- `port() -> str`: Port from URI, empty string if missing (e.g., "3000", "")
+- `protocol() -> str`: Protocol from URI (e.g., "http", "https", "ssh", "git", "file")
+- `path() -> list[str]`: URI path segments (e.g., ["vadimvolk", "ansible"] from "/vadimvolk/ansible.git")
+- `uri() -> str`: Full URI string
 - `tag(name: str) -> str`: Get tag value by name (same as template function)
 - `tag_exist(name: str) -> bool`: Check if tag exists (same as template function)
 

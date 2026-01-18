@@ -68,7 +68,7 @@ def _create_predicate_context(
         tags: Optional dictionary of tag key-value pairs.
 
     Returns:
-        Dictionary of context variables and functions.
+        Dictionary of context functions.
     """
     # Create bound functions for file system checks
     def file_exists(path: str) -> bool:
@@ -80,8 +80,12 @@ def _create_predicate_context(
     def path_exists(path: str) -> bool:
         return _path_exists(path, source_path)
 
+    def source_path_func() -> str:
+        """Get absolute path to source repository."""
+        return str(source_path)
+
     context: dict[str, object] = {
-        "source_path": str(source_path),
+        "source_path": source_path_func,
         "file_exists": file_exists,
         "dir_exists": dir_exists,
         "path_exists": path_exists,

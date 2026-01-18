@@ -39,30 +39,19 @@ def _build_uri_context(uri: ParsedURI, tags: dict[str, str] = {}) -> dict[str, o
         tags: Optional dictionary of tag key-value pairs.
 
     Returns:
-        Dictionary of context variables for predicate evaluation.
+        Dictionary of context functions for predicate evaluation.
     """
-    context: dict[str, object] = {
-        "host": uri.host,
-        "port": uri.port,
-        "protocol": uri.protocol,
-        "path": uri.path_segments,
-        "uri": uri.uri,
+    return {
+        # URI functions
+        "host": lambda: uri.host,
+        "port": lambda: uri.port,
+        "protocol": lambda: uri.protocol,
+        "path": lambda: uri.path_segments,
+        "uri": lambda: uri.uri,
+        # Tag functions
+        "tag": lambda name: tags.get(name, ""),
+        "tag_exist": lambda name: name in tags,
     }
-
-    # Add tag functions
-
-    def tag(name: str) -> str:
-        """Get tag value by name."""
-        return tags.get(name, "")
-
-    def tag_exist(name: str) -> bool:
-        """Check if tag exists."""
-        return name in tags
-
-    context["tag"] = tag
-    context["tag_exist"] = tag_exist
-
-    return context
 
 
 def find_matching_source_rule(

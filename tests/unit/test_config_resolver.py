@@ -22,7 +22,7 @@ class TestFindMatchingSourceRule:
         """Test matching GitHub predicate with 'github' in host."""
         github_rule = SourceRule(
             name="github",
-            predicate='"github" in host',
+            predicate='"github" in host()',
             sources="~/sources/github/path(-2)/path(-1)",
         )
         config = Config(
@@ -41,7 +41,7 @@ class TestFindMatchingSourceRule:
         """Test matching GitLab predicate."""
         gitlab_rule = SourceRule(
             name="gitlab",
-            predicate='"gitlab" in host',
+            predicate='"gitlab" in host()',
             sources="~/sources/gitlab/path(-2)/path(-1)",
         )
         config = Config(
@@ -60,7 +60,7 @@ class TestFindMatchingSourceRule:
         """Test that no match returns None."""
         github_rule = SourceRule(
             name="github",
-            predicate='"github" in host',
+            predicate='"github" in host()',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -106,7 +106,7 @@ class TestFindMatchingSourceRule:
         """Test predicate that accesses path segments."""
         rule = SourceRule(
             name="myorg",
-            predicate='path[0] == "myorg"',
+            predicate='path()[0] == "myorg"',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -124,7 +124,7 @@ class TestFindMatchingSourceRule:
         """Test predicate that checks protocol."""
         rule = SourceRule(
             name="ssh",
-            predicate='protocol == "ssh"',
+            predicate='protocol() == "ssh"',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -142,7 +142,7 @@ class TestFindMatchingSourceRule:
         """Test predicate that checks port."""
         rule = SourceRule(
             name="custom",
-            predicate='port == "3000"',
+            predicate='port() == "3000"',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -177,12 +177,12 @@ class TestFindMatchingSourceRule:
         # Test with 'not "github" in host' form
         non_github_rule1 = SourceRule(
             name="non_github1",
-            predicate='not "github" in host',
+            predicate='not "github" in host()',
         )
         # Test with '"github" not in host' form
         non_github_rule2 = SourceRule(
             name="non_github2",
-            predicate='"github" not in host',
+            predicate='"github" not in host()',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -343,7 +343,7 @@ class TestFindMatchingSourceRule:
         """Test tag functions combined with URI predicates."""
         rule = SourceRule(
             name="github_prod",
-            predicate='"github" in host and tag("env") == "production"',
+            predicate='"github" in host() and tag("env") == "production"',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -480,7 +480,7 @@ class TestResolveSourcePath:
         """Test that matching rule's sources template is used."""
         github_rule = SourceRule(
             name="github",
-            predicate='"github" in host',
+            predicate='"github" in host()',
             sources="~/sources/github/path(-2)/path(-1)",
         )
         config = Config(
@@ -500,7 +500,7 @@ class TestResolveSourcePath:
         """Test fallback to default when rule has no sources template."""
         rule = SourceRule(
             name="github",
-            predicate='"github" in host',
+            predicate='"github" in host()',
             sources=None,  # No sources template
         )
         config = Config(
@@ -574,7 +574,7 @@ class TestResolveWorktreePath:
         """Test that matching rule's worktrees template is used."""
         github_rule = SourceRule(
             name="github",
-            predicate='"github" in host',
+            predicate='"github" in host()',
             sources="~/sources/github",
             worktrees="~/worktrees/github/path(-2)/path(-1)/branch()",
         )
@@ -596,7 +596,7 @@ class TestResolveWorktreePath:
         """Test fallback to default when rule has no worktrees template."""
         rule = SourceRule(
             name="github",
-            predicate='"github" in host',
+            predicate='"github" in host()',
             sources="~/sources/github",
             worktrees=None,
         )
@@ -651,7 +651,7 @@ class TestMigrationPathCalculation:
         """Test calculating new path for GitHub repository."""
         github_rule = SourceRule(
             name="github",
-            predicate='"github" in host',
+            predicate='"github" in host()',
             sources="~/sources/github/path(-2)/path(-1)",
         )
         config = Config(
@@ -671,7 +671,7 @@ class TestMigrationPathCalculation:
         """Test calculating new path for GitLab with nested groups."""
         gitlab_rule = SourceRule(
             name="gitlab",
-            predicate='"gitlab" in host',
+            predicate='"gitlab" in host()',
             sources="~/sources/gitlab/path(-3)/path(-2)/path(-1)",
         )
         config = Config(
@@ -692,7 +692,7 @@ class TestMigrationPathCalculation:
         """Test that default path is used for unknown hosts."""
         github_rule = SourceRule(
             name="github",
-            predicate='"github" in host',
+            predicate='"github" in host()',
             sources="~/sources/github/path(-1)",
         )
         config = Config(
@@ -727,7 +727,7 @@ class TestMigrationPathCalculation:
         """Test resolve_source_path with tag() in rule's sources template."""
         rule = SourceRule(
             name="github",
-            predicate='"github" in host',
+            predicate='"github" in host()',
             sources="~/sources/tag('env')/github/path(-2)/path(-1)",
         )
         config = Config(
@@ -796,7 +796,7 @@ class TestMigrationPathCalculation:
         """Test resolve_worktree_path with tag() in rule's worktrees template."""
         rule = SourceRule(
             name="github",
-            predicate='"github" in host',
+            predicate='"github" in host()',
             sources="~/sources/github",
             worktrees="~/worktrees/tag('env')/github/path(-1)/norm_branch()",
         )

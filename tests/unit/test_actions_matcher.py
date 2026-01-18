@@ -47,7 +47,7 @@ class TestFindMatchingProjects:
     def test_matches_source_path_predicate(self, tmp_path: Path) -> None:
         """Test matching project with source_path variable predicate."""
         rule = ProjectRule(
-            predicate='source_path != ""',
+            predicate='source_path() != ""',
             source_actions=[Action(action_type="command", args=["echo"])],
         )
 
@@ -113,7 +113,7 @@ class TestFindMatchingProjects:
     def test_predicate_with_source_path_variable(self, tmp_path: Path) -> None:
         """Test predicate that uses source_path variable."""
         rule = ProjectRule(
-            predicate='source_path != ""',
+            predicate='source_path() != ""',
             source_actions=[Action(action_type="command", args=["echo"])],
         )
 

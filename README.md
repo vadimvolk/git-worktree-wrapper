@@ -88,12 +88,12 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 
 sources:
   github:
-    predicate: '"github" in host'
+    predicate: '"github" in host()'
     sources: ~/Developer/sources/github/path(-2)/path(-1)
     worktrees: ~/Developer/worktrees/github/path(-2)/path(-1)/norm_branch()
 
   gitlab:
-    predicate: '"gitlab" in host'
+    predicate: '"gitlab" in host()'
     sources: ~/Developer/sources/gitlab/path(-3)/path(-2)/path(-1)
     worktrees: ~/Developer/worktrees/gitlab/path(-3)/path(-2)/path(-1)/norm_branch()
 
