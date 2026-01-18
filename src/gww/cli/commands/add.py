@@ -141,10 +141,10 @@ def run_add(args: argparse.Namespace) -> int:
         print(f"Error adding worktree: {e}", file=sys.stderr)
         return 1
 
-    # Execute worktree actions if any project rules match
-    if config.projects:
+    # Execute worktree actions if any action rules match
+    if config.actions:
         try:
-            actions = get_worktree_actions(config.projects, source_path, tags, dest_path=worktree_path)
+            actions = get_worktree_actions(config.actions, source_path, tags, dest_path=worktree_path)
             if actions:
                 if verbose > 0 and not quiet:
                     print(

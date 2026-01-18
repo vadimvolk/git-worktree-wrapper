@@ -48,13 +48,13 @@ sources:
         assert "github" in result["sources"]
         assert result["sources"]["github"]["predicate"] == '"github" in host'
 
-    def test_loads_config_with_projects(self, tmp_path: Path) -> None:
-        """Test loading config with project rules."""
+    def test_loads_config_with_actions(self, tmp_path: Path) -> None:
+        """Test loading config with action rules."""
         config_file = tmp_path / "config.yml"
         config_file.write_text("""
 default_sources: ~/sources/default
 default_worktrees: ~/worktrees/default
-projects:
+actions:
   - predicate: 'file_exists("package.json")'
     source_actions:
       - command: "npm install"
@@ -62,9 +62,9 @@ projects:
 
         result = load_config(config_file)
 
-        assert "projects" in result
-        assert len(result["projects"]) == 1
-        assert result["projects"][0]["predicate"] == 'file_exists("package.json")'
+        assert "actions" in result
+        assert len(result["actions"]) == 1
+        assert result["actions"][0]["predicate"] == 'file_exists("package.json")'
 
     def test_raises_error_for_nonexistent_file(self, tmp_path: Path) -> None:
         """Test that ConfigNotFoundError is raised for missing file."""
@@ -215,10 +215,10 @@ class TestGetDefaultConfig:
         assert "sources:" in result or "# sources:" in result
         assert "github" in result.lower()
 
-    def test_includes_commented_project_examples(self) -> None:
-        """Test that default config includes commented project rule examples."""
+    def test_includes_commented_action_examples(self) -> None:
+        """Test that default config includes commented action rule examples."""
         result = get_default_config()
-        assert "projects:" in result or "# projects:" in result
+        assert "actions:" in result or "# actions:" in result
 
     def test_includes_template_function_documentation(self) -> None:
         """Test that default config includes template function docs."""

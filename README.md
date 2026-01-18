@@ -118,7 +118,7 @@ sources:
     sources: ~/Developer/sources/gitlab/path(-3)/path(-2)/path(-1)
     worktrees: ~/Developer/worktrees/gitlab/path(-3)/path(-2)/path(-1)/norm_branch()
 
-projects:
+actions:
   - predicate: file_exists("local.properties")
     source_actions:
       - abs_copy: ["~/sources/default-local.properties", "local.properties"]

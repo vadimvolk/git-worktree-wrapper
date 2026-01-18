@@ -15,14 +15,14 @@ Represents the YAML configuration file (`config.yml` in `$XDG_CONFIG_HOME/gww/`)
 - `default_sources` (str, required): Template string for default source checkout location
 - `default_worktrees` (str, required): Template string for default worktree location
 - `sources` (dict[str, SourceRule], optional): Named source routing rules
-- `projects` (list[ProjectRule], optional): Project detection and action rules
+- `actions` (list[ProjectRule], optional): Action rules for project detection
 
 **Validation Rules**:
 - `default_sources` and `default_worktrees` must be non-empty strings
 - Template strings must be valid (syntax checked during evaluation)
 - `sources` keys must be unique strings
 - Each `SourceRule` must have a `predicate` field
-- `projects` list must contain valid `ProjectRule` objects
+- `actions` list must contain valid `ProjectRule` objects
 
 **State**: Immutable after loading (read-only during runtime)
 

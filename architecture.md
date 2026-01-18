@@ -36,7 +36,7 @@ sources:
 # sources - optional value, if missing default_sources used, if present evalueate to get checkout folder
 # worktrees - optional value, if missing default_worktrees used, if present evaluate to get worktrees folder
 # branch() - git branch name as is
-projects:
+actions:
     - predicate: file_exists(local.properties)
       source_actions: 
         - abs_copy("~/sources/default-local.properties", "local.properties")
@@ -52,7 +52,7 @@ projects:
 ```
 
 # Commands:
-gww clone <uri> - find proper location for new source and checkout there. Then analyze result with projects and execute source_actions for any project with matched predicate
+gww clone <uri> - find proper location for new source and checkout there. Then analyze result with actions and execute source_actions for any action with matched predicate
 
 gww add <branch> - must executed inside a source or worktree folder. Add a worktree for branch. To get destination folder uses settings file
 

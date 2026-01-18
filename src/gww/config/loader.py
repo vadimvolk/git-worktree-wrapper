@@ -235,7 +235,7 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 #     sources: ~/Developer/sources/tag("project")/path(-2)/path(-1)
 #     worktrees: ~/Developer/worktrees/tag("project")/path(-2)/path(-1)/branch()-tag("worktree-name")
 #
-# Project rules (optional)
+# Actions (optional)
 # Execute actions after clone or worktree creation based on project detection
 #
 # Command action syntax:
@@ -247,7 +247,7 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 #
 # Uncomment and customize as needed:
 
-# projects:
+# actions:
 #   - predicate: 'file_exists("local.properties")'
 #     source_actions:
 #       - abs_copy: ["~/sources/default-local.properties", "local.properties"]
@@ -255,7 +255,7 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 #       - rel_copy: ["local.properties"]
 #       - command: "./setup-env.sh"
 #
-#   # Tag-based project actions:
+#   # Tag-based actions:
 #   - predicate: not file_exists("CLAUDE.md") and tag_exist("use-claude")
 #     source_actions:
 #       - command: "claude init"

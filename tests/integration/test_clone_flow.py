@@ -270,7 +270,7 @@ class TestCloneWithProjectActions:
 default_sources: {target_dir}/sources/path(-1)
 default_worktrees: {target_dir}/worktrees
 
-projects:
+actions:
   - predicate: 'True'
     source_actions:
       - abs_copy: ["{marker_file}", "copied_marker.txt"]

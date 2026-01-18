@@ -65,13 +65,13 @@ class Config:
         default_sources: Template string for default source location.
         default_worktrees: Template string for default worktree location.
         sources: Named source routing rules.
-        projects: Project detection and action rules.
+        actions: Action rules for project detection.
     """
 
     default_sources: str
     default_worktrees: str
     sources: dict[str, SourceRule] = field(default_factory=dict)
-    projects: list[ProjectRule] = field(default_factory=list)
+    actions: list[ProjectRule] = field(default_factory=list)
 
 
 def _validate_string(value: Any, field_name: str) -> str:
@@ -211,7 +211,7 @@ def _validate_project_rule(data: Any, index: int) -> ProjectRule:
     Raises:
         ConfigValidationError: If validation fails.
     """
-    context = f"projects[{index}]"
+    context = f"actions[{index}]"
 
     if not isinstance(data, dict):
         raise ConfigValidationError(
@@ -285,20 +285,20 @@ def validate_config(data: dict[str, Any]) -> Config:
         for name, rule_data in sources_data.items():
             sources[name] = _validate_source_rule(name, rule_data)
 
-    # Validate optional projects
-    projects: list[ProjectRule] = []
-    if "projects" in data:
-        projects_data = data["projects"]
-        if not isinstance(projects_data, list):
+    # Validate optional actions
+    actions: list[ProjectRule] = []
+    if "actions" in data:
+        actions_data = data["actions"]
+        if not isinstance(actions_data, list):
             raise ConfigValidationError(
-                f"'projects' must be a list, got {type(projects_data).__name__}"
+                f"'actions' must be a list, got {type(actions_data).__name__}"
             )
-        for i, rule_data in enumerate(projects_data):
-            projects.append(_validate_project_rule(rule_data, i))
+        for i, rule_data in enumerate(actions_data):
+            actions.append(_validate_project_rule(rule_data, i))
 
     return Config(
         default_sources=default_sources,
         default_worktrees=default_worktrees,
         sources=sources,
-        projects=projects,
+        actions=actions,
     )

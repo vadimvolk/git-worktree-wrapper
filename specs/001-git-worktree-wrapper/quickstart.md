@@ -241,7 +241,7 @@ gww clone https://other.com/user/repo.git
 **Setup**: Config with project detection and actions
 
 ```yaml
-projects:
+actions:
     - predicate: file_exists(local.properties)
       source_actions:
           - abs_copy("~/sources/default-local.properties", "local.properties")
@@ -458,7 +458,7 @@ gww add feature-branch --tag env=dev --tag team=frontend
 
 ```yaml
 # Project-specific functions (only available in project predicates)
-projects:
+actions:
   - predicate: 'file_exists("package.json")'
     source_actions:
       - type: command
@@ -478,7 +478,7 @@ projects:
         args: ["install", "-e", "."]
 
 # Shared functions also available in project predicates
-projects:
+actions:
   - predicate: 'file_exists("package.json") and tag("env") == "prod"'
     source_actions:
       - type: command
