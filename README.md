@@ -1,25 +1,27 @@
 <!-- Language switcher -->
 **English** | [Русский](README.ru.md)
 
-# GWW - Git Worktree Wrapper
+> ⚠️ **Warning**: GWW is not heavily tested, use at your own risk!
+
+# 🚀 GWW - Git Worktree Wrapper
 
 A CLI tool that wraps git worktree functionality with configurable path templates, condition-based routing, and project-specific actions.
 
-## Features
+## ✨ Features
 
-- **Configurable path templates**: Dynamic path generation using templates with functions like `path(n)`, `branch()`, `norm_branch()`, `tag()`
-- **Condition-based routing**: Route repositories to different locations based on URI conditions (host, path, protocol, tags)
-- **Tag support**: Pass custom tags via `--tag` option for conditional routing and path organization
-- **Project actions**: Execute custom actions (file copies, commands) after clone or worktree creation
-- **Shell completion**: Bash, Zsh, and Fish completion support
+- **📝 Configurable path templates**: Dynamic path generation using templates with functions like `path(n)`, `branch()`, `norm_branch()`, `tag()`
+- **🔄 Condition-based routing**: Route repositories to different locations based on URI conditions (host, path, protocol, tags)
+- **🏷️ Tag support**: Pass custom tags via `--tag` option for conditional routing and path organization
+- **⚙️ Project actions**: Execute custom actions (file copies, commands) after clone or worktree creation
+- **🐚 Shell completion**: Bash, Zsh, and Fish completion support
 
-## Requirements
+## 📋 Requirements
 
-- Python 3.11+
-- Git
-- Unix-like system (Linux, macOS)
+- 🐍 Python 3.11+
+- 🔧 Git
+- 🖥️ Unix-like system (Linux, macOS)
 
-## Installation
+## 📦 Installation
 
 ### Install the CLI (recommended)
 
@@ -60,9 +62,9 @@ python -m pip install .
 gww --help
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. Initialize Configuration
+### 1. ⚙️ Initialize Configuration
 
 ```bash
 gww init config
@@ -70,14 +72,14 @@ gww init config
 
 This creates a default configuration file at `~/.config/gww/config.yml` (Linux) or `~/Library/Application Support/gww/config.yml` (macOS).
 
-### 2. Clone a Repository
+### 2. 📥 Clone a Repository
 
 ```bash
 gww clone https://github.com/user/repo.git
 # Output: ~/Developer/sources/github/user/repo
 ```
 
-### 3. Add a Worktree
+### 3. ➕ Add a Worktree
 
 ```bash
 cd ~/Developer/sources/github/user/repo
@@ -85,21 +87,23 @@ gww add feature-branch
 # Output: ~/Developer/worktrees/github/user/repo/feature-branch
 ```
 
-### 4. Remove a Worktree
+### 4. ➖ Remove a Worktree
 
 ```bash
 gww remove feature-branch
 # Output: Removed worktree: ~/Developer/worktrees/github/user/repo/feature-branch
 ```
 
-### 5. Update Source Repository
+### 5. 🔄 Update Source Repository
 
 ```bash
 gww pull
 # Output: Updated source repository: ~/Developer/sources/github/user/repo
 ```
 
-## Configuration
+**Note**: `gww pull` will pull the source repository even if it's called from a worktree, as long as the source repository is clean and has `main` or `master` branch checked out. This is useful for merge/rebase scenarios where you want to update the source repository while working in a worktree.
+
+## ⚙️ Configuration
 
 Example `config.yml`:
 
@@ -126,9 +130,9 @@ actions:
       - rel_copy: ["local.properties"]
 ```
 
-### Template Functions
+### 📝 Template Functions
 
-#### URI Functions (available in templates and `when` conditions)
+#### 🌐 URI Functions (available in templates and `when` conditions)
 
 | Function | Description | Example |
 |----------|-------------|---------|
@@ -138,21 +142,22 @@ actions:
 | `uri()` | Get full URI string | `uri()` → `"https://github.com/user/repo.git"` |
 | `path(n)` | Get URI path segment by index (0-based, negative for reverse) | `path(-1)` → `"repo"`, `path(0)` → `"user"` |
 
-#### Branch Functions (available in templates)
+#### 🌿 Branch Functions (available in templates)
 
 | Function | Description | Example |
 |----------|-------------|---------|
 | `branch()` | Get current branch name | `branch()` → `"feature/new/ui"` |
 | `norm_branch(replacement)` | Branch name with `/` replaced (default: `"-"`) | `norm_branch()` → `"feature-new-ui"`, `norm_branch("_")` → `"feature_new_ui"` |
 
-#### Tag Functions (available in templates and `when` conditions)
+#### ⚙️ Actions (available in `actions` section)
 
-| Function | Description | Example |
-|----------|-------------|---------|
-| `tag(name)` | Get tag value by name (returns empty string if not set) | `tag("env")` → `"prod"` |
-| `tag_exist(name)` | Check if tag exists (returns boolean) | `tag_exist("env")` → `True` |
+| Action | Description | Example |
+|--------|-------------|---------|
+| `abs_copy` | Copy file from absolute path to relative destination in target directory | `abs_copy: ["~/sources/default-local.properties", "local.properties"]` |
+| `rel_copy` | Copy file from source repository to worktree (relative paths) | `rel_copy: ["local.properties"]` or `rel_copy: ["config.template", "config"]` |
+| `command` | Execute external command (runs in destination directory, template functions available) | `command: "npm install"` or `command: "claude init"` |
 
-#### Project Functions (available only in project `when` conditions)
+#### 📁 Actions Functions (available in `command` actions and `when` conditions)
 
 | Function | Description | Example |
 |----------|-------------|---------|
@@ -162,41 +167,60 @@ actions:
 | `dir_exists(path)` | Check if directory exists relative to source repository | `dir_exists("config")` → `True` |
 | `path_exists(path)` | Check if path exists (file or directory) relative to source repository | `path_exists("local.properties")` → `True` |
 
-**Tag Usage Example**:
+#### 🏷️ Tag Functions (available in templates and `when` conditions)
+
+| Function | Description | Example |
+|----------|-------------|---------|
+| `tag(name)` | Get tag value by name (returns empty string if not set) | `tag("env")` → `"prod"` |
+| `tag_exist(name)` | Check if tag exists (returns boolean) | `tag_exist("env")` → `True` |
+
+**🏷️ Tag Usage Example**:
 ```yaml
 sources:
-  production:
-    when: 'tag_exist("env") and tag("env") == "prod"'
-    sources: ~/Developer/sources/prod/path(-2)/path(-1)
-    worktrees: ~/Developer/worktrees/prod/path(-2)/path(-1)/norm_branch()
+  # Temporary checkout: Clone repositories to ~/Downloads/temp for quick access
+  # Usage: gww clone <uri> --tag temp
+  temp:
+    when: 'tag_exist("temp")'
+    sources: ~/Downloads/temp/path(-1)
+    worktrees: ~/Downloads/temp/path(-1)/norm_branch()
+
+  # Code review worktrees: Add worktrees to ~/Developer/worktree/code-review for review tasks
+  # Usage: gww add <branch> --tag review
+  review:
+    when: 'tag_exist("review")'
+    sources: ~/Developer/sources/path(-2)/path(-1)
+    worktrees: ~/Developer/worktree/code-review/path(-1)/norm_branch()
 ```
 
 ```bash
-# Clone with tags
-gww clone https://github.com/user/repo.git --tag env=prod --tag project=backend
+# Clone to temporary location
+gww clone https://github.com/user/repo.git --tag temp
+# Output: ~/Downloads/temp/repo
 
-# Add worktree with tags
-gww add feature-branch --tag env=dev --tag team=frontend
+# Add worktree for code review
+cd ~/Developer/sources/github/user/repo
+gww add feature-branch --tag review
+# Output: ~/Developer/worktree/code-review/repo/feature-branch
 ```
 
-## Commands
+## 📖 Commands
 
 | Command | Description |
 |---------|-------------|
-| `gww clone <uri> [--tag key=value]...` | Clone repository to configured location (tags available in templates/conditions) |
-| `gww add <branch> [-c] [--tag key=value]...` | Add worktree for branch (optionally create branch, tags available in templates/conditions) |
-| `gww remove <branch\|path> [-f]` | Remove worktree |
-| `gww pull` | Update source repository |
-| `gww migrate <path> [--dry-run] [--move]` | Migrate repositories to new locations |
-| `gww init config` | Create default configuration file |
-| `gww init shell <shell>` | Install shell completion (bash/zsh/fish) |
+| `gww clone <uri> [--tag key=value]...` | 📥 Clone repository to configured location (tags available in templates/conditions) |
+| `gww add <branch> [-c] [--tag key=value]...` | ➕ Add worktree for branch (optionally create branch, tags available in templates/conditions) |
+| `gww remove <branch\|path> [-f]` | ➖ Remove worktree |
+| `gww pull` | 🔄 Update source repository (works from worktrees if source is clean and on main/master) |
+| `gww migrate <path> [--dry-run] [--move]` | 🚚 Migrate repositories to new locations |
+| `gww init config` | ⚙️ Create default configuration file |
+| `gww init shell <shell>` | 🐚 Install shell completion (bash/zsh/fish) |
 
 **Common Options**:
 - `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times)
 
-## Development
+## 🛠️ Development
 
-### Running Tests
+### 🧪 Running Tests
 
 ```bash
 # Run all tests
@@ -212,12 +236,12 @@ uv run pytest tests/unit/
 uv run pytest tests/integration/
 ```
 
-### Type Checking
+### 🔍 Type Checking
 
 ```bash
 uv run mypy src/gww
 ```
 
-## License
+## 📄 License
 
 MIT
