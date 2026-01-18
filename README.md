@@ -72,29 +72,37 @@ gww init config
 
 This creates a default configuration file at `~/.config/gww/config.yml` (Linux) or `~/Library/Application Support/gww/config.yml` (macOS).
 
-### 2. 📥 Clone a Repository
+### 2. 🐚 Initialize Shell Integration
 
 ```bash
-gww clone https://github.com/user/repo.git
-# Output: ~/Developer/sources/github/user/repo
+gww init shell zsh  # or bash, or fish
 ```
 
-### 3. ➕ Add a Worktree
+This installs shell completion and aliases (`gwc`, `gwa`, `gwr`) for easier workflow. Follow the instructions printed by the command to enable them in your shell.
+
+### 3. 📥 Clone a Repository
+
+```bash
+gwc https://github.com/user/repo.git
+# Automatically navigates to: ~/Developer/sources/github/user/repo
+```
+
+### 4. ➕ Add a Worktree
 
 ```bash
 cd ~/Developer/sources/github/user/repo
-gww add feature-branch
-# Output: ~/Developer/worktrees/github/user/repo/feature-branch
+gwa feature-branch
+# Automatically navigates to: ~/Developer/worktrees/github/user/repo/feature-branch
 ```
 
-### 4. ➖ Remove a Worktree
+### 5. ➖ Remove a Worktree
 
 ```bash
-gww remove feature-branch
+gwr feature-branch
 # Output: Removed worktree: ~/Developer/worktrees/github/user/repo/feature-branch
 ```
 
-### 5. 🔄 Update Source Repository
+### 6. 🔄 Update Source Repository
 
 ```bash
 gww pull
