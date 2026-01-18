@@ -216,7 +216,51 @@ gww add feature-branch --tag review
 | `gww init shell <shell>` | 🐚 Install shell completion (bash/zsh/fish) |
 
 **Common Options**:
-- `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times)
+- `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times).
+
+## 🔄 Update
+
+### Using uv
+
+```bash
+# Re-run the install command to update to the latest version
+uv tool install "git+https://github.com/vadimvolk/git-worktree-wrapper.git"
+
+# Or use the update command (if available)
+uv tool update gww
+```
+
+### Using pipx
+
+```bash
+pipx upgrade gww
+```
+
+### Using pip
+
+```bash
+python -m pip install --upgrade gww
+```
+
+## 🗑️ Uninstall
+
+### Using uv
+
+```bash
+uv tool uninstall gww
+```
+
+### Using pipx
+
+```bash
+pipx uninstall gww
+```
+
+### Using pip
+
+```bash
+python -m pip uninstall gww
+```
 
 ## 🛠️ Development
 

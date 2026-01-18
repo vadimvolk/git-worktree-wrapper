@@ -65,6 +65,13 @@ def create_parser() -> argparse.ArgumentParser:
         "uri",
         help="Git repository URI (HTTP, HTTPS, SSH, or file://)",
     )
+    clone_parser.add_argument(
+        "-t", "--tag",
+        action="append",
+        default=[],
+        help="Tag in format key=value or just key (can be specified multiple times)",
+        metavar="TAG",
+    )
 
     # add command
     add_parser = subparsers.add_parser(
@@ -80,6 +87,13 @@ def create_parser() -> argparse.ArgumentParser:
         "-c", "--create-branch",
         action="store_true",
         help="Create branch from current commit if it doesn't exist",
+    )
+    add_parser.add_argument(
+        "-t", "--tag",
+        action="append",
+        default=[],
+        help="Tag in format key=value or just key (can be specified multiple times)",
+        metavar="TAG",
     )
 
     # remove command

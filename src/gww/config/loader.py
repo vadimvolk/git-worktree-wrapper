@@ -160,7 +160,7 @@ DEFAULT_CONFIG_TEMPLATE = """\
 #
 # Tag Functions:
 #   tag(name)            - Get tag value by name (returns empty string if not set)
-#                         Tags are passed via --tag option: gww clone <uri> --tag env=prod
+#                         Tags are passed via --tag option
 #                         Example: tag("env") returns "prod" if --tag env=prod was used
 #
 #   tag_exist(name)      - Check if tag exists (returns True/False)
