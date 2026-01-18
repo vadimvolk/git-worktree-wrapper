@@ -1,5 +1,7 @@
 """Unit tests for template functions in src/gww/template/functions.py."""
 
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -12,6 +14,57 @@ from gww.template.functions import (
 )
 from gww.template.evaluator import evaluate_template
 from gww.utils.uri import parse_uri
+
+
+def _init_git_repo(path: Path) -> None:
+    """Initialize a git repository at the given path."""
+    subprocess.run(
+        ["git", "init"],
+        cwd=path,
+        check=True,
+        capture_output=True,
+    )
+    # Configure git user for the repo (needed for commits)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"],
+        cwd=path,
+        check=True,
+        capture_output=True,
+    )
+
+
+def _create_initial_commit(path: Path) -> None:
+    """Create an initial commit in the git repository."""
+    readme = path / "README.md"
+    readme.write_text("# Test Repo\n")
+    subprocess.run(
+        ["git", "add", "."],
+        cwd=path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "Initial commit"],
+        cwd=path,
+        check=True,
+        capture_output=True,
+    )
+
+
+def _add_worktree(repo_path: Path, worktree_path: Path, branch: str) -> None:
+    """Add a worktree to the repository."""
+    subprocess.run(
+        ["git", "worktree", "add", str(worktree_path), "-b", branch],
+        cwd=repo_path,
+        check=True,
+        capture_output=True,
+    )
 
 
 class TestTagFunction:
@@ -470,13 +523,119 @@ class TestProjectFunctions:
         assert "dir_exists" in functions
         assert "path_exists" in functions
 
-    def test_source_path_returns_absolute_path(self, tmp_path: Path) -> None:
-        """Test source_path() returns absolute path string."""
+    def test_source_path_from_source_repo_root(self, tmp_path: Path) -> None:
+        """Test source_path() returns repo root when called from source repository root."""
+        repo_path = tmp_path / "repo"
+        repo_path.mkdir()
+        _init_git_repo(repo_path)
+        _create_initial_commit(repo_path)
+
+        functions = create_project_functions(tmp_path)  # param not used by source_path()
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(repo_path)
+            result = functions["source_path"]()
+            assert result == str(repo_path.resolve())
+        finally:
+            os.chdir(original_cwd)
+
+    def test_source_path_from_source_repo_subdirectory(self, tmp_path: Path) -> None:
+        """Test source_path() finds repo root when called from subdirectory."""
+        repo_path = tmp_path / "repo"
+        repo_path.mkdir()
+        _init_git_repo(repo_path)
+        _create_initial_commit(repo_path)
+
+        subdir = repo_path / "src" / "nested"
+        subdir.mkdir(parents=True)
+
         functions = create_project_functions(tmp_path)
 
-        result = functions["source_path"]()
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(subdir)
+            result = functions["source_path"]()
+            assert result == str(repo_path.resolve())
+        finally:
+            os.chdir(original_cwd)
 
-        assert result == str(tmp_path)
+    def test_source_path_from_worktree_root(self, tmp_path: Path) -> None:
+        """Test source_path() returns worktree root when called from worktree."""
+        repo_path = tmp_path / "repo"
+        repo_path.mkdir()
+        _init_git_repo(repo_path)
+        _create_initial_commit(repo_path)
+
+        worktree_path = tmp_path / "worktree"
+        _add_worktree(repo_path, worktree_path, "feature-branch")
+
+        functions = create_project_functions(tmp_path)
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(worktree_path)
+            result = functions["source_path"]()
+            assert result == str(worktree_path.resolve())
+        finally:
+            os.chdir(original_cwd)
+
+    def test_source_path_from_worktree_subdirectory(self, tmp_path: Path) -> None:
+        """Test source_path() finds worktree root when called from worktree subdirectory."""
+        repo_path = tmp_path / "repo"
+        repo_path.mkdir()
+        _init_git_repo(repo_path)
+        _create_initial_commit(repo_path)
+
+        worktree_path = tmp_path / "worktree"
+        _add_worktree(repo_path, worktree_path, "feature-branch")
+
+        subdir = worktree_path / "src" / "nested"
+        subdir.mkdir(parents=True)
+
+        functions = create_project_functions(tmp_path)
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(subdir)
+            result = functions["source_path"]()
+            assert result == str(worktree_path.resolve())
+        finally:
+            os.chdir(original_cwd)
+
+    def test_source_path_outside_git_repo_returns_empty_string(self, tmp_path: Path) -> None:
+        """Test source_path() returns empty string when not in a git repository."""
+        non_git_dir = tmp_path / "not_a_repo"
+        non_git_dir.mkdir()
+
+        functions = create_project_functions(tmp_path)
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(non_git_dir)
+            result = functions["source_path"]()
+            assert result == ""
+        finally:
+            os.chdir(original_cwd)
+
+    def test_source_path_returns_absolute_path(self, tmp_path: Path) -> None:
+        """Test source_path() returns absolute path string."""
+        repo_path = tmp_path / "repo"
+        repo_path.mkdir()
+        _init_git_repo(repo_path)
+        _create_initial_commit(repo_path)
+
+        functions = create_project_functions(tmp_path)
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(repo_path)
+            result = functions["source_path"]()
+            # Should be absolute path
+            assert Path(result).is_absolute()
+            assert result == str(repo_path.resolve())
+        finally:
+            os.chdir(original_cwd)
 
     def test_file_exists_returns_true_for_existing_file(self, tmp_path: Path) -> None:
         """Test file_exists() returns True for existing file."""

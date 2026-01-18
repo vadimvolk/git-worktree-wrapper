@@ -6,6 +6,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional, Union
 
+from gww.git.repository import (
+    NotGitRepositoryError,
+    get_repository_root,
+    is_git_repository,
+)
 from gww.utils.uri import ParsedURI
 
 
@@ -226,15 +231,29 @@ def create_project_functions(source_path: Path) -> dict[str, Callable[..., Any]]
     or URI predicates.
 
     Args:
-        source_path: Path to source repository.
+        source_path: Path to source repository (used by file_exists, dir_exists, path_exists).
 
     Returns:
         Dictionary of project-specific functions.
     """
 
     def _source_path() -> str:
-        """Get absolute path to source repository."""
-        return str(source_path)
+        """Get absolute path to source repository or worktree root.
+
+        Detects repository based on current working directory.
+        - If in source repository: returns source repository root
+        - If in worktree: returns worktree root
+        - If in subdirectory: finds and returns repository root
+        - If not in git repository: returns empty string
+        """
+        try:
+            cwd = Path.cwd()
+            if not is_git_repository(cwd):
+                return ""
+            repo_root = get_repository_root(cwd)
+            return str(repo_root.resolve())
+        except NotGitRepositoryError:
+            return ""
 
     def _file_exists(path: str) -> bool:
         """Check if a file exists relative to source repository.

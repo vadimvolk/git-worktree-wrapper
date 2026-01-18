@@ -173,8 +173,15 @@ DEFAULT_CONFIG_TEMPLATE = """\
 #
 # PROJECT-SPECIFIC FUNCTIONS (only in project predicates):
 # ---------------------------------------------------------
-#   source_path()        - Absolute path to source repository (string)
-#                         Example: source_path() returns "/home/user/Developer/sources/github/user/repo"
+#   source_path()        - Absolute path to current repository or worktree root (string)
+#                         Detects repository based on current working directory:
+#                         - If in source repository: returns source repository root
+#                         - If in worktree: returns worktree root
+#                         - If in subdirectory: finds and returns repository/worktree root
+#                         - If not in git repository: returns empty string
+#                         Examples:
+#                           source_path() returns "/home/user/Developer/sources/github/user/repo"
+#                           source_path() returns "/home/user/Developer/worktrees/github/user/repo/feature-branch"
 #
 #   file_exists(path)    - Check if file exists in source repository (returns True/False)
 #                         Path is relative to source repository root

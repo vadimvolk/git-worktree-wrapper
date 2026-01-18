@@ -74,7 +74,7 @@ Represents a project type detection rule with associated actions to execute duri
 **Context Functions** (available during predicate evaluation):
 - Shared functions: URI functions (`host()`, `port()`, `protocol()`, `uri()`, `path()`, `path(index)`), tag functions (`tag(name)`, `tag_exist(name)`) - see TemplateFunction section
 - Project-specific functions (only in project predicates):
-  - `source_path() -> str`: Absolute path to source repository
+  - `source_path() -> str`: Absolute path to current repository or worktree root (detects from cwd)
   - `file_exists(path: str) -> bool`: Check if file exists in source repository (relative to repo root)
   - `dir_exists(path: str) -> bool`: Check if directory exists in source repository (relative to repo root)
   - `path_exists(path: str) -> bool`: Check if path exists (file or directory) in source repository (relative to repo root)
@@ -237,7 +237,11 @@ Built-in functions available in template expressions, URI predicates, and projec
   - Useful in predicates: `tag_exist("env") and tag("env") == "prod"`
 
 **Project Functions** (only in project predicates):
-- `source_path() -> str`: Absolute path to source repository
+- `source_path() -> str`: Absolute path to current repository or worktree root. Detects based on current working directory:
+  - If in source repository: returns source repository root
+  - If in worktree: returns worktree root
+  - If in subdirectory: finds and returns repository/worktree root
+  - If not in git repository: returns empty string
 - `file_exists(path: str) -> bool`: Check if file exists in source repository (path relative to repo root)
 - `dir_exists(path: str) -> bool`: Check if directory exists in source repository (path relative to repo root)
 - `path_exists(path: str) -> bool`: Check if path exists (file or directory) in source repository (path relative to repo root)

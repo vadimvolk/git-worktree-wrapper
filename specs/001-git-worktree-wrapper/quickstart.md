@@ -363,7 +363,8 @@ gww migrate ~/old-repos --move
   - Branch functions: `branch()`, `norm_branch(replacement)` (when branch context available)
   - Tag functions: `tag(name)`, `tag_exist(name)`
 - **Project-specific functions** (only in project predicates):
-  - `source_path()`, `file_exists(path)`, `dir_exists(path)`, `path_exists(path)`
+  - `source_path()` - returns current repository/worktree root path (detects from cwd, returns empty string if not in git repo)
+  - `file_exists(path)`, `dir_exists(path)`, `path_exists(path)` - check paths relative to source repository
 
 **Note on `path()` function**:
 - `path()` with no arguments returns a list of all path segments (use in predicates: `path()[0]`, `path()[-1]`)
