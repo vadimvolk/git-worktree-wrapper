@@ -519,6 +519,7 @@ class TestProjectFunctions:
         functions = create_project_functions(tmp_path)
 
         assert "source_path" in functions
+        assert "dest_path" in functions
         assert "file_exists" in functions
         assert "dir_exists" in functions
         assert "path_exists" in functions
@@ -636,6 +637,72 @@ class TestProjectFunctions:
             assert result == str(repo_path.resolve())
         finally:
             os.chdir(original_cwd)
+
+    def test_dest_path_returns_source_path_when_dest_path_not_provided(self, tmp_path: Path) -> None:
+        """Test dest_path() returns source_path when dest_path parameter is None (clone context)."""
+        source_path = tmp_path / "source"
+        source_path.mkdir()
+
+        functions = create_project_functions(source_path)
+
+        result = functions["dest_path"]()
+
+        assert result == str(source_path.resolve())
+
+    def test_dest_path_returns_provided_path_when_set(self, tmp_path: Path) -> None:
+        """Test dest_path() returns the provided path when dest_path is set (add context)."""
+        source_path = tmp_path / "source"
+        source_path.mkdir()
+        worktree_path = tmp_path / "worktree"
+        worktree_path.mkdir()
+
+        functions = create_project_functions(source_path, dest_path=worktree_path)
+
+        result = functions["dest_path"]()
+
+        assert result == str(worktree_path.resolve())
+
+    def test_dest_path_returns_absolute_path(self, tmp_path: Path) -> None:
+        """Test dest_path() returns absolute path string."""
+        source_path = tmp_path / "source"
+        source_path.mkdir()
+        worktree_path = tmp_path / "worktree"
+        worktree_path.mkdir()
+
+        functions = create_project_functions(source_path, dest_path=worktree_path)
+
+        result = functions["dest_path"]()
+
+        assert Path(result).is_absolute()
+        assert result == str(worktree_path.resolve())
+
+    def test_dest_path_clone_context(self, tmp_path: Path) -> None:
+        """Test dest_path() in clone context (dest_path equals source_path)."""
+        source_path = tmp_path / "clone_target"
+        source_path.mkdir()
+
+        # In clone context, dest_path is set to the same as source_path
+        functions = create_project_functions(source_path, dest_path=source_path)
+
+        result = functions["dest_path"]()
+
+        assert result == str(source_path.resolve())
+
+    def test_dest_path_add_context(self, tmp_path: Path) -> None:
+        """Test dest_path() in add context (dest_path is worktree path)."""
+        source_path = tmp_path / "source_repo"
+        source_path.mkdir()
+        worktree_path = tmp_path / "worktrees" / "feature-branch"
+        worktree_path.mkdir(parents=True)
+
+        # In add context, dest_path is the worktree path
+        functions = create_project_functions(source_path, dest_path=worktree_path)
+
+        result = functions["dest_path"]()
+
+        assert result == str(worktree_path.resolve())
+        # Verify it's different from source_path
+        assert result != str(source_path.resolve())
 
     def test_file_exists_returns_true_for_existing_file(self, tmp_path: Path) -> None:
         """Test file_exists() returns True for existing file."""

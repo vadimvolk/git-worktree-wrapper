@@ -183,6 +183,15 @@ DEFAULT_CONFIG_TEMPLATE = """\
 #                           source_path() returns "/home/user/Developer/sources/github/user/repo"
 #                           source_path() returns "/home/user/Developer/worktrees/github/user/repo/feature-branch"
 #
+#   dest_path()          - Absolute path to destination (clone target or worktree) (string)
+#                         Returns the destination path based on operation context:
+#                         - During clone: returns source_path (same as source_path())
+#                         - During add: returns the worktree path
+#                         Useful for commands that need the operation's output location
+#                         Examples:
+#                           After clone: dest_path() returns "/home/user/Developer/sources/github/user/repo"
+#                           After add: dest_path() returns "/home/user/Developer/worktrees/github/user/repo/feature-branch"
+#
 #   file_exists(path)    - Check if file exists in source repository (returns True/False)
 #                         Path is relative to source repository root
 #                         Example: file_exists("package.json") checks for package.json in repo

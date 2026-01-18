@@ -75,6 +75,7 @@ Represents a project type detection rule with associated actions to execute duri
 - Shared functions: URI functions (`host()`, `port()`, `protocol()`, `uri()`, `path()`, `path(index)`), tag functions (`tag(name)`, `tag_exist(name)`) - see TemplateFunction section
 - Project-specific functions (only in project predicates):
   - `source_path() -> str`: Absolute path to current repository or worktree root (detects from cwd)
+  - `dest_path() -> str`: Absolute path to destination (clone target or worktree). During clone: returns source_path. During add: returns worktree path.
   - `file_exists(path: str) -> bool`: Check if file exists in source repository (relative to repo root)
   - `dir_exists(path: str) -> bool`: Check if directory exists in source repository (relative to repo root)
   - `path_exists(path: str) -> bool`: Check if path exists (file or directory) in source repository (relative to repo root)
@@ -207,7 +208,7 @@ Built-in functions available in template expressions, URI predicates, and projec
   - Branch functions: `branch()`, `norm_branch(replacement)`
   - Tag functions: `tag(name)`, `tag_exist(name)`
 - **Project-specific functions** (only available in project predicates):
-  - `source_path()`, `file_exists(path)`, `dir_exists(path)`, `path_exists(path)`
+  - `source_path()`, `dest_path()`, `file_exists(path)`, `dir_exists(path)`, `path_exists(path)`
 
 **URI Functions**:
 - `host() -> str`: Hostname from URI (e.g., "github.com", "rulez.netbird.selfhosted")
@@ -242,6 +243,10 @@ Built-in functions available in template expressions, URI predicates, and projec
   - If in worktree: returns worktree root
   - If in subdirectory: finds and returns repository/worktree root
   - If not in git repository: returns empty string
+- `dest_path() -> str`: Absolute path to destination (clone target or worktree). Returns the destination path based on operation context:
+  - During `clone`: returns source_path (same as `source_path()` - the cloned repository location)
+  - During `add`: returns the worktree path (the destination where the worktree is created)
+  - Useful for commands that need to know where the operation's output will be located
 - `file_exists(path: str) -> bool`: Check if file exists in source repository (path relative to repo root)
 - `dir_exists(path: str) -> bool`: Check if directory exists in source repository (path relative to repo root)
 - `path_exists(path: str) -> bool`: Check if path exists (file or directory) in source repository (path relative to repo root)

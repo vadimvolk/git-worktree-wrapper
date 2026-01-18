@@ -78,7 +78,7 @@ def run_clone(args: argparse.Namespace) -> int:
     # Execute source actions if any project rules match
     if config.projects:
         try:
-            actions = get_source_actions(config.projects, source_path, tags)
+            actions = get_source_actions(config.projects, source_path, tags, dest_path=source_path)
             if actions:
                 if verbose > 0 and not quiet:
                     print(f"Executing {len(actions)} source action(s)...", file=sys.stderr)

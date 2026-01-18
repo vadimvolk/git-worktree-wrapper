@@ -224,7 +224,10 @@ def create_function_registry(context: TemplateContext) -> dict[str, Callable[...
     return registry.get_functions()
 
 
-def create_project_functions(source_path: Path) -> dict[str, Callable[..., Any]]:
+def create_project_functions(
+    source_path: Path,
+    dest_path: Optional[Path] = None,
+) -> dict[str, Callable[..., Any]]:
     """Create project-specific functions for project predicate evaluation.
 
     These functions are only available in project predicates, not in templates
@@ -232,6 +235,9 @@ def create_project_functions(source_path: Path) -> dict[str, Callable[..., Any]]
 
     Args:
         source_path: Path to source repository (used by file_exists, dir_exists, path_exists).
+        dest_path: Optional destination path. For clone operations, this is the same as
+            source_path. For add operations, this is the worktree path. If None,
+            dest_path() will return the same as source_path().
 
     Returns:
         Dictionary of project-specific functions.
@@ -254,6 +260,19 @@ def create_project_functions(source_path: Path) -> dict[str, Callable[..., Any]]
             return str(repo_root.resolve())
         except NotGitRepositoryError:
             return ""
+
+    def _dest_path() -> str:
+        """Get absolute path to destination (clone target or worktree).
+
+        Returns the destination path based on operation context:
+        - During clone: returns source_path (same as source_path())
+        - During add: returns worktree path
+        - If dest_path was not provided: returns source_path()
+        """
+        if dest_path is not None:
+            return str(dest_path.resolve())
+        # Fallback to source_path behavior
+        return str(source_path.resolve())
 
     def _file_exists(path: str) -> bool:
         """Check if a file exists relative to source repository.
@@ -293,6 +312,7 @@ def create_project_functions(source_path: Path) -> dict[str, Callable[..., Any]]
 
     return {
         "source_path": _source_path,
+        "dest_path": _dest_path,
         "file_exists": _file_exists,
         "dir_exists": _dir_exists,
         "path_exists": _path_exists,

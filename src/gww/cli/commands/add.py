@@ -144,7 +144,7 @@ def run_add(args: argparse.Namespace) -> int:
     # Execute worktree actions if any project rules match
     if config.projects:
         try:
-            actions = get_worktree_actions(config.projects, source_path, tags)
+            actions = get_worktree_actions(config.projects, source_path, tags, dest_path=worktree_path)
             if actions:
                 if verbose > 0 and not quiet:
                     print(
