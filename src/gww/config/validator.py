@@ -18,13 +18,13 @@ class SourceRule:
 
     Attributes:
         name: Rule name/identifier.
-        predicate: Expression evaluated against URI context.
+        when: Expression evaluated against URI context.
         sources: Template string for source checkout location.
         worktrees: Template string for worktree location.
     """
 
     name: str
-    predicate: str
+    when: str
     sources: Optional[str] = None
     worktrees: Optional[str] = None
 
@@ -47,12 +47,12 @@ class ProjectRule:
     """Validated project detection rule.
 
     Attributes:
-        predicate: Expression evaluated against repository filesystem.
+        when: Expression evaluated against repository filesystem.
         after_clone: Actions executed after source checkout.
         after_add: Actions executed when worktree is added.
     """
 
-    predicate: str
+    when: str
     after_clone: list[Action] = field(default_factory=list)
     after_add: list[Action] = field(default_factory=list)
 
@@ -177,10 +177,10 @@ def _validate_source_rule(name: str, data: Any) -> SourceRule:
             f"Source rule '{name}' must be a mapping, got {type(data).__name__}"
         )
 
-    if "predicate" not in data:
-        raise ConfigValidationError(f"Source rule '{name}' missing required 'predicate'")
+    if "when" not in data:
+        raise ConfigValidationError(f"Source rule '{name}' missing required 'when'")
 
-    predicate = _validate_string(data["predicate"], f"sources.{name}.predicate")
+    when = _validate_string(data["when"], f"sources.{name}.when")
 
     sources = None
     if "sources" in data:
@@ -192,7 +192,7 @@ def _validate_source_rule(name: str, data: Any) -> SourceRule:
 
     return SourceRule(
         name=name,
-        predicate=predicate,
+        when=when,
         sources=sources,
         worktrees=worktrees,
     )
@@ -218,10 +218,10 @@ def _validate_project_rule(data: Any, index: int) -> ProjectRule:
             f"{context} must be a mapping, got {type(data).__name__}"
         )
 
-    if "predicate" not in data:
-        raise ConfigValidationError(f"{context} missing required 'predicate'")
+    if "when" not in data:
+        raise ConfigValidationError(f"{context} missing required 'when'")
 
-    predicate = _validate_string(data["predicate"], f"{context}.predicate")
+    when = _validate_string(data["when"], f"{context}.when")
 
     after_clone: list[Action] = []
     if "after_clone" in data:
@@ -247,7 +247,7 @@ def _validate_project_rule(data: Any, index: int) -> ProjectRule:
         )
 
     return ProjectRule(
-        predicate=predicate,
+        when=when,
         after_clone=after_clone,
         after_add=after_add,
     )

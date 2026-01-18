@@ -189,10 +189,10 @@ default_worktrees: {target_dir}/worktrees
 
 sources:
   github:
-    predicate: '"github" in host()'
+    when: '"github" in host()'
     sources: {target_dir}/github/path(-2)/path(-1)
   gitlab:
-    predicate: '"gitlab" in host()'
+    when: '"gitlab" in host()'
     sources: {target_dir}/gitlab/path(-2)/path(-1)
 """)
 
@@ -227,10 +227,10 @@ default_worktrees: {target_dir}/worktrees
 
 sources:
   github:
-    predicate: '"github" in host()'
+    when: '"github" in host()'
     sources: {target_dir}/github/path(-2)/path(-1)
   gitlab:
-    predicate: '"gitlab" in host()'
+    when: '"gitlab" in host()'
     sources: {target_dir}/gitlab/path(-2)/path(-1)
 """)
 
@@ -266,10 +266,10 @@ default_worktrees: {target_dir}/worktrees
 
 sources:
   github:
-    predicate: '"github" in host()'
+    when: '"github" in host()'
     sources: {target_dir}/github/path(-2)/path(-1)
   gitlab:
-    predicate: '"gitlab" in host()'
+    when: '"gitlab" in host()'
     sources: {target_dir}/gitlab/path(-2)/path(-1)
 """)
 
@@ -406,7 +406,7 @@ default_worktrees: {target_dir}/worktrees
 
 sources:
   github:
-    predicate: '"github" in host()'
+    when: '"github" in host()'
     sources: {target_dir}/github/path(-2)/path(-1)
 """)
 
@@ -519,7 +519,7 @@ default_worktrees: {target_dir}/worktrees
 
 sources:
   github:
-    predicate: '"github" in host()'
+    when: '"github" in host()'
     sources: {target_dir}/github/path(-2)/path(-1)
 """)
 

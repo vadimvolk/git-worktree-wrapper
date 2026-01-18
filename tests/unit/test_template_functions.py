@@ -478,12 +478,12 @@ class TestPathFunction:
         with pytest.raises(ValueError, match="No URI context available"):
             functions["path"](0)
 
-    def test_path_in_predicate(self) -> None:
-        """Test path(index) works in predicate context."""
+    def test_path_in_when(self) -> None:
+        """Test path(index) works in 'when' condition context."""
         context = TemplateContext(uri=parse_uri("https://github.com/myorg/repo.git"))
         functions = create_function_registry(context)
 
-        # Simulate predicate evaluation: path(0) == "myorg"
+        # Simulate 'when' condition evaluation: path(0) == "myorg"
         result = functions["path"](0)
 
         assert result == "myorg"

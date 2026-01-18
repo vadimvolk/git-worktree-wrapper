@@ -38,7 +38,7 @@ default_sources: ~/sources/default
 default_worktrees: ~/worktrees/default
 sources:
   github:
-    predicate: '"github" in host'
+    when: '"github" in host'
     sources: ~/sources/github/path(-2)/path(-1)
 """)
 
@@ -46,7 +46,7 @@ sources:
 
         assert "sources" in result
         assert "github" in result["sources"]
-        assert result["sources"]["github"]["predicate"] == '"github" in host'
+        assert result["sources"]["github"]["when"] == '"github" in host'
 
     def test_loads_config_with_actions(self, tmp_path: Path) -> None:
         """Test loading config with action rules."""
@@ -55,7 +55,7 @@ sources:
 default_sources: ~/sources/default
 default_worktrees: ~/worktrees/default
 actions:
-  - predicate: 'file_exists("package.json")'
+  - when: 'file_exists("package.json")'
     after_clone:
       - command: "npm install"
 """)
@@ -64,7 +64,7 @@ actions:
 
         assert "actions" in result
         assert len(result["actions"]) == 1
-        assert result["actions"][0]["predicate"] == 'file_exists("package.json")'
+        assert result["actions"][0]["when"] == 'file_exists("package.json")'
 
     def test_raises_error_for_nonexistent_file(self, tmp_path: Path) -> None:
         """Test that ConfigNotFoundError is raised for missing file."""

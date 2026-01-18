@@ -71,11 +71,11 @@ def find_matching_source_rule(
 
     for name, rule in config.sources.items():
         try:
-            if evaluate_predicate(rule.predicate, context):
+            if evaluate_predicate(rule.when, context):
                 return rule
         except TemplateError as e:
             raise ResolverError(
-                f"Error evaluating predicate for source rule '{name}': {e}"
+                f"Error evaluating 'when' for source rule '{name}': {e}"
             ) from e
 
     return None

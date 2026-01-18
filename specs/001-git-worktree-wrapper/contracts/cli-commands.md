@@ -17,7 +17,7 @@ gww <command> [arguments] [options]
 - `--help`, `-h`: Show command help
 - `--verbose`, `-v`: Increase verbosity (may be repeated)
 - `--quiet`, `-q`: Suppress non-error output
-- `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times). Tags are available in template evaluation and predicate evaluation.
+- `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times). Tags are available in template evaluation and `when` condition evaluation.
 
 ## Command Specifications
 
@@ -29,16 +29,16 @@ gww <command> [arguments] [options]
 - `uri` (str, required): Git repository URI (HTTP, HTTPS, SSH, or file://)
 
 **Options**:
-- `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times). Tags are available in template evaluation and predicate evaluation.
+- `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times). Tags are available in template evaluation and `when` condition evaluation.
 
 **Behavior**:
 1. Parse URI to extract protocol, host, port, and path segments
 2. Parse tags from `--tag` options into dictionary (format: `key=value` or `key` for tags without values)
-3. Evaluate source rules (predicates) to find matching rule or use default (tags available via `tag()` and `tag_exist()` functions)
+3. Evaluate source rules (`when` conditions) to find matching rule or use default (tags available via `tag()` and `tag_exist()` functions)
 4. Resolve `sources` template to get absolute checkout path (tags available via `tag()` function)
 5. Create directory structure if needed
 6. Execute `git clone <uri> <path>`
-7. Detect project type by evaluating project predicates (tags available via `tag()` and `tag_exist()` functions)
+7. Detect project type by evaluating project `when` conditions (tags available via `tag()` and `tag_exist()` functions)
 8. Execute matching project `after_clone` actions in order
 9. Report success with clone path
 
@@ -62,7 +62,7 @@ gww clone git@gitlab.com:group/project.git
 gww clone https://github.com/user/repo.git --tag env=prod --tag project=backend
 # Tags available: tag("env") returns "prod", tag("project") returns "backend"
 # Can be used in templates: ~/Developer/sources/tag("env")/path(-1)
-# Can be used in predicates: tag_exist("env") and tag("env") == "prod"
+# Can be used in 'when' conditions: tag_exist("env") and tag("env") == "prod"
 ```
 
 ---
@@ -77,7 +77,7 @@ gww clone https://github.com/user/repo.git --tag env=prod --tag project=backend
 
 **Options**:
 - `--create-branch`, `-c`: Create branch from current commit (source or worktree) if branch doesn't exist
-- `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times). Tags are available in template evaluation and predicate evaluation.
+- `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times). Tags are available in template evaluation and `when` condition evaluation.
 
 **Behavior**:
 1. Detect current repository (source or worktree)
@@ -93,7 +93,7 @@ gww clone https://github.com/user/repo.git --tag env=prod --tag project=backend
 7. Evaluate worktree template to get absolute worktree path (tags available via `tag()` function)
 8. Create directory structure if needed
 9. Execute `git worktree add <path> <branch>` (worktree remains attached to repository)
-10. Detect project type by evaluating project predicates (tags available via `tag()` and `tag_exist()` functions)
+10. Detect project type by evaluating project `when` conditions (tags available via `tag()` and `tag_exist()` functions)
 11. Execute matching project `after_add` actions in order
 12. Report success with worktree path
 

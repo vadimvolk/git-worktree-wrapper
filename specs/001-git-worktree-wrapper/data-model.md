@@ -21,7 +21,7 @@ Represents the YAML configuration file (`config.yml` in `$XDG_CONFIG_HOME/gww/`)
 - `default_sources` and `default_worktrees` must be non-empty strings
 - Template strings must be valid (syntax checked during evaluation)
 - `sources` keys must be unique strings
-- Each `SourceRule` must have a `predicate` field
+- Each `SourceRule` must have a `when` field
 - `actions` list must contain valid `ProjectRule` objects
 
 **State**: Immutable after loading (read-only during runtime)
@@ -34,20 +34,20 @@ Represents the YAML configuration file (`config.yml` in `$XDG_CONFIG_HOME/gww/`)
 
 ### 2. SourceRule
 
-Represents a predicate-based routing rule for determining source and worktree locations based on repository URI.
+Represents a condition-based routing rule for determining source and worktree locations based on repository URI.
 
 **Attributes**:
-- `predicate` (str, required): Expression evaluated against URI context (host, path segments)
+- `when` (str, required): Expression evaluated against URI context (host, path segments)
 - `sources` (str, optional): Template string for source checkout location (falls back to `default_sources`)
 - `worktrees` (str, optional): Template string for worktree location (falls back to `default_worktrees`)
 
 **Validation Rules**:
-- `predicate` must be a valid simpleeval expression
-- `predicate` must evaluate to boolean
+- `when` must be a valid simpleeval expression
+- `when` must evaluate to boolean
 - `sources` and `worktrees` (if present) must be valid template strings
 - At least one source rule must match for any valid URI (or default is used)
 
-**Context Functions** (available during predicate evaluation):
+**Context Functions** (available during `when` evaluation):
 - URI functions: `host()`, `port()`, `protocol()`, `uri()`, `path(index)` (see TemplateFunction section)
 - Tag functions: `tag(name)`, `tag_exist(name)` (see TemplateFunction section)
 
@@ -61,19 +61,19 @@ Represents a predicate-based routing rule for determining source and worktree lo
 Represents a project type detection rule with associated actions to execute during checkout or worktree creation.
 
 **Attributes**:
-- `predicate` (str, required): Expression evaluated against repository filesystem (e.g., `file_exists(local.properties)`)
+- `when` (str, required): Expression evaluated against repository filesystem (e.g., `file_exists(local.properties)`)
 - `after_clone` (list[Action], optional): Actions executed after source checkout
 - `after_add` (list[Action], optional): Actions executed when worktree is added
 
 **Validation Rules**:
-- `predicate` must be a valid simpleeval expression
-- `predicate` must evaluate to boolean
+- `when` must be a valid simpleeval expression
+- `when` must evaluate to boolean
 - `after_clone` and `after_add` must be valid action lists
 - At least one action type must be specified
 
-**Context Functions** (available during predicate evaluation):
+**Context Functions** (available during `when` evaluation):
 - Shared functions: URI functions (`host()`, `port()`, `protocol()`, `uri()`, `path(index)`), tag functions (`tag(name)`, `tag_exist(name)`) - see TemplateFunction section
-- Project-specific functions (only in project predicates):
+- Project-specific functions (only in project `when` conditions):
   - `source_path() -> str`: Absolute path to current repository or worktree root (detects from cwd)
   - `dest_path() -> str`: Absolute path to destination (clone target or worktree). During clone: returns source_path. During add: returns worktree path.
   - `file_exists(path: str) -> bool`: Check if file exists in source repository (relative to repo root)
@@ -200,14 +200,14 @@ Context object passed to template evaluator for resolving template variables.
 
 ### 8. TemplateFunction
 
-Built-in functions available in template expressions, URI predicates, and project predicates.
+Built-in functions available in template expressions and `when` conditions.
 
 **Function Availability**:
-- **Shared functions** (available in templates, URI predicates, and project predicates):
+- **Shared functions** (available in templates and `when` conditions):
   - URI functions: `host()`, `port()`, `protocol()`, `uri()`, `path(index)`
   - Branch functions: `branch()`, `norm_branch(replacement)`
   - Tag functions: `tag(name)`, `tag_exist(name)`
-- **Project-specific functions** (only available in project predicates):
+- **Project-specific functions** (only available in project `when` conditions):
   - `source_path()`, `dest_path()`, `file_exists(path)`, `dir_exists(path)`, `path_exists(path)`
 
 **URI Functions**:
@@ -232,9 +232,9 @@ Built-in functions available in template expressions, URI predicates, and projec
   - `tag("project")`: Returns value of tag "project" if set, empty string otherwise
 - `tag_exist(name: str) -> bool`: Check if tag exists (with or without value). Returns True if tag exists, False otherwise
   - `tag_exist("env")`: Returns True if tag "env" was provided via `--tag env` or `--tag env=value`
-  - Useful in predicates: `tag_exist("env") and tag("env") == "prod"`
+  - Useful in `when` conditions: `tag_exist("env") and tag("env") == "prod"`
 
-**Project Functions** (only in project predicates):
+**Project Functions** (only in project `when` conditions):
 - `source_path() -> str`: Absolute path to current repository or worktree root. Detects based on current working directory:
   - If in source repository: returns source repository root
   - If in worktree: returns worktree root
@@ -302,7 +302,7 @@ TemplateContext
 - YAML syntax must be valid
 - Required fields must be present
 - Template strings must be parseable
-- Predicates must be valid simpleeval expressions
+- `when` conditions must be valid simpleeval expressions
 - Action types must be recognized
 
 ### Repository Validation

@@ -5,23 +5,23 @@
 
 ## Overview
 
-Build a CLI tool `gww` that wraps git worktree functionality with configurable path templates, predicate-based routing, and project-specific actions. The tool uses YAML configuration with template evaluation for dynamic path generation, supports multiple git hosting providers, and provides commands for cloning, worktree management, migration, and shell autocompletion.
+Build a CLI tool `gww` that wraps git worktree functionality with configurable path templates, condition-based routing, and project-specific actions. The tool uses YAML configuration with template evaluation for dynamic path generation, supports multiple git hosting providers, and provides commands for cloning, worktree management, migration, and shell autocompletion.
 
 ## Functional Requirements
 
 ### FR1: Repository Cloning
 **Priority**: P1 (MVP)
 
-Users can clone repositories to configurable source locations based on URI predicates, with project-specific actions executed after clone.
+Users can clone repositories to configurable source locations based on URI conditions, with project-specific actions executed after clone.
 
 **Acceptance Criteria**:
 - Command: `gww clone <uri> [--tag key=value]...`
 - Parse URI to extract protocol, host, port, and path segments
 - Parse optional tags from `--tag` options (format: `key=value` or `key`)
-- Evaluate source rules (predicates) to find matching rule or use default (tags available in predicate context)
+- Evaluate source rules (`when` conditions) to find matching rule or use default (tags available in condition context)
 - Resolve `sources` template to get absolute checkout path (tags available in template context)
 - Execute `git clone <uri> <path>`
-- Detect project type by evaluating project predicates (tags available in predicate context)
+- Detect project type by evaluating project `when` conditions (tags available in condition context)
 - Execute matching project `after_clone` actions in order
 - Report success with clone path to stdout
 - Handle errors: invalid URI, clone failures, action failures (exit code 1)
@@ -36,7 +36,7 @@ gww clone git@gitlab.com:group/project.git
 # Output: ~/Developer/sources/gitlab/group/project
 
 gww clone https://github.com/user/repo.git --tag env=prod --tag project=backend
-# Tags available in templates and predicates: tag("env") returns "prod", tag("project") returns "backend"
+# Tags available in templates and 'when' conditions: tag("env") returns "prod", tag("project") returns "backend"
 ```
 
 ---
@@ -55,7 +55,7 @@ Users can add worktrees for branches with configurable paths and project-specifi
 - If branch doesn't exist and `--create-branch` specified: create branch from current commit
 - Evaluate worktree template to get absolute worktree path (tags available in template context)
 - Execute `git worktree add <path> <branch>`
-- Detect project type and execute matching project `after_add` actions in order (tags available in predicate context)
+- Detect project type and execute matching project `after_add` actions in order (tags available in condition context)
 - Report success with worktree path to stdout
 - Handle errors: not in git repo, branch not found without --create-branch, worktree add failed, action failed (exit code 1)
 - Handle configuration errors (exit code 2)
@@ -265,7 +265,7 @@ gww init shell bash
 ### NFR5: Configuration
 - Configuration file: `gww.yml` in `$XDG_CONFIG_HOME/gww/` (or platform equivalent)
 - Support for configurable path templates with function evaluation
-- Support for predicate-based routing for multiple git hosting providers
+- Support for condition-based routing for multiple git hosting providers
 - Support for project-specific action hooks
 
 ---

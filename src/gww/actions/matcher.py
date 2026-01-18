@@ -128,11 +128,11 @@ def find_matching_projects(
 
     for i, rule in enumerate(rules):
         try:
-            if evaluate_predicate(rule.predicate, context):
+            if evaluate_predicate(rule.when, context):
                 matching.append(rule)
         except TemplateError as e:
             raise MatcherError(
-                f"Error evaluating predicate for project rule {i}: {e}"
+                f"Error evaluating 'when' for project rule {i}: {e}"
             ) from e
 
     return matching

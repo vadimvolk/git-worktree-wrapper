@@ -7,13 +7,13 @@
 
 ## Summary
 
-Build a CLI tool `gww` that wraps git worktree functionality with configurable path templates, predicate-based routing, and project-specific actions. The tool uses YAML configuration with template evaluation for dynamic path generation, supports multiple git hosting providers, and provides commands for checkout, worktree management, migration, and shell autocompletion.
+Build a CLI tool `gww` that wraps git worktree functionality with configurable path templates, condition-based routing, and project-specific actions. The tool uses YAML configuration with template evaluation for dynamic path generation, supports multiple git hosting providers, and provides commands for checkout, worktree management, migration, and shell autocompletion.
 
 ## Technical Context
 
 **Language/Version**: Python 3.11+  
 **Primary Dependencies**: 
-- `simpleeval` - for predicate and template evaluation (version: latest, with custom StrictSimpleEval subclass)
+- `simpleeval` - for 'when' condition and template evaluation (version: latest, with custom StrictSimpleEval subclass)
 - `ruamel.yaml` - for YAML config parsing with comment preservation (round-trip mode)
 - Standard library: `subprocess`, `pathlib`, `argparse`, `shutil`, `os`, `sys`
 
@@ -35,7 +35,7 @@ Build a CLI tool `gww` that wraps git worktree functionality with configurable p
 **Scale/Scope**: 
 - ~7 CLI commands
 - Configurable path templates with function evaluation
-- Support for multiple git hosting providers via predicates
+- Support for multiple git hosting providers via 'when' conditions
 - Project-specific action hooks
 - Shell autocompletion for 3 shells (bash, zsh, fish)
 
@@ -114,7 +114,7 @@ src/
 │   ├── actions/
 │   │   ├── __init__.py
 │   │   ├── executor.py         # Execute project actions (abs_copy, rel_copy, command)
-│   │   └── matcher.py          # Match projects by predicates
+│   │   └── matcher.py          # Match projects by 'when' conditions
 │   └── utils/
 │       ├── __init__.py
 │       ├── xdg.py              # XDG_CONFIG_HOME handling
@@ -148,7 +148,7 @@ README.md
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| External dependency: simpleeval | Safe expression evaluation for predicates and templates | Standard library `eval()` is unsafe for user-provided config. Custom parser would be too complex and error-prone. |
+| External dependency: simpleeval | Safe expression evaluation for 'when' conditions and templates | Standard library `eval()` is unsafe for user-provided config. Custom parser would be too complex and error-prone. |
 | External dependency: ruamel.yaml | User-friendly config format with comments and formatting preservation | JSON lacks comments and is less readable. PyYAML loses comments and formatting. Config files need documentation inline and user formatting preferences preserved. |
 | Template evaluation engine | Complex path template system with function calls | Simple string substitution insufficient for path(-2), norm_branch(), etc. Need function evaluation. |
 

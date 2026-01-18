@@ -113,7 +113,7 @@ default_worktrees: {target_dir}/worktrees
 
 sources:
   local:
-    predicate: 'protocol() == "file"'
+    when: 'protocol() == "file"'
     sources: {target_dir}/local/path(-1)
 """)
 
@@ -271,7 +271,7 @@ default_sources: {target_dir}/sources/path(-1)
 default_worktrees: {target_dir}/worktrees
 
 actions:
-  - predicate: 'True'
+  - when: 'True'
     after_clone:
       - abs_copy: ["{marker_file}", "copied_marker.txt"]
 """)

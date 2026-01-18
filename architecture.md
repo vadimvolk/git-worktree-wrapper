@@ -9,8 +9,8 @@ Works with configuration file gww.yml located in $XDG_CONFIG_HOME compliant mann
 default_sources: ~/Developer/sources/default/path(-2)/path(-1)
 default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 # where:
-# default_sources - template used to get checkout folder if no bellow sources predicates matched
-# default_worktrees - template used to get worktree folder if no bellow sources predicates matched
+# default_sources - template used to get checkout folder if no bellow sources conditions matched
+# default_worktrees - template used to get worktree folder if no bellow sources conditions matched
 # path(0) - first uri path segment
 # path(1) - second and so on path segment. If segment with index is missing returns ""
 # path(-1) - last path segment
@@ -18,26 +18,26 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 # norm_branch() - normalized git branch with "/" replaced with "-"
 sources:
     github:
-        predicate: "github" in host # host if host part of uri, e.g "http://rulez.netbird.selfhosted:3000/vadimvolk/ansible.git" -> rulez.netbird.selfhosted
+        when: "github" in host # host if host part of uri, e.g "http://rulez.netbird.selfhosted:3000/vadimvolk/ansible.git" -> rulez.netbird.selfhosted
         sources: ~/Developer/sources/github/path(-2)/path(-1)
         worktrees: ~/Developer/worktrees/github/path(-2)/path(-1)/branch()
     gitlab:
-        predicate: "gitlab" in host and !contains(host, "scp") # !contains mean not contains
+        when: "gitlab" in host and !contains(host, "scp") # !contains mean not contains
         sources: ~/Developer/sources/gitlab/path(-3)/path(-2)/path(-1)
         worktrees: ~/Developer/worktrees/gitlab/path(-3)/path(-2)/path(-1)-branch()
     my_sources:
-        predicate: path(0) == "username"
+        when: path(0) == "username"
         sources: ~/Developer/sources/mine/path(-2)/path(-1)
         worktrees: ~/Developer/worktrees/mine/path(-2)/path(-1)/norm_branch("-")
 # where:
-# sources - predicate based checkout and worktrees locations
+# sources - condition based checkout and worktrees locations
 # github, gitlab, my_sources - names of locations sections
-# Each section should contain predicate. If evaluated to true that section used for getting settings. 
+# Each section should contain 'when'. If evaluated to true that section used for getting settings. 
 # sources - optional value, if missing default_sources used, if present evalueate to get checkout folder
 # worktrees - optional value, if missing default_worktrees used, if present evaluate to get worktrees folder
 # branch() - git branch name as is
 actions:
-    - predicate: file_exists(local.properties)
+    - when: file_exists(local.properties)
       after_clone: 
         - abs_copy("~/sources/default-local.properties", "local.properties")
       after_add:
@@ -45,14 +45,14 @@ actions:
         - command("custom-handler")
     
 # where:
-# android - project type name, if predicate evaluate to true after_clone executed after checkout, and after_add executed when worktree added
+# android - project type name, if 'when' condition evaluates to true after_clone executed after checkout, and after_add executed when worktree added
 # abs_copy - copy file from absolute path (first argument), to filename relative to checkout or worktree base folder
 # rel_copy - copy file with relative path from source to worktree, this action applicable only to worktree actions
 # command(custom_handler) - if executed for source receives a single argument a source folder, if executed for worktree receive 2 arguments source folder and worktree folder
 ```
 
 # Commands:
-gww clone <uri> - find proper location for new source and checkout there. Then analyze result with actions and execute after_clone for any action with matched predicate
+gww clone <uri> - find proper location for new source and checkout there. Then analyze result with actions and execute after_clone for any action with matched 'when' condition
 
 gww add <branch> - must executed inside a source or worktree folder. Add a worktree for branch. To get destination folder uses settings file
 
@@ -69,6 +69,6 @@ gww init shell [fishshell|zsh|bash] generate autocompletion for specific shell. 
 # Common technical solutions:
 ## Use uv for dependencies management and installing gww script in target system
 ## Use type hints for all function arguments and return values
-## Use simpleeval library for predicate and templates evaluation
+## Use simpleeval library for 'when' conditions and templates evaluation
 ## Customize simpleeval for strict check of function argument count and it's types. Show readable error message if failed
 ## For template evaluation pre process string for following tokens: function calls, otheres. Evaluate function calls and join with rest of text. if "(" is part of template and not a fuction call it should be duplicated. Eg template "not_function((my folder))" should evaluated to "not_function(my folder)". Do not bother with nested fuctions for that case.

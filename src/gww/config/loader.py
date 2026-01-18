@@ -130,7 +130,7 @@ DEFAULT_CONFIG_TEMPLATE = """\
 # Template Functions and Variables Available
 # ===========================================
 #
-# SHARED FUNCTIONS (available in templates, URI predicates, and project predicates):
+# SHARED FUNCTIONS (available in templates and 'when' conditions):
 # ----------------------------------------------------------------------------------
 #
 # URI Functions:
@@ -164,10 +164,10 @@ DEFAULT_CONFIG_TEMPLATE = """\
 #                         Example: tag("env") returns "prod" if --tag env=prod was used
 #
 #   tag_exist(name)      - Check if tag exists (returns True/False)
-#                         Useful in predicates for conditional routing and path templates
+#                         Useful in 'when' conditions for conditional routing and path templates
 #                         Example: tag_exist("env") returns True if --tag env was used
 #
-# PROJECT-SPECIFIC FUNCTIONS (only in project predicates):
+# PROJECT-SPECIFIC FUNCTIONS (only in project 'when' conditions):
 # ---------------------------------------------------------
 #   source_path()        - Absolute path to current repository or worktree root (string)
 #                         Detects repository based on current working directory:
@@ -205,33 +205,33 @@ default_sources: ~/Developer/sources/default/path(-2)/path(-1)
 default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 
 # Source routing rules (optional)
-# Routes repositories to different locations based on URI predicates
+# Routes repositories to different locations based on URI conditions
 # Uncomment and customize as needed:
 
 # sources:
 #   github:
-#     predicate: '"github" in host()'
+#     when: '"github" in host()'
 #     sources: ~/Developer/sources/github/path(-2)/path(-1)
 #     worktrees: ~/Developer/worktrees/github/path(-2)/path(-1)/norm_branch()
 #
 #   gitlab:
-#     predicate: '"gitlab" in host()'
+#     when: '"gitlab" in host()'
 #     sources: ~/Developer/sources/gitlab/path(-3)/path(-2)/path(-1)
 #     worktrees: ~/Developer/worktrees/gitlab/path(-3)/path(-2)/path(-1)/norm_branch()
 #
 #   custom:
-#     predicate: 'path(0) == "myorg"'
+#     when: 'path(0) == "myorg"'
 #     sources: ~/Developer/sources/custom/path(-2)/path(-1)
 #
 #   # Tag-based routing examples:
 #   review:
-#     predicate: 'tag_exist("review")
+#     when: 'tag_exist("review")
 #     sources: ~/Developer/sources/custom/path(-2)/path(-1)
 #     worktrees: ~/Developer/worktrees/review/path(-2)/path(-1)/norm_branch()
 #
 #   # Tag-based path templates:
 #   tagged_sources:
-#     predicate: 'tag_exist("worktree-name")'
+#     when: 'tag_exist("worktree-name")'
 #     sources: ~/Developer/sources/tag("project")/path(-2)/path(-1)
 #     worktrees: ~/Developer/worktrees/tag("project")/path(-2)/path(-1)/branch()-tag("worktree-name")
 #
@@ -248,7 +248,7 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 # Uncomment and customize as needed:
 
 # actions:
-#   - predicate: 'file_exists("local.properties")'
+#   - when: 'file_exists("local.properties")'
 #     after_clone:
 #       - abs_copy: ["~/sources/default-local.properties", "local.properties"]
 #     after_add:
@@ -256,19 +256,19 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 #       - command: "./setup-env.sh"
 #
 #   # Tag-based actions:
-#   - predicate: not file_exists("CLAUDE.md") and tag_exist("use-claude")
+#   - when: not file_exists("CLAUDE.md") and tag_exist("use-claude")
 #     after_clone:
 #       - command: "claude init"
 #     after_add:
 #       - rel_copy: ["CLAUDE.md"]
 #
 #   # Commands with template functions:
-#   - predicate: file_exists("CLAUDE.md") and tag_exist("use-claude") and tag_exist("review")
+#   - when: file_exists("CLAUDE.md") and tag_exist("use-claude") and tag_exist("review")
 #     after_add:
 #       - command: "claude -p tag('prompt') --cwd dest_path()"
 #
 #   # Simple command with dest_path:
-#   - predicate: 'file_exists("package.json")'
+#   - when: 'file_exists("package.json")'
 #     after_add:
 #       - command: "npm install --prefix dest_path()"
 """

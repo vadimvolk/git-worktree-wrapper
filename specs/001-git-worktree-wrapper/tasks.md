@@ -49,7 +49,7 @@
 - [X] T015 [P] Implement git worktree operations wrapper in src/gww/git/worktree.py
 - [X] T016 [P] Implement git branch operations in src/gww/git/branch.py
 - [X] T017 [P] Implement URI parsing (protocol, host, port, path segments) in src/gww/utils/uri.py
-- [X] T018 [P] Implement project action matcher (predicate evaluation) in src/gww/actions/matcher.py
+- [X] T018 [P] Implement project action matcher ('when' condition evaluation) in src/gww/actions/matcher.py
 - [X] T019 [P] Implement project action executor (abs_copy, rel_copy, command) in src/gww/actions/executor.py
 - [X] T020 [P] Implement shell completion generation utilities in src/gww/utils/shell.py
 - [X] T021 Create base CLI argument parser structure in src/gww/cli/main.py
@@ -60,16 +60,16 @@
 
 ## Phase 3: User Story 1 - Clone Repositories (Priority: P1) 🎯 MVP
 
-**Goal**: Users can clone repositories to configurable source locations based on URI predicates, with project-specific actions executed after clone.
+**Goal**: Users can clone repositories to configurable source locations based on URI conditions, with project-specific actions executed after clone.
 
-**Independent Test**: Run `gww clone https://github.com/user/repo.git` from a clean state and verify repository is cloned to expected location based on config, and after_clone actions are executed if project predicate matches.
+**Independent Test**: Run `gww clone https://github.com/user/repo.git` from a clean state and verify repository is cloned to expected location based on config, and after_clone actions are executed if project 'when' condition matches.
 
 ### Tests for User Story 1
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
 - [X] T022 [P] [US1] Unit test for URI parsing in tests/unit/test_uri_parsing.py
-- [X] T023 [P] [US1] Unit test for source rule predicate matching in tests/unit/test_config_resolver.py
+- [X] T023 [P] [US1] Unit test for source rule 'when' condition matching in tests/unit/test_config_resolver.py
 - [X] T024 [P] [US1] Unit test for template resolution with URI context in tests/unit/test_config_resolver.py
 - [X] T025 [P] [US1] Unit test for project action matching and execution in tests/unit/test_actions_matcher.py
 - [X] T026 [P] [US1] Integration test for clone command end-to-end in tests/integration/test_clone_flow.py
@@ -89,7 +89,7 @@
 
 **Goal**: Users can add worktrees for branches with configurable paths and project-specific actions executed after worktree creation.
 
-**Independent Test**: From a cloned repository, run `gww add feature-branch` and verify worktree is created at expected location based on config, branch is checked out, and after_add actions are executed if project predicate matches.
+**Independent Test**: From a cloned repository, run `gww add feature-branch` and verify worktree is created at expected location based on config, branch is checked out, and after_add actions are executed if project 'when' condition matches.
 
 ### Tests for User Story 2
 
@@ -299,7 +299,7 @@
 ```bash
 # Launch all tests for User Story 1 together:
 Task T022: "Unit test for URI parsing in tests/unit/test_uri_parsing.py"
-Task T023: "Unit test for source rule predicate matching in tests/unit/test_config_resolver.py"
+Task T023: "Unit test for source rule 'when' condition matching in tests/unit/test_config_resolver.py"
 Task T024: "Unit test for template resolution with URI context in tests/unit/test_config_resolver.py"
 Task T025: "Unit test for project action matching and execution in tests/unit/test_actions_matcher.py"
 Task T026: "Integration test for clone command end-to-end in tests/integration/test_clone_flow.py"

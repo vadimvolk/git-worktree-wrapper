@@ -18,11 +18,11 @@ from gww.utils.uri import parse_uri
 class TestFindMatchingSourceRule:
     """Tests for find_matching_source_rule function."""
 
-    def test_matches_github_predicate(self) -> None:
-        """Test matching GitHub predicate with 'github' in host."""
+    def test_matches_github_when(self) -> None:
+        """Test matching GitHub 'when' condition with 'github' in host."""
         github_rule = SourceRule(
             name="github",
-            predicate='"github" in host()',
+            when='"github" in host()',
             sources="~/sources/github/path(-2)/path(-1)",
         )
         config = Config(
@@ -37,11 +37,11 @@ class TestFindMatchingSourceRule:
         assert result is not None
         assert result.name == "github"
 
-    def test_matches_gitlab_predicate(self) -> None:
-        """Test matching GitLab predicate."""
+    def test_matches_gitlab_when(self) -> None:
+        """Test matching GitLab 'when' condition."""
         gitlab_rule = SourceRule(
             name="gitlab",
-            predicate='"gitlab" in host()',
+            when='"gitlab" in host()',
             sources="~/sources/gitlab/path(-2)/path(-1)",
         )
         config = Config(
@@ -60,7 +60,7 @@ class TestFindMatchingSourceRule:
         """Test that no match returns None."""
         github_rule = SourceRule(
             name="github",
-            predicate='"github" in host()',
+            when='"github" in host()',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -75,8 +75,8 @@ class TestFindMatchingSourceRule:
 
     def test_first_match_wins(self) -> None:
         """Test that first matching rule wins."""
-        rule1 = SourceRule(name="rule1", predicate="True")
-        rule2 = SourceRule(name="rule2", predicate="True")
+        rule1 = SourceRule(name="rule1", when="True")
+        rule2 = SourceRule(name="rule2", when="True")
         config = Config(
             default_sources="~/sources/default",
             default_worktrees="~/worktrees/default",
@@ -102,11 +102,11 @@ class TestFindMatchingSourceRule:
 
         assert result is None
 
-    def test_predicate_with_path_access(self) -> None:
-        """Test predicate that accesses path segments."""
+    def test_when_with_path_access(self) -> None:
+        """Test 'when' condition that accesses path segments."""
         rule = SourceRule(
             name="myorg",
-            predicate='path(0) == "myorg"',
+            when='path(0) == "myorg"',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -120,11 +120,11 @@ class TestFindMatchingSourceRule:
         assert result is not None
         assert result.name == "myorg"
 
-    def test_predicate_with_protocol_check(self) -> None:
-        """Test predicate that checks protocol."""
+    def test_when_with_protocol_check(self) -> None:
+        """Test 'when' condition that checks protocol."""
         rule = SourceRule(
             name="ssh",
-            predicate='protocol() == "ssh"',
+            when='protocol() == "ssh"',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -138,11 +138,11 @@ class TestFindMatchingSourceRule:
         assert result is not None
         assert result.name == "ssh"
 
-    def test_predicate_with_port_check(self) -> None:
-        """Test predicate that checks port."""
+    def test_when_with_port_check(self) -> None:
+        """Test 'when' condition that checks port."""
         rule = SourceRule(
             name="custom",
-            predicate='port() == "3000"',
+            when='port() == "3000"',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -156,11 +156,11 @@ class TestFindMatchingSourceRule:
         assert result is not None
         assert result.name == "custom"
 
-    def test_invalid_predicate_raises_resolver_error(self) -> None:
-        """Test that invalid predicate raises ResolverError."""
+    def test_invalid_when_raises_resolver_error(self) -> None:
+        """Test that invalid 'when' condition raises ResolverError."""
         rule = SourceRule(
             name="invalid",
-            predicate="undefined_variable",
+            when="undefined_variable",
         )
         config = Config(
             default_sources="~/sources/default",
@@ -169,20 +169,20 @@ class TestFindMatchingSourceRule:
         )
         uri = parse_uri("https://github.com/user/repo.git")
 
-        with pytest.raises(ResolverError, match="Error evaluating predicate"):
+        with pytest.raises(ResolverError, match="Error evaluating 'when'"):
             find_matching_source_rule(config, uri)
 
-    def test_not_in_predicate_forms(self) -> None:
+    def test_not_in_when_forms(self) -> None:
         """Test that both 'not "github" in host' and '"github" not in host' work correctly."""
         # Test with 'not "github" in host' form
         non_github_rule1 = SourceRule(
             name="non_github1",
-            predicate='not "github" in host()',
+            when='not "github" in host()',
         )
         # Test with '"github" not in host' form
         non_github_rule2 = SourceRule(
             name="non_github2",
-            predicate='"github" not in host()',
+            when='"github" not in host()',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -196,7 +196,7 @@ class TestFindMatchingSourceRule:
         # Test with GitHub URI - should NOT match either rule
         github_uri = parse_uri("https://github.com/user/repo.git")
         result1 = find_matching_source_rule(config, github_uri)
-        # Since "github" IS in host, both predicates should be False
+        # Since "github" IS in host, both 'when' conditions should be False
         assert result1 is None
 
         # Test with non-GitHub URI - should match both rules
@@ -215,11 +215,11 @@ class TestFindMatchingSourceRule:
         assert result3 is not None
         assert result3.name == "non_github2"
 
-    def test_matches_with_tag_exist_predicate(self) -> None:
-        """Test matching source rule with tag_exist() predicate."""
+    def test_matches_with_tag_exist_when(self) -> None:
+        """Test matching source rule with tag_exist() in 'when' condition."""
         rule = SourceRule(
             name="tagged",
-            predicate='tag_exist("env")',
+            when='tag_exist("env")',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -237,7 +237,7 @@ class TestFindMatchingSourceRule:
         """Test no match when tag_exist() returns False."""
         rule = SourceRule(
             name="tagged",
-            predicate='tag_exist("env")',
+            when='tag_exist("env")',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -250,11 +250,11 @@ class TestFindMatchingSourceRule:
 
         assert result is None
 
-    def test_matches_with_tag_value_predicate(self) -> None:
-        """Test matching source rule with tag() value comparison."""
+    def test_matches_with_tag_value_when(self) -> None:
+        """Test matching source rule with tag() value comparison in 'when' condition."""
         rule = SourceRule(
             name="production",
-            predicate='tag("env") == "production"',
+            when='tag("env") == "production"',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -269,10 +269,10 @@ class TestFindMatchingSourceRule:
         assert result.name == "production"
 
     def test_no_match_with_different_tag_value(self) -> None:
-        """Test no match when tag value doesn't match predicate."""
+        """Test no match when tag value doesn't match 'when' condition."""
         rule = SourceRule(
             name="production",
-            predicate='tag("env") == "production"',
+            when='tag("env") == "production"',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -289,7 +289,7 @@ class TestFindMatchingSourceRule:
         """Test tag() returns empty string when tag doesn't exist."""
         rule = SourceRule(
             name="empty",
-            predicate='tag("missing") == ""',
+            when='tag("missing") == ""',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -307,7 +307,7 @@ class TestFindMatchingSourceRule:
         """Test tag_exist() returns True even when tag has empty value."""
         rule = SourceRule(
             name="flagged",
-            predicate='tag_exist("flag")',
+            when='tag_exist("flag")',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -321,11 +321,11 @@ class TestFindMatchingSourceRule:
         assert result is not None
         assert result.name == "flagged"
 
-    def test_tag_with_empty_value_in_predicate(self) -> None:
-        """Test tag() with empty value in predicate."""
+    def test_tag_with_empty_value_in_when(self) -> None:
+        """Test tag() with empty value in 'when' condition."""
         rule = SourceRule(
             name="empty_flag",
-            predicate='tag("flag") == ""',
+            when='tag("flag") == ""',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -339,11 +339,11 @@ class TestFindMatchingSourceRule:
         assert result is not None
         assert result.name == "empty_flag"
 
-    def test_tag_functions_with_uri_and_tag_predicate(self) -> None:
-        """Test tag functions combined with URI predicates."""
+    def test_tag_functions_with_uri_and_tag_when(self) -> None:
+        """Test tag functions combined with URI 'when' conditions."""
         rule = SourceRule(
             name="github_prod",
-            predicate='"github" in host() and tag("env") == "production"',
+            when='"github" in host() and tag("env") == "production"',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -372,11 +372,11 @@ class TestFindMatchingSourceRule:
         )
         assert result3 is None
 
-    def test_multiple_tags_in_predicate(self) -> None:
-        """Test using multiple tags in predicate."""
+    def test_multiple_tags_in_when(self) -> None:
+        """Test using multiple tags in 'when' condition."""
         rule = SourceRule(
             name="multi_tag",
-            predicate='tag_exist("env") and tag("env") == "production" and tag_exist("version")',
+            when='tag_exist("env") and tag("env") == "production" and tag_exist("version")',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -392,11 +392,11 @@ class TestFindMatchingSourceRule:
         assert result is not None
         assert result.name == "multi_tag"
 
-    def test_tag_functions_with_complex_predicate(self) -> None:
-        """Test tag functions in complex predicate with logical operators."""
+    def test_tag_functions_with_complex_when(self) -> None:
+        """Test tag functions in complex 'when' condition with logical operators."""
         rule = SourceRule(
             name="complex",
-            predicate='tag_exist("env") and (tag("env") == "production" or tag("env") == "staging")',
+            when='tag_exist("env") and (tag("env") == "production" or tag("env") == "staging")',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -423,7 +423,7 @@ class TestFindMatchingSourceRule:
         """Test tag functions when no tags are provided."""
         rule = SourceRule(
             name="tagged",
-            predicate='tag_exist("env")',
+            when='tag_exist("env")',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -440,11 +440,11 @@ class TestFindMatchingSourceRule:
         """Test tag functions when only some tags are provided."""
         rule1 = SourceRule(
             name="env_rule",
-            predicate='tag_exist("env")',
+            when='tag_exist("env")',
         )
         rule2 = SourceRule(
             name="version_rule",
-            predicate='tag_exist("version")',
+            when='tag_exist("version")',
         )
         config = Config(
             default_sources="~/sources/default",
@@ -480,7 +480,7 @@ class TestResolveSourcePath:
         """Test that matching rule's sources template is used."""
         github_rule = SourceRule(
             name="github",
-            predicate='"github" in host()',
+            when='"github" in host()',
             sources="~/sources/github/path(-2)/path(-1)",
         )
         config = Config(
@@ -500,7 +500,7 @@ class TestResolveSourcePath:
         """Test fallback to default when rule has no sources template."""
         rule = SourceRule(
             name="github",
-            predicate='"github" in host()',
+            when='"github" in host()',
             sources=None,  # No sources template
         )
         config = Config(
@@ -574,7 +574,7 @@ class TestResolveWorktreePath:
         """Test that matching rule's worktrees template is used."""
         github_rule = SourceRule(
             name="github",
-            predicate='"github" in host()',
+            when='"github" in host()',
             sources="~/sources/github",
             worktrees="~/worktrees/github/path(-2)/path(-1)/branch()",
         )
@@ -596,7 +596,7 @@ class TestResolveWorktreePath:
         """Test fallback to default when rule has no worktrees template."""
         rule = SourceRule(
             name="github",
-            predicate='"github" in host()',
+            when='"github" in host()',
             sources="~/sources/github",
             worktrees=None,
         )
@@ -651,7 +651,7 @@ class TestMigrationPathCalculation:
         """Test calculating new path for GitHub repository."""
         github_rule = SourceRule(
             name="github",
-            predicate='"github" in host()',
+            when='"github" in host()',
             sources="~/sources/github/path(-2)/path(-1)",
         )
         config = Config(
@@ -671,7 +671,7 @@ class TestMigrationPathCalculation:
         """Test calculating new path for GitLab with nested groups."""
         gitlab_rule = SourceRule(
             name="gitlab",
-            predicate='"gitlab" in host()',
+            when='"gitlab" in host()',
             sources="~/sources/gitlab/path(-3)/path(-2)/path(-1)",
         )
         config = Config(
@@ -692,7 +692,7 @@ class TestMigrationPathCalculation:
         """Test that default path is used for unknown hosts."""
         github_rule = SourceRule(
             name="github",
-            predicate='"github" in host()',
+            when='"github" in host()',
             sources="~/sources/github/path(-1)",
         )
         config = Config(
@@ -727,7 +727,7 @@ class TestMigrationPathCalculation:
         """Test resolve_source_path with tag() in rule's sources template."""
         rule = SourceRule(
             name="github",
-            predicate='"github" in host()',
+            when='"github" in host()',
             sources="~/sources/tag('env')/github/path(-2)/path(-1)",
         )
         config = Config(
@@ -796,7 +796,7 @@ class TestMigrationPathCalculation:
         """Test resolve_worktree_path with tag() in rule's worktrees template."""
         rule = SourceRule(
             name="github",
-            predicate='"github" in host()',
+            when='"github" in host()',
             sources="~/sources/github",
             worktrees="~/worktrees/tag('env')/github/path(-1)/norm_branch()",
         )

@@ -3,12 +3,12 @@
 
 # GWW — Git Worktree Wrapper
 
-CLI-инструмент, который оборачивает функциональность `git worktree`, добавляя настраиваемые шаблоны путей, маршрутизацию на основе предикатов и действия, специфичные для проекта.
+CLI-инструмент, который оборачивает функциональность `git worktree`, добавляя настраиваемые шаблоны путей, маршрутизацию на основе условий и действия, специфичные для проекта.
 
 ## Возможности
 
 - **Настраиваемые шаблоны путей**: Динамическая генерация путей с использованием шаблонов и функций вроде `path(n)`, `branch()`, `norm_branch()`, `tag()`
-- **Маршрутизация на основе предикатов**: Размещение репозиториев в разные локации по предикатам URI (host, path, protocol, tags)
+- **Маршрутизация на основе условий**: Размещение репозиториев в разные локации по условиям URI (host, path, protocol, tags)
 - **Поддержка тегов**: Передавайте пользовательские теги через опцию `--tag` для условной маршрутизации и организации путей
 - **Действия проекта**: Выполнение пользовательских действий (копирование файлов, команды) после клонирования или создания worktree
 - **Автодополнение shell**: Поддержка completion для Bash, Zsh и Fish
@@ -109,17 +109,17 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 
 sources:
   github:
-    predicate: '"github" in host()'
+    when: '"github" in host()'
     sources: ~/Developer/sources/github/path(-2)/path(-1)
     worktrees: ~/Developer/worktrees/github/path(-2)/path(-1)/norm_branch()
 
   gitlab:
-    predicate: '"gitlab" in host()'
+    when: '"gitlab" in host()'
     sources: ~/Developer/sources/gitlab/path(-3)/path(-2)/path(-1)
     worktrees: ~/Developer/worktrees/gitlab/path(-3)/path(-2)/path(-1)/norm_branch()
 
 actions:
-  - predicate: file_exists("local.properties")
+  - when: file_exists("local.properties")
     after_clone:
       - abs_copy: ["~/sources/default-local.properties", "local.properties"]
     after_add:
@@ -128,7 +128,7 @@ actions:
 
 ### Функции шаблонов
 
-#### Функции URI (доступны в шаблонах, URI-предикатах и предикатах проектов)
+#### Функции URI (доступны в шаблонах и условиях `when`)
 
 | Function | Description | Example |
 |----------|-------------|---------|
@@ -145,14 +145,14 @@ actions:
 | `branch()` | Получить имя текущей ветки | `branch()` → `"feature/new/ui"` |
 | `norm_branch(replacement)` | Имя ветки с заменой `/` (по умолчанию: `"-"`) | `norm_branch()` → `"feature-new-ui"`, `norm_branch("_")` → `"feature_new_ui"` |
 
-#### Функции тегов (доступны в шаблонах, URI-предикатах и предикатах проектов)
+#### Функции тегов (доступны в шаблонах и условиях `when`)
 
 | Function | Description | Example |
 |----------|-------------|---------|
 | `tag(name)` | Получить значение тега по имени (пустая строка, если не задан) | `tag("env")` → `"prod"` |
 | `tag_exist(name)` | Проверить, существует ли тег (возвращает boolean) | `tag_exist("env")` → `True` |
 
-#### Функции проекта (доступны только в предикатах проектов)
+#### Функции проекта (доступны только в условиях `when` проектов)
 
 | Function | Description | Example |
 |----------|-------------|---------|
@@ -167,7 +167,7 @@ actions:
 ```yaml
 sources:
   production:
-    predicate: 'tag_exist("env") and tag("env") == "prod"'
+    when: 'tag_exist("env") and tag("env") == "prod"'
     sources: ~/Developer/sources/prod/path(-2)/path(-1)
     worktrees: ~/Developer/worktrees/prod/path(-2)/path(-1)/norm_branch()
 ```
@@ -184,8 +184,8 @@ gww add feature-branch --tag env=dev --tag team=frontend
 
 | Command | Description |
 |---------|-------------|
-| `gww clone <uri> [--tag key=value]...` | Клонировать репозиторий в настроенную локацию (теги доступны в шаблонах/предикатах) |
-| `gww add <branch> [-c] [--tag key=value]...` | Добавить worktree для ветки (опционально создать ветку, теги доступны в шаблонах/предикатах) |
+| `gww clone <uri> [--tag key=value]...` | Клонировать репозиторий в настроенную локацию (теги доступны в шаблонах/условиях) |
+| `gww add <branch> [-c] [--tag key=value]...` | Добавить worktree для ветки (опционально создать ветку, теги доступны в шаблонах/условиях) |
 | `gww remove <branch\|path> [-f]` | Удалить worktree |
 | `gww pull` | Обновить исходный репозиторий |
 | `gww migrate <path> [--dry-run] [--move]` | Мигрировать репозитории в новые локации |

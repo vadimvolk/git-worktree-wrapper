@@ -3,12 +3,12 @@
 
 # GWW - Git Worktree Wrapper
 
-A CLI tool that wraps git worktree functionality with configurable path templates, predicate-based routing, and project-specific actions.
+A CLI tool that wraps git worktree functionality with configurable path templates, condition-based routing, and project-specific actions.
 
 ## Features
 
 - **Configurable path templates**: Dynamic path generation using templates with functions like `path(n)`, `branch()`, `norm_branch()`, `tag()`
-- **Predicate-based routing**: Route repositories to different locations based on URI predicates (host, path, protocol, tags)
+- **Condition-based routing**: Route repositories to different locations based on URI conditions (host, path, protocol, tags)
 - **Tag support**: Pass custom tags via `--tag` option for conditional routing and path organization
 - **Project actions**: Execute custom actions (file copies, commands) after clone or worktree creation
 - **Shell completion**: Bash, Zsh, and Fish completion support
@@ -109,17 +109,17 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 
 sources:
   github:
-    predicate: '"github" in host()'
+    when: '"github" in host()'
     sources: ~/Developer/sources/github/path(-2)/path(-1)
     worktrees: ~/Developer/worktrees/github/path(-2)/path(-1)/norm_branch()
 
   gitlab:
-    predicate: '"gitlab" in host()'
+    when: '"gitlab" in host()'
     sources: ~/Developer/sources/gitlab/path(-3)/path(-2)/path(-1)
     worktrees: ~/Developer/worktrees/gitlab/path(-3)/path(-2)/path(-1)/norm_branch()
 
 actions:
-  - predicate: file_exists("local.properties")
+  - when: file_exists("local.properties")
     after_clone:
       - abs_copy: ["~/sources/default-local.properties", "local.properties"]
     after_add:
@@ -128,7 +128,7 @@ actions:
 
 ### Template Functions
 
-#### URI Functions (available in templates, URI predicates, and project predicates)
+#### URI Functions (available in templates and `when` conditions)
 
 | Function | Description | Example |
 |----------|-------------|---------|
@@ -145,14 +145,14 @@ actions:
 | `branch()` | Get current branch name | `branch()` → `"feature/new/ui"` |
 | `norm_branch(replacement)` | Branch name with `/` replaced (default: `"-"`) | `norm_branch()` → `"feature-new-ui"`, `norm_branch("_")` → `"feature_new_ui"` |
 
-#### Tag Functions (available in templates, URI predicates, and project predicates)
+#### Tag Functions (available in templates and `when` conditions)
 
 | Function | Description | Example |
 |----------|-------------|---------|
 | `tag(name)` | Get tag value by name (returns empty string if not set) | `tag("env")` → `"prod"` |
 | `tag_exist(name)` | Check if tag exists (returns boolean) | `tag_exist("env")` → `True` |
 
-#### Project Functions (available only in project predicates)
+#### Project Functions (available only in project `when` conditions)
 
 | Function | Description | Example |
 |----------|-------------|---------|
@@ -166,7 +166,7 @@ actions:
 ```yaml
 sources:
   production:
-    predicate: 'tag_exist("env") and tag("env") == "prod"'
+    when: 'tag_exist("env") and tag("env") == "prod"'
     sources: ~/Developer/sources/prod/path(-2)/path(-1)
     worktrees: ~/Developer/worktrees/prod/path(-2)/path(-1)/norm_branch()
 ```
@@ -183,8 +183,8 @@ gww add feature-branch --tag env=dev --tag team=frontend
 
 | Command | Description |
 |---------|-------------|
-| `gww clone <uri> [--tag key=value]...` | Clone repository to configured location (tags available in templates/predicates) |
-| `gww add <branch> [-c] [--tag key=value]...` | Add worktree for branch (optionally create branch, tags available in templates/predicates) |
+| `gww clone <uri> [--tag key=value]...` | Clone repository to configured location (tags available in templates/conditions) |
+| `gww add <branch> [-c] [--tag key=value]...` | Add worktree for branch (optionally create branch, tags available in templates/conditions) |
 | `gww remove <branch\|path> [-f]` | Remove worktree |
 | `gww pull` | Update source repository |
 | `gww migrate <path> [--dry-run] [--move]` | Migrate repositories to new locations |

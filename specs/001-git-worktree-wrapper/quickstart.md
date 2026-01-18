@@ -32,12 +32,12 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 
 sources:
     github:
-        predicate: "github" in host
+        when: "github" in host
         sources: ~/Developer/sources/github/path(-2)/path(-1)
         worktrees: ~/Developer/worktrees/github/path(-2)/path(-1)/branch()
     
     gitlab:
-        predicate: "gitlab" in host and !contains(host, "scp")
+        when: "gitlab" in host and !contains(host, "scp")
         sources: ~/Developer/sources/gitlab/path(-3)/path(-2)/path(-1)
         worktrees: ~/Developer/worktrees/gitlab/path(-3)/path(-2)/path(-1)-branch()
 ```
@@ -205,15 +205,15 @@ gww pull
 ```yaml
 sources:
     github:
-        predicate: "github" in host
+        when: "github" in host
         sources: ~/Developer/sources/github/path(-2)/path(-1)
     
     gitlab:
-        predicate: "gitlab" in host and !contains(host, "scp")
+        when: "gitlab" in host and !contains(host, "scp")
         sources: ~/Developer/sources/gitlab/path(-3)/path(-2)/path(-1)
     
     custom:
-        predicate: path(0) == "myorg"
+        when: path(0) == "myorg"
         sources: ~/Developer/sources/custom/path(-2)/path(-1)
 ```
 
@@ -242,7 +242,7 @@ gww clone https://other.com/user/repo.git
 
 ```yaml
 actions:
-    - predicate: file_exists(local.properties)
+    - when: file_exists(local.properties)
       after_clone:
           - abs_copy("~/sources/default-local.properties", "local.properties")
       after_add:
@@ -264,17 +264,17 @@ actions:
 ```yaml
 sources:
   production:
-    predicate: 'tag_exist("env") and tag("env") == "prod"'
+    when: 'tag_exist("env") and tag("env") == "prod"'
     sources: ~/Developer/sources/prod/path(-2)/path(-1)
     worktrees: ~/Developer/worktrees/prod/path(-2)/path(-1)/norm_branch()
   
   development:
-    predicate: 'tag_exist("env") and tag("env") == "dev"'
+    when: 'tag_exist("env") and tag("env") == "dev"'
     sources: ~/Developer/sources/dev/path(-2)/path(-1)
     worktrees: ~/Developer/worktrees/dev/path(-2)/path(-1)/norm_branch()
   
   project_backend:
-    predicate: 'tag_exist("project") and tag("project") == "backend"'
+    when: 'tag_exist("project") and tag("project") == "backend"'
     sources: ~/Developer/sources/backend/path(-2)/path(-1)
     worktrees: ~/Developer/worktrees/backend/path(-2)/path(-1)/norm_branch()
 ```
@@ -358,11 +358,11 @@ gww migrate ~/old-repos --move
 ## Template Function Examples
 
 **Function Availability**:
-- **Shared functions** (available in templates, URI predicates, and project predicates):
+- **Shared functions** (available in templates and `when` conditions):
   - URI functions: `host()`, `port()`, `protocol()`, `uri()`, `path(index)`
   - Branch functions: `branch()`, `norm_branch(replacement)` (when branch context available)
   - Tag functions: `tag(name)`, `tag_exist(name)`
-- **Project-specific functions** (only in project predicates):
+- **Project-specific functions** (only in project `when` conditions):
   - `source_path()` - returns current repository/worktree root path (detects from cwd, returns empty string if not in git repo)
   - `file_exists(path)`, `dir_exists(path)`, `path_exists(path)` - check paths relative to source repository
 
@@ -409,14 +409,14 @@ sources: ~/Developer/sources/host()/path(-2)/path(-1)
 sources: ~/Developer/sources/protocol()/path(-2)/path(-1)
 # Evaluates to: ~/Developer/sources/https/vadimvolk/ansible
 
-# Using URI functions in predicates
+# Using URI functions in 'when' conditions
 sources:
   github:
-    predicate: '"github" in host()'
+    when: '"github" in host()'
     sources: ~/Developer/sources/github/path(-2)/path(-1)
   
   custom:
-    predicate: 'path(0) == "myorg"'
+    when: 'path(0) == "myorg"'
     sources: ~/Developer/sources/custom/path(-2)/path(-1)
 ```
 
@@ -432,14 +432,14 @@ sources: ~/Developer/sources/tag("env")/path(-2)/path(-1)
 worktrees: ~/Developer/worktrees/tag("project")/path(-1)/branch()
 # Evaluates to: ~/Developer/worktrees/backend/ansible/feature-branch
 
-# Using tag_exist() in predicates
+# Using tag_exist() in 'when' conditions
 sources:
   production:
-    predicate: 'tag_exist("env") and tag("env") == "prod"'
+    when: 'tag_exist("env") and tag("env") == "prod"'
     sources: ~/Developer/sources/prod/path(-2)/path(-1)
   
   development:
-    predicate: 'tag_exist("env") and tag("env") == "dev"'
+    when: 'tag_exist("env") and tag("env") == "dev"'
     sources: ~/Developer/sources/dev/path(-2)/path(-1)
 ```
 
@@ -447,45 +447,45 @@ sources:
 ```bash
 # Clone with tags
 gww clone https://github.com/user/repo.git --tag env=prod --tag project=backend
-# Tags available in templates and predicates
+# Tags available in templates and 'when' conditions
 
 # Add worktree with tags
 gww add feature-branch --tag env=dev --tag team=frontend
 # Tags can be used in worktree path templates
 ```
 
-### Project Predicate Functions
+### Project 'when' Condition Functions
 
 ```yaml
-# Project-specific functions (only available in project predicates)
+# Project-specific functions (only available in project 'when' conditions)
 actions:
-  - predicate: 'file_exists("package.json")'
+  - when: 'file_exists("package.json")'
     after_clone:
       - type: command
         command: npm
         args: ["install"]
   
-  - predicate: 'dir_exists("src") and file_exists("pom.xml")'
+  - when: 'dir_exists("src") and file_exists("pom.xml")'
     after_clone:
       - type: command
         command: mvn
         args: ["install", "-DskipTests"]
   
-  - predicate: 'path_exists("setup.py")'
+  - when: 'path_exists("setup.py")'
     after_clone:
       - type: command
         command: pip
         args: ["install", "-e", "."]
 
-# Shared functions also available in project predicates
+# Shared functions also available in project 'when' conditions
 actions:
-  - predicate: 'file_exists("package.json") and tag("env") == "prod"'
+  - when: 'file_exists("package.json") and tag("env") == "prod"'
     after_clone:
       - type: command
         command: npm
         args: ["run", "build:prod"]
   
-  - predicate: 'host() == "github.com" and file_exists("Makefile")'
+  - when: 'host() == "github.com" and file_exists("Makefile")'
     after_clone:
       - type: command
         command: make
