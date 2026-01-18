@@ -317,6 +317,153 @@ class TestTagFunctionsIntegration:
         assert functions["tag_exist"]("missing") is False
 
 
+class TestTimeIdFunction:
+    """Tests for time_id() template function."""
+
+    def test_time_id_default_format_matches_pattern(self) -> None:
+        """Test time_id() with default format returns expected pattern."""
+        import re
+
+        context = TemplateContext()
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        result = functions["time_id"]()
+
+        # Pattern: YYYYMMDD-HHMM.SS (e.g., "20260120-2134.03")
+        pattern = r"^\d{8}-\d{4}\.\d{2}$"
+        assert re.match(pattern, result), f"Result '{result}' doesn't match pattern YYYYMMDD-HHMM.SS"
+
+    def test_time_id_custom_format(self) -> None:
+        """Test time_id() with custom format string."""
+        context = TemplateContext()
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        result = functions["time_id"]("%Y-%m-%d")
+
+        # Should match YYYY-MM-DD pattern
+        import re
+        pattern = r"^\d{4}-\d{2}-\d{2}$"
+        assert re.match(pattern, result), f"Result '{result}' doesn't match pattern YYYY-MM-DD"
+
+    def test_time_id_caches_datetime_across_calls(self) -> None:
+        """Test time_id() caches datetime and reuses it for subsequent calls."""
+        context = TemplateContext()
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        # Call with default format
+        result1 = functions["time_id"]()
+        # Call with custom format
+        result2 = functions["time_id"]("%Y%m%d%H%M%S")
+        # Call with another format
+        result3 = functions["time_id"]("%Y")
+
+        # Extract date parts from default format (YYYYMMDD-HHMM.SS)
+        date_from_default = result1[:8]  # YYYYMMDD
+        time_from_default = result1[9:13]  # HHMM
+        sec_from_default = result1[14:16]  # SS
+
+        # result2 format is YYYYMMDDHHMMSS
+        date_from_custom = result2[:8]  # YYYYMMDD
+        time_from_custom = result2[8:12]  # HHMM
+        sec_from_custom = result2[12:14]  # SS
+
+        # Verify same datetime was used
+        assert date_from_default == date_from_custom
+        assert time_from_default == time_from_custom
+        assert sec_from_default == sec_from_custom
+
+        # result3 format is YYYY (year only)
+        year_from_default = result1[:4]
+        assert result3 == year_from_default
+
+    def test_time_id_different_registries_have_different_datetimes(self) -> None:
+        """Test that different FunctionRegistry instances may have different cached datetimes."""
+        import time
+
+        context = TemplateContext()
+
+        registry1 = FunctionRegistry(context)
+        functions1 = registry1.get_functions()
+        result1 = functions1["time_id"]()
+
+        # Small delay to potentially get different time
+        time.sleep(0.01)
+
+        registry2 = FunctionRegistry(context)
+        functions2 = registry2.get_functions()
+        result2 = functions2["time_id"]()
+
+        # Each registry has its own cached datetime
+        # The results might be the same (if called within same second) or different
+        # What's important is that they each have their own cache
+        assert registry1._cached_datetime is not None
+        assert registry2._cached_datetime is not None
+        # They could be equal or different depending on timing
+        # The key test is that each registry caches independently
+
+    def test_time_id_in_template_evaluation(self) -> None:
+        """Test time_id() function in template evaluation."""
+        import re
+
+        context = TemplateContext(
+            uri=parse_uri("https://github.com/user/repo.git"),
+        )
+
+        result = evaluate_template("~/sources/path(-1)/time_id()", context)
+
+        # Should contain repo name and time_id pattern
+        assert "repo" in result
+        # Extract time_id part (after last /)
+        time_id_part = result.split("/")[-1]
+        pattern = r"^\d{8}-\d{4}\.\d{2}$"
+        assert re.match(pattern, time_id_part), f"time_id part '{time_id_part}' doesn't match pattern"
+
+    def test_time_id_with_custom_format_in_template(self) -> None:
+        """Test time_id() with custom format in template evaluation."""
+        import re
+
+        context = TemplateContext(
+            uri=parse_uri("https://github.com/user/repo.git"),
+        )
+
+        result = evaluate_template("~/sources/path(-1)/time_id('%Y-%m-%d')", context)
+
+        # Should contain repo name and custom time_id pattern
+        assert "repo" in result
+        # Extract time_id part (after last /)
+        time_id_part = result.split("/")[-1]
+        pattern = r"^\d{4}-\d{2}-\d{2}$"
+        assert re.match(pattern, time_id_part), f"time_id part '{time_id_part}' doesn't match pattern"
+
+    def test_time_id_multiple_calls_in_same_template(self) -> None:
+        """Test multiple time_id() calls in same template use same datetime."""
+        context = TemplateContext()
+
+        # Call time_id twice with different formats in same template
+        result = evaluate_template("time_id()/time_id('%Y')", context)
+
+        parts = result.split("/")
+        assert len(parts) == 2
+
+        # First part: default format YYYYMMDD-HHMM.SS
+        # Second part: just year YYYY
+        year_from_first = parts[0][:4]
+        year_from_second = parts[1]
+
+        assert year_from_first == year_from_second
+
+    def test_time_id_is_registered_in_function_registry(self) -> None:
+        """Test that time_id is registered in the function registry."""
+        context = TemplateContext()
+        functions = create_function_registry(context)
+
+        assert "time_id" in functions
+        assert callable(functions["time_id"])
+
+
 class TestURIFunctions:
     """Tests for URI functions (host, port, protocol, uri) in templates."""
 
@@ -795,3 +942,10 @@ class TestFunctionRegistryContainsAllFunctions:
 
         assert "tag" in functions
         assert "tag_exist" in functions
+
+    def test_registry_contains_utility_functions(self) -> None:
+        """Test registry includes all utility functions."""
+        context = TemplateContext()
+        functions = create_function_registry(context)
+
+        assert "time_id" in functions

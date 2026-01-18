@@ -207,6 +207,8 @@ Built-in functions available in template expressions and `when` conditions.
   - URI functions: `host()`, `port()`, `protocol()`, `uri()`, `path(index)`
   - Branch functions: `branch()`, `norm_branch(replacement)`
   - Tag functions: `tag(name)`, `tag_exist(name)`
+- **Template-only functions** (available only in templates, not in `when` conditions):
+  - Utility functions: `time_id(fmt)`
 - **Project-specific functions** (only available in project `when` conditions):
   - `source_path()`, `dest_path()`, `file_exists(path)`, `dir_exists(path)`, `path_exists(path)`
 
@@ -225,6 +227,15 @@ Built-in functions available in template expressions and `when` conditions.
 - `norm_branch(replacement: str = "-") -> str`: Branch name with "/" replaced with `replacement` (default: "-")
   - `norm_branch()`: Branch name with "/" replaced with "-"
   - `norm_branch("_")`: Branch name with "/" replaced with "_"
+
+**Utility Functions** (template-only, not available in `when` conditions):
+- `time_id(fmt: str = "%Y%m%d-%H%M.%S") -> str`: Generate datetime-based identifier string
+  - The datetime is captured on first call and cached for subsequent calls within the same template evaluation
+  - Default format produces strings like `"20260120-2134.03"` (YYYYMMDD-HHMM.SS)
+  - `time_id()`: Returns datetime with default format
+  - `time_id("%Y-%m-%d")`: Returns datetime with custom format (e.g., `"2026-01-20"`)
+  - `time_id("%H%M%S")`: Returns time only (e.g., `"213403"`)
+  - Format codes: see [Python strftime documentation](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes)
 
 **Tag Functions**:
 - `tag(name: str) -> str`: Get tag value by name. Returns empty string if tag doesn't exist or has no value

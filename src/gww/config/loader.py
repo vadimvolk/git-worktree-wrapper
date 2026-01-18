@@ -158,6 +158,16 @@ DEFAULT_CONFIG_TEMPLATE = """\
 #                         - norm_branch("_"): replaces "/" with "_"
 #                         Example: norm_branch() from "feature/new-ui" → "feature-new-ui"
 #
+# Utility Functions (template-only, not available in 'when' conditions):
+#   time_id(fmt)         - Generate datetime-based identifier string
+#                         The datetime is captured on first call and cached for subsequent
+#                         calls within the same template evaluation session.
+#                         - time_id(): default format "%Y%m%d-%H%M.%S" → "20260120-2134.03"
+#                         - time_id("%Y-%m-%d"): custom format → "2026-01-20"
+#                         - time_id("%H%M%S"): time only → "213403"
+#                         Format codes: https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
+#                         Useful for creating unique branch/worktree names with timestamps.
+#
 # Tag Functions:
 #   tag(name)            - Get tag value by name (returns empty string if not set)
 #                         Tags are passed via --tag option
@@ -234,6 +244,11 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 #     when: 'tag_exist("worktree-name")'
 #     sources: ~/Developer/sources/tag("project")/path(-2)/path(-1)
 #     worktrees: ~/Developer/worktrees/tag("project")/path(-2)/path(-1)/branch()-tag("worktree-name")
+#
+#   # Time-based worktree names (useful for temporary or timestamped worktrees):
+#   timestamped:
+#     when: 'tag_exist("timestamp")'
+#     worktrees: ~/Developer/worktrees/path(-2)/path(-1)/norm_branch()-time_id()
 #
 # Actions (optional)
 # Execute actions after clone or worktree creation based on project detection

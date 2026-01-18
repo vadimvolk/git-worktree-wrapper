@@ -149,6 +149,12 @@ actions:
 | `branch()` | Get current branch name | `branch()` → `"feature/new/ui"` |
 | `norm_branch(replacement)` | Branch name with `/` replaced (default: `"-"`) | `norm_branch()` → `"feature-new-ui"`, `norm_branch("_")` → `"feature_new_ui"` |
 
+#### ⏰ Utility Functions (available in templates)
+
+| Function | Description | Example |
+|----------|-------------|---------|
+| `time_id(fmt)` | Generate datetime-based identifier (cached per template evaluation). See [format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes). | `time_id()` → `"20260120-2134.03"`, `time_id("%Y-%m-%d")` → `"2026-01-20"` |
+
 #### ⚙️ Actions (available in `actions` section)
 
 | Action | Description | Example |

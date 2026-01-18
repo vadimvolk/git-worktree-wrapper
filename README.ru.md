@@ -149,6 +149,12 @@ actions:
 | `branch()` | Получить имя текущей ветки | `branch()` → `"feature/new/ui"` |
 | `norm_branch(replacement)` | Имя ветки с заменой `/` (по умолчанию: `"-"`) | `norm_branch()` → `"feature-new-ui"`, `norm_branch("_")` → `"feature_new_ui"` |
 
+#### ⏰ Утилитарные функции (доступны в шаблонах)
+
+| Function | Description | Example |
+|----------|-------------|---------|
+| `time_id(fmt)` | Генерирует идентификатор на основе даты/времени (кэшируется в рамках одного шаблона). См. [коды формата](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes). | `time_id()` → `"20260120-2134.03"`, `time_id("%Y-%m-%d")` → `"2026-01-20"` |
+
 #### ⚙️ Действия (доступны в секции `actions`)
 
 | Action | Description | Example |

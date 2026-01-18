@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -38,6 +39,9 @@ class FunctionRegistry:
     - URI functions: host(), port(), protocol(), uri(), path(index)
     - Branch functions: branch(), norm_branch(replacement)
     - Tag functions: tag(name), tag_exist(name)
+
+    Template-only functions (not available in predicates):
+    - Utility functions: time_id(fmt) - generates datetime-based identifier strings
     """
 
     def __init__(self, context: TemplateContext) -> None:
@@ -48,6 +52,7 @@ class FunctionRegistry:
         """
         self._context = context
         self._functions: dict[str, Callable[..., Any]] = {}
+        self._cached_datetime: Optional[datetime] = None
         self._register_builtin_functions()
 
     def _register_builtin_functions(self) -> None:
@@ -64,6 +69,8 @@ class FunctionRegistry:
         # Tag functions
         self._functions["tag"] = self._tag
         self._functions["tag_exist"] = self._tag_exist
+        # Utility functions (template-only)
+        self._functions["time_id"] = self._time_id
 
     def get_functions(self) -> dict[str, Callable[..., Any]]:
         """Return dictionary of all registered functions.
@@ -201,6 +208,27 @@ class FunctionRegistry:
             True if tag exists (with or without value), False otherwise.
         """
         return name in self._context.tags
+
+    # --- Utility Functions ---
+
+    def _time_id(self, fmt: str = "%Y%m%d-%H%M.%S") -> str:
+        """Generate a datetime-based identifier string.
+
+        The datetime is captured on first call and cached for subsequent calls
+        within the same template evaluation session. This ensures consistent
+        timestamps when time_id() is called multiple times with different formats.
+
+        Args:
+            fmt: Optional strftime format string. If not provided, uses default
+                 format "%Y%m%d-%H%M.%S" (e.g., "20260120-2134.03").
+
+        Returns:
+            Formatted datetime string.
+        """
+        if self._cached_datetime is None:
+            self._cached_datetime = datetime.now()
+
+        return self._cached_datetime.strftime(fmt)
 
 
 def create_function_registry(context: TemplateContext) -> dict[str, Callable[..., Any]]:
