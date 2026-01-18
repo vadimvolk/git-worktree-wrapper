@@ -153,7 +153,7 @@ def execute_action(
         action_type: One of "abs_copy", "rel_copy", "command".
         args: Action arguments.
         source_dir: Source repository path (required for rel_copy).
-        target_dir: Target directory (source repo for source_actions, worktree for worktree_actions).
+        target_dir: Target directory (source repo for after_clone, worktree for after_add).
 
     Raises:
         ActionError: If action fails.

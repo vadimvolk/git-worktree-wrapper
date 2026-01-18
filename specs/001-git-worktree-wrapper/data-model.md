@@ -62,13 +62,13 @@ Represents a project type detection rule with associated actions to execute duri
 
 **Attributes**:
 - `predicate` (str, required): Expression evaluated against repository filesystem (e.g., `file_exists(local.properties)`)
-- `source_actions` (list[Action], optional): Actions executed after source checkout
-- `worktree_actions` (list[Action], optional): Actions executed when worktree is added
+- `after_clone` (list[Action], optional): Actions executed after source checkout
+- `after_add` (list[Action], optional): Actions executed when worktree is added
 
 **Validation Rules**:
 - `predicate` must be a valid simpleeval expression
 - `predicate` must evaluate to boolean
-- `source_actions` and `worktree_actions` must be valid action lists
+- `after_clone` and `after_add` must be valid action lists
 - At least one action type must be specified
 
 **Context Functions** (available during predicate evaluation):
@@ -114,7 +114,7 @@ Represents a single action to execute (file copy or command execution).
 - `type` must be one of the valid action types
 - Required attributes must be non-empty strings
 - `AbsCopyAction.source` must be absolute path
-- `RelCopyAction` only valid in `worktree_actions` context
+- `RelCopyAction` only valid in `after_add` context
 - `CommandAction.command` must be executable or in PATH
 
 **Relationships**:

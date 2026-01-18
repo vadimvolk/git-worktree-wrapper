@@ -62,7 +62,7 @@
 
 **Goal**: Users can clone repositories to configurable source locations based on URI predicates, with project-specific actions executed after clone.
 
-**Independent Test**: Run `gww clone https://github.com/user/repo.git` from a clean state and verify repository is cloned to expected location based on config, and source_actions are executed if project predicate matches.
+**Independent Test**: Run `gww clone https://github.com/user/repo.git` from a clean state and verify repository is cloned to expected location based on config, and after_clone actions are executed if project predicate matches.
 
 ### Tests for User Story 1
 
@@ -89,7 +89,7 @@
 
 **Goal**: Users can add worktrees for branches with configurable paths and project-specific actions executed after worktree creation.
 
-**Independent Test**: From a cloned repository, run `gww add feature-branch` and verify worktree is created at expected location based on config, branch is checked out, and worktree_actions are executed if project predicate matches.
+**Independent Test**: From a cloned repository, run `gww add feature-branch` and verify worktree is created at expected location based on config, branch is checked out, and after_add actions are executed if project predicate matches.
 
 ### Tests for User Story 2
 

@@ -22,7 +22,7 @@ Users can clone repositories to configurable source locations based on URI predi
 - Resolve `sources` template to get absolute checkout path (tags available in template context)
 - Execute `git clone <uri> <path>`
 - Detect project type by evaluating project predicates (tags available in predicate context)
-- Execute matching project `source_actions` in order
+- Execute matching project `after_clone` actions in order
 - Report success with clone path to stdout
 - Handle errors: invalid URI, clone failures, action failures (exit code 1)
 - Handle configuration errors (exit code 2)
@@ -55,7 +55,7 @@ Users can add worktrees for branches with configurable paths and project-specifi
 - If branch doesn't exist and `--create-branch` specified: create branch from current commit
 - Evaluate worktree template to get absolute worktree path (tags available in template context)
 - Execute `git worktree add <path> <branch>`
-- Detect project type and execute matching project `worktree_actions` in order (tags available in predicate context)
+- Detect project type and execute matching project `after_add` actions in order (tags available in predicate context)
 - Report success with worktree path to stdout
 - Handle errors: not in git repo, branch not found without --create-branch, worktree add failed, action failed (exit code 1)
 - Handle configuration errors (exit code 2)

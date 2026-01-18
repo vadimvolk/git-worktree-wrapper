@@ -249,27 +249,27 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 
 # actions:
 #   - predicate: 'file_exists("local.properties")'
-#     source_actions:
+#     after_clone:
 #       - abs_copy: ["~/sources/default-local.properties", "local.properties"]
-#     worktree_actions:
+#     after_add:
 #       - rel_copy: ["local.properties"]
 #       - command: "./setup-env.sh"
 #
 #   # Tag-based actions:
 #   - predicate: not file_exists("CLAUDE.md") and tag_exist("use-claude")
-#     source_actions:
+#     after_clone:
 #       - command: "claude init"
-#     worktree_actions:
+#     after_add:
 #       - rel_copy: ["CLAUDE.md"]
 #
 #   # Commands with template functions:
 #   - predicate: file_exists("CLAUDE.md") and tag_exist("use-claude") and tag_exist("review")
-#     worktree_actions:
+#     after_add:
 #       - command: "claude -p tag('prompt') --cwd dest_path()"
 #
 #   # Simple command with dest_path:
 #   - predicate: 'file_exists("package.json")'
-#     worktree_actions:
+#     after_add:
 #       - command: "npm install --prefix dest_path()"
 """
 

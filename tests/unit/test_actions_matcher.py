@@ -25,7 +25,7 @@ class TestFindMatchingProjects:
         """Test matching project with always-true predicate."""
         rule = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["echo found"])],
+            after_clone=[Action(action_type="command", args=["echo found"])],
         )
 
         result = find_matching_projects([rule], tmp_path)
@@ -37,7 +37,7 @@ class TestFindMatchingProjects:
         """Test no match with false predicate."""
         rule = ProjectRule(
             predicate='False',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         result = find_matching_projects([rule], tmp_path)
@@ -50,7 +50,7 @@ class TestFindMatchingProjects:
         dest.mkdir()
         rule = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["./setup.sh dest_path()"])],
+            after_clone=[Action(action_type="command", args=["./setup.sh dest_path()"])],
         )
 
         result = get_source_actions([rule], tmp_path, dest_path=dest)
@@ -65,7 +65,7 @@ class TestFindMatchingProjects:
         """Test command action with tag() function."""
         rule = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["claude -p tag('prompt')"])],
+            after_clone=[Action(action_type="command", args=["claude -p tag('prompt')"])],
         )
 
         result = get_source_actions([rule], tmp_path, tags={"prompt": "/review"})
@@ -79,7 +79,7 @@ class TestFindMatchingProjects:
         """Test command action with quoted arguments."""
         rule = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["echo 'hello world'"])],
+            after_clone=[Action(action_type="command", args=["echo 'hello world'"])],
         )
 
         result = get_source_actions([rule], tmp_path)
@@ -93,7 +93,7 @@ class TestFindMatchingProjects:
         """Test matching project with source_path variable predicate."""
         rule = ProjectRule(
             predicate='source_path() != ""',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         result = find_matching_projects([rule], tmp_path)
@@ -104,11 +104,11 @@ class TestFindMatchingProjects:
         """Test matching multiple project rules."""
         rule1 = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["npm install"])],
+            after_clone=[Action(action_type="command", args=["npm install"])],
         )
         rule2 = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["pip install"])],
+            after_clone=[Action(action_type="command", args=["pip install"])],
         )
 
         result = find_matching_projects([rule1, rule2], tmp_path)
@@ -127,15 +127,15 @@ class TestFindMatchingProjects:
         """Test with mix of matching and non-matching rules."""
         rule1 = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["action1"])],
+            after_clone=[Action(action_type="command", args=["action1"])],
         )
         rule2 = ProjectRule(
             predicate='False',
-            source_actions=[Action(action_type="command", args=["action2"])],
+            after_clone=[Action(action_type="command", args=["action2"])],
         )
         rule3 = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["action3"])],
+            after_clone=[Action(action_type="command", args=["action3"])],
         )
 
         result = find_matching_projects([rule1, rule2, rule3], tmp_path)
@@ -149,7 +149,7 @@ class TestFindMatchingProjects:
         """Test that invalid predicate raises MatcherError."""
         rule = ProjectRule(
             predicate='undefined_variable',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         with pytest.raises(MatcherError, match="Error evaluating predicate"):
@@ -159,7 +159,7 @@ class TestFindMatchingProjects:
         """Test predicate that uses source_path variable."""
         rule = ProjectRule(
             predicate='source_path() != ""',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         result = find_matching_projects([rule], tmp_path)
@@ -171,7 +171,7 @@ class TestFindMatchingProjects:
         """Test matching project with tag_exist() predicate."""
         rule = ProjectRule(
             predicate='tag_exist("env")',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         result = find_matching_projects([rule], tmp_path, tags={"env": "production"})
@@ -183,7 +183,7 @@ class TestFindMatchingProjects:
         """Test no match when tag_exist() returns False."""
         rule = ProjectRule(
             predicate='tag_exist("env")',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         result = find_matching_projects([rule], tmp_path, tags={"other": "value"})
@@ -194,7 +194,7 @@ class TestFindMatchingProjects:
         """Test matching project with tag() value comparison."""
         rule = ProjectRule(
             predicate='tag("env") == "production"',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         result = find_matching_projects([rule], tmp_path, tags={"env": "production"})
@@ -205,7 +205,7 @@ class TestFindMatchingProjects:
         """Test no match when tag value doesn't match predicate."""
         rule = ProjectRule(
             predicate='tag("env") == "production"',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         result = find_matching_projects([rule], tmp_path, tags={"env": "development"})
@@ -216,7 +216,7 @@ class TestFindMatchingProjects:
         """Test tag() returns empty string when tag doesn't exist."""
         rule = ProjectRule(
             predicate='tag("missing") == ""',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         result = find_matching_projects([rule], tmp_path, tags={})
@@ -227,7 +227,7 @@ class TestFindMatchingProjects:
         """Test tag_exist() returns True even when tag has empty value."""
         rule = ProjectRule(
             predicate='tag_exist("flag")',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         result = find_matching_projects([rule], tmp_path, tags={"flag": ""})
@@ -238,7 +238,7 @@ class TestFindMatchingProjects:
         """Test tag() with empty value in predicate."""
         rule = ProjectRule(
             predicate='tag("flag") == ""',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         result = find_matching_projects([rule], tmp_path, tags={"flag": ""})
@@ -249,7 +249,7 @@ class TestFindMatchingProjects:
         """Test using multiple tags in predicate."""
         rule = ProjectRule(
             predicate='tag_exist("env") and tag("env") == "production"',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         result = find_matching_projects(
@@ -262,7 +262,7 @@ class TestFindMatchingProjects:
         """Test tag functions in complex predicate with logical operators."""
         rule = ProjectRule(
             predicate='tag_exist("env") and (tag("env") == "production" or tag("env") == "staging")',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         # Test with production
@@ -285,7 +285,7 @@ class TestFindMatchingProjects:
         """Test tag functions when no tags are provided."""
         rule = ProjectRule(
             predicate='tag_exist("env")',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         result = find_matching_projects([rule], tmp_path)
@@ -296,11 +296,11 @@ class TestFindMatchingProjects:
         """Test tag functions when only some tags are provided."""
         rule1 = ProjectRule(
             predicate='tag_exist("env")',
-            source_actions=[Action(action_type="command", args=["action1"])],
+            after_clone=[Action(action_type="command", args=["action1"])],
         )
         rule2 = ProjectRule(
             predicate='tag_exist("version")',
-            source_actions=[Action(action_type="command", args=["action2"])],
+            after_clone=[Action(action_type="command", args=["action2"])],
         )
 
         result = find_matching_projects(
@@ -318,7 +318,7 @@ class TestGetSourceActions:
         """Test returning source actions for matching project rules."""
         rule = ProjectRule(
             predicate='True',
-            source_actions=[
+            after_clone=[
                 Action(action_type="abs_copy", args=["~/default.properties", "local.properties"]),
                 Action(action_type="command", args=["./setup.sh"]),
             ],
@@ -335,7 +335,7 @@ class TestGetSourceActions:
         """Test returning empty list when no rules match."""
         rule = ProjectRule(
             predicate='False',
-            source_actions=[Action(action_type="command", args=["echo"])],
+            after_clone=[Action(action_type="command", args=["echo"])],
         )
 
         result = get_source_actions([rule], tmp_path)
@@ -346,11 +346,11 @@ class TestGetSourceActions:
         """Test returning actions from multiple matching rules."""
         rule1 = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["action1"])],
+            after_clone=[Action(action_type="command", args=["action1"])],
         )
         rule2 = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["action2"])],
+            after_clone=[Action(action_type="command", args=["action2"])],
         )
 
         result = get_source_actions([rule1, rule2], tmp_path)
@@ -360,12 +360,12 @@ class TestGetSourceActions:
         assert ("command", ["action1"]) in result
         assert ("command", ["action2"]) in result
 
-    def test_ignores_worktree_actions(self, tmp_path: Path) -> None:
-        """Test that get_source_actions ignores worktree_actions."""
+    def test_ignores_after_add_actions(self, tmp_path: Path) -> None:
+        """Test that get_source_actions ignores after_add actions."""
         rule = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["source-cmd"])],
-            worktree_actions=[Action(action_type="command", args=["worktree-cmd"])],
+            after_clone=[Action(action_type="command", args=["source-cmd"])],
+            after_add=[Action(action_type="command", args=["worktree-cmd"])],
         )
 
         result = get_source_actions([rule], tmp_path)
@@ -381,8 +381,8 @@ class TestGetWorktreeActions:
         """Test returning worktree actions for matching project rules."""
         rule = ProjectRule(
             predicate='True',
-            source_actions=[],
-            worktree_actions=[
+            after_clone=[],
+            after_add=[
                 Action(action_type="rel_copy", args=["local.properties"]),
                 Action(action_type="command", args=["./init-worktree.sh"]),
             ],
@@ -399,19 +399,19 @@ class TestGetWorktreeActions:
         """Test returning empty list when no rules match."""
         rule = ProjectRule(
             predicate='False',
-            worktree_actions=[Action(action_type="command", args=["echo"])],
+            after_add=[Action(action_type="command", args=["echo"])],
         )
 
         result = get_worktree_actions([rule], tmp_path)
 
         assert len(result) == 0
 
-    def test_ignores_source_actions(self, tmp_path: Path) -> None:
-        """Test that get_worktree_actions ignores source_actions."""
+    def test_ignores_after_clone_actions(self, tmp_path: Path) -> None:
+        """Test that get_worktree_actions ignores after_clone actions."""
         rule = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["source-cmd"])],
-            worktree_actions=[Action(action_type="command", args=["worktree-cmd"])],
+            after_clone=[Action(action_type="command", args=["source-cmd"])],
+            after_add=[Action(action_type="command", args=["worktree-cmd"])],
         )
 
         result = get_worktree_actions([rule], tmp_path)
@@ -427,7 +427,7 @@ class TestActionsExecution:
         """Test abs_copy action arguments are properly formatted."""
         rule = ProjectRule(
             predicate='True',
-            source_actions=[
+            after_clone=[
                 Action(action_type="abs_copy", args=["~/configs/default.properties", "local.properties"])
             ],
         )
@@ -445,7 +445,7 @@ class TestActionsExecution:
         """Test rel_copy action arguments are properly formatted."""
         rule = ProjectRule(
             predicate='True',
-            worktree_actions=[
+            after_add=[
                 Action(action_type="rel_copy", args=["local.properties", "settings.properties"])
             ],
         )
@@ -463,7 +463,7 @@ class TestActionsExecution:
         """Test command action with multiple arguments (single string, parsed with shlex)."""
         rule = ProjectRule(
             predicate='True',
-            source_actions=[
+            after_clone=[
                 # Command is now a single string that gets parsed with shlex
                 Action(action_type="command", args=["make build --verbose"])
             ],
@@ -480,7 +480,7 @@ class TestActionsExecution:
         """Test that action order is preserved."""
         rule = ProjectRule(
             predicate='True',
-            source_actions=[
+            after_clone=[
                 Action(action_type="command", args=["first-cmd"]),
                 Action(action_type="abs_copy", args=["src", "dst"]),
                 Action(action_type="command", args=["third-cmd"]),

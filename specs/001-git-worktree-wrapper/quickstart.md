@@ -243,9 +243,9 @@ gww clone https://other.com/user/repo.git
 ```yaml
 actions:
     - predicate: file_exists(local.properties)
-      source_actions:
+      after_clone:
           - abs_copy("~/sources/default-local.properties", "local.properties")
-      worktree_actions:
+      after_add:
           - rel_copy("local.properties")
           - command("custom-handler")
 ```
@@ -460,19 +460,19 @@ gww add feature-branch --tag env=dev --tag team=frontend
 # Project-specific functions (only available in project predicates)
 actions:
   - predicate: 'file_exists("package.json")'
-    source_actions:
+    after_clone:
       - type: command
         command: npm
         args: ["install"]
   
   - predicate: 'dir_exists("src") and file_exists("pom.xml")'
-    source_actions:
+    after_clone:
       - type: command
         command: mvn
         args: ["install", "-DskipTests"]
   
   - predicate: 'path_exists("setup.py")'
-    source_actions:
+    after_clone:
       - type: command
         command: pip
         args: ["install", "-e", "."]
@@ -480,13 +480,13 @@ actions:
 # Shared functions also available in project predicates
 actions:
   - predicate: 'file_exists("package.json") and tag("env") == "prod"'
-    source_actions:
+    after_clone:
       - type: command
         command: npm
         args: ["run", "build:prod"]
   
   - predicate: 'host() == "github.com" and file_exists("Makefile")'
-    source_actions:
+    after_clone:
       - type: command
         command: make
         args: ["install"]

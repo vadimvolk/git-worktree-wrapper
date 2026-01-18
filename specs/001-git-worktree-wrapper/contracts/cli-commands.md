@@ -39,7 +39,7 @@ gww <command> [arguments] [options]
 5. Create directory structure if needed
 6. Execute `git clone <uri> <path>`
 7. Detect project type by evaluating project predicates (tags available via `tag()` and `tag_exist()` functions)
-8. Execute matching project `source_actions` in order
+8. Execute matching project `after_clone` actions in order
 9. Report success with clone path
 
 **Exit Codes**:
@@ -94,7 +94,7 @@ gww clone https://github.com/user/repo.git --tag env=prod --tag project=backend
 8. Create directory structure if needed
 9. Execute `git worktree add <path> <branch>` (worktree remains attached to repository)
 10. Detect project type by evaluating project predicates (tags available via `tag()` and `tag_exist()` functions)
-11. Execute matching project `worktree_actions` in order
+11. Execute matching project `after_add` actions in order
 12. Report success with worktree path
 
 **Exit Codes**:

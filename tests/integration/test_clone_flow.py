@@ -252,14 +252,14 @@ default_worktrees: {target_dir}/worktrees
 class TestCloneWithProjectActions:
     """Integration tests for clone with project actions."""
 
-    def test_clone_executes_source_actions(
+    def test_clone_executes_after_clone_actions(
         self,
         bare_repo: Path,
         config_dir: Path,
         target_dir: Path,
         tmp_path: Path,
     ) -> None:
-        """Test that source actions are executed after clone."""
+        """Test that after_clone actions are executed after clone."""
         # Create a marker file to copy
         marker_file = tmp_path / "marker.txt"
         marker_file.write_text("marker content")
@@ -272,7 +272,7 @@ default_worktrees: {target_dir}/worktrees
 
 actions:
   - predicate: 'True'
-    source_actions:
+    after_clone:
       - abs_copy: ["{marker_file}", "copied_marker.txt"]
 """)
 

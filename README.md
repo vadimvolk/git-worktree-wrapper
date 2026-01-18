@@ -120,9 +120,9 @@ sources:
 
 actions:
   - predicate: file_exists("local.properties")
-    source_actions:
+    after_clone:
       - abs_copy: ["~/sources/default-local.properties", "local.properties"]
-    worktree_actions:
+    after_add:
       - rel_copy: ["local.properties"]
 ```
 

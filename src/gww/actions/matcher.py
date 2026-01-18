@@ -168,7 +168,7 @@ def get_source_actions(
 
     actions: list[tuple[str, list[str]]] = []
     for rule in matching:
-        for action in rule.source_actions:
+        for action in rule.after_clone:
             actions.append(_process_action(action, context))
 
     return actions
@@ -204,7 +204,7 @@ def get_worktree_actions(
 
     actions: list[tuple[str, list[str]]] = []
     for rule in matching:
-        for action in rule.worktree_actions:
+        for action in rule.after_add:
             actions.append(_process_action(action, context))
 
     return actions

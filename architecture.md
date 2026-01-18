@@ -38,21 +38,21 @@ sources:
 # branch() - git branch name as is
 actions:
     - predicate: file_exists(local.properties)
-      source_actions: 
+      after_clone: 
         - abs_copy("~/sources/default-local.properties", "local.properties")
-      worktree_actions:
+      after_add:
         - rel_copy("local.properties")
         - command("custom-handler")
     
 # where:
-# android - project type name, if predicate evaluate to true source_actions executed after checkout, and worktree_actions executed when worktree added
+# android - project type name, if predicate evaluate to true after_clone executed after checkout, and after_add executed when worktree added
 # abs_copy - copy file from absolute path (first argument), to filename relative to checkout or worktree base folder
 # rel_copy - copy file with relative path from source to worktree, this action applicable only to worktree actions
 # command(custom_handler) - if executed for source receives a single argument a source folder, if executed for worktree receive 2 arguments source folder and worktree folder
 ```
 
 # Commands:
-gww clone <uri> - find proper location for new source and checkout there. Then analyze result with actions and execute source_actions for any action with matched predicate
+gww clone <uri> - find proper location for new source and checkout there. Then analyze result with actions and execute after_clone for any action with matched predicate
 
 gww add <branch> - must executed inside a source or worktree folder. Add a worktree for branch. To get destination folder uses settings file
 

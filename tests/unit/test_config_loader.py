@@ -56,7 +56,7 @@ default_sources: ~/sources/default
 default_worktrees: ~/worktrees/default
 actions:
   - predicate: 'file_exists("package.json")'
-    source_actions:
+    after_clone:
       - command: "npm install"
 """)
 

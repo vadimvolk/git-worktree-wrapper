@@ -48,13 +48,13 @@ class ProjectRule:
 
     Attributes:
         predicate: Expression evaluated against repository filesystem.
-        source_actions: Actions executed after source checkout.
-        worktree_actions: Actions executed when worktree is added.
+        after_clone: Actions executed after source checkout.
+        after_add: Actions executed when worktree is added.
     """
 
     predicate: str
-    source_actions: list[Action] = field(default_factory=list)
-    worktree_actions: list[Action] = field(default_factory=list)
+    after_clone: list[Action] = field(default_factory=list)
+    after_add: list[Action] = field(default_factory=list)
 
 
 @dataclass
@@ -223,33 +223,33 @@ def _validate_project_rule(data: Any, index: int) -> ProjectRule:
 
     predicate = _validate_string(data["predicate"], f"{context}.predicate")
 
-    source_actions: list[Action] = []
-    if "source_actions" in data:
-        actions_data = data["source_actions"]
+    after_clone: list[Action] = []
+    if "after_clone" in data:
+        actions_data = data["after_clone"]
         if not isinstance(actions_data, list):
-            raise ConfigValidationError(f"{context}.source_actions must be a list")
+            raise ConfigValidationError(f"{context}.after_clone must be a list")
         for i, action_data in enumerate(actions_data):
-            action = _validate_action(action_data, f"{context}.source_actions[{i}]")
-            source_actions.append(action)
+            action = _validate_action(action_data, f"{context}.after_clone[{i}]")
+            after_clone.append(action)
 
-    worktree_actions: list[Action] = []
-    if "worktree_actions" in data:
-        actions_data = data["worktree_actions"]
+    after_add: list[Action] = []
+    if "after_add" in data:
+        actions_data = data["after_add"]
         if not isinstance(actions_data, list):
-            raise ConfigValidationError(f"{context}.worktree_actions must be a list")
+            raise ConfigValidationError(f"{context}.after_add must be a list")
         for i, action_data in enumerate(actions_data):
-            action = _validate_action(action_data, f"{context}.worktree_actions[{i}]")
-            worktree_actions.append(action)
+            action = _validate_action(action_data, f"{context}.after_add[{i}]")
+            after_add.append(action)
 
-    if not source_actions and not worktree_actions:
+    if not after_clone and not after_add:
         raise ConfigValidationError(
-            f"{context} must have at least one of: source_actions, worktree_actions"
+            f"{context} must have at least one of: after_clone, after_add"
         )
 
     return ProjectRule(
         predicate=predicate,
-        source_actions=source_actions,
-        worktree_actions=worktree_actions,
+        after_clone=after_clone,
+        after_add=after_add,
     )
 
 
