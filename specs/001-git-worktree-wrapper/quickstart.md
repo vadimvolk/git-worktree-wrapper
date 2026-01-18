@@ -357,6 +357,18 @@ gww migrate ~/old-repos --move
 
 ## Template Function Examples
 
+**Function Availability**:
+- **Shared functions** (available in templates, URI predicates, and project predicates):
+  - URI functions: `host()`, `port()`, `protocol()`, `uri()`, `path()`, `path(index)`
+  - Branch functions: `branch()`, `norm_branch(replacement)` (when branch context available)
+  - Tag functions: `tag(name)`, `tag_exist(name)`
+- **Project-specific functions** (only in project predicates):
+  - `source_path()`, `file_exists(path)`, `dir_exists(path)`, `path_exists(path)`
+
+**Note on `path()` function**:
+- `path()` with no arguments returns a list of all path segments (use in predicates: `path()[0]`, `path()[-1]`)
+- `path(index)` with an index returns a single path segment string (use in templates: `path(-1)`, `path(0)`)
+
 ### Path Functions
 
 ```yaml
@@ -386,6 +398,29 @@ worktrees: ~/worktrees/norm_branch()
 
 worktrees: ~/worktrees/norm_branch("_")
 # Evaluates to: ~/worktrees/feature_new_ui
+```
+
+### URI Functions
+
+```yaml
+# URI: https://github.com/vadimvolk/ansible.git
+
+# Using URI functions in templates (now available!)
+sources: ~/Developer/sources/host()/path(-2)/path(-1)
+# Evaluates to: ~/Developer/sources/github.com/vadimvolk/ansible
+
+sources: ~/Developer/sources/protocol()/path(-2)/path(-1)
+# Evaluates to: ~/Developer/sources/https/vadimvolk/ansible
+
+# Using URI functions in predicates
+sources:
+  github:
+    predicate: '"github" in host()'
+    sources: ~/Developer/sources/github/path(-2)/path(-1)
+  
+  custom:
+    predicate: 'path()[0] == "myorg"'
+    sources: ~/Developer/sources/custom/path(-2)/path(-1)
 ```
 
 ### Tag Functions
@@ -420,6 +455,44 @@ gww clone https://github.com/user/repo.git --tag env=prod --tag project=backend
 # Add worktree with tags
 gww add feature-branch --tag env=dev --tag team=frontend
 # Tags can be used in worktree path templates
+```
+
+### Project Predicate Functions
+
+```yaml
+# Project-specific functions (only available in project predicates)
+projects:
+  - predicate: 'file_exists("package.json")'
+    source_actions:
+      - type: command
+        command: npm
+        args: ["install"]
+  
+  - predicate: 'dir_exists("src") and file_exists("pom.xml")'
+    source_actions:
+      - type: command
+        command: mvn
+        args: ["install", "-DskipTests"]
+  
+  - predicate: 'path_exists("setup.py")'
+    source_actions:
+      - type: command
+        command: pip
+        args: ["install", "-e", "."]
+
+# Shared functions also available in project predicates
+projects:
+  - predicate: 'file_exists("package.json") and tag("env") == "prod"'
+    source_actions:
+      - type: command
+        command: npm
+        args: ["run", "build:prod"]
+  
+  - predicate: 'host() == "github.com" and file_exists("Makefile")'
+    source_actions:
+      - type: command
+        command: make
+        args: ["install"]
 ```
 
 ### Escaping Parentheses

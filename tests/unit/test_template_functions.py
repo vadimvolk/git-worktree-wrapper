@@ -1,8 +1,15 @@
 """Unit tests for template functions in src/gww/template/functions.py."""
 
+from pathlib import Path
+
 import pytest
 
-from gww.template.functions import FunctionRegistry, TemplateContext, create_function_registry
+from gww.template.functions import (
+    FunctionRegistry,
+    TemplateContext,
+    create_function_registry,
+    create_project_functions,
+)
 from gww.template.evaluator import evaluate_template
 from gww.utils.uri import parse_uri
 
@@ -255,3 +262,321 @@ class TestTagFunctionsIntegration:
         assert functions["tag"]("test") == "value"
         assert functions["tag_exist"]("test") is True
         assert functions["tag_exist"]("missing") is False
+
+
+class TestURIFunctions:
+    """Tests for URI functions (host, port, protocol, uri) in templates."""
+
+    def test_host_returns_hostname(self) -> None:
+        """Test host() returns URI hostname."""
+        context = TemplateContext(uri=parse_uri("https://github.com/user/repo.git"))
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        result = functions["host"]()
+
+        assert result == "github.com"
+
+    def test_host_without_uri_raises_error(self) -> None:
+        """Test host() raises ValueError when no URI context."""
+        context = TemplateContext()
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        with pytest.raises(ValueError, match="No URI context available"):
+            functions["host"]()
+
+    def test_port_returns_port(self) -> None:
+        """Test port() returns URI port."""
+        context = TemplateContext(uri=parse_uri("http://git.example.com:3000/org/repo.git"))
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        result = functions["port"]()
+
+        assert result == "3000"
+
+    def test_port_returns_empty_when_not_specified(self) -> None:
+        """Test port() returns empty string when port not specified."""
+        context = TemplateContext(uri=parse_uri("https://github.com/user/repo.git"))
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        result = functions["port"]()
+
+        assert result == ""
+
+    def test_protocol_returns_scheme(self) -> None:
+        """Test protocol() returns URI protocol/scheme."""
+        context = TemplateContext(uri=parse_uri("https://github.com/user/repo.git"))
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        result = functions["protocol"]()
+
+        assert result == "https"
+
+    def test_protocol_for_ssh(self) -> None:
+        """Test protocol() returns ssh for SCP-style URLs."""
+        context = TemplateContext(uri=parse_uri("git@github.com:user/repo.git"))
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        result = functions["protocol"]()
+
+        assert result == "ssh"
+
+    def test_uri_returns_full_uri(self) -> None:
+        """Test uri() returns full URI string."""
+        uri_str = "https://github.com/user/repo.git"
+        context = TemplateContext(uri=parse_uri(uri_str))
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        result = functions["uri"]()
+
+        assert result == uri_str
+
+    def test_host_in_template_evaluation(self) -> None:
+        """Test host() function in template evaluation."""
+        context = TemplateContext(
+            uri=parse_uri("https://github.com/user/repo.git"),
+        )
+
+        result = evaluate_template("~/sources/host()/path(-1)", context)
+
+        assert "github.com" in result
+        assert "repo" in result
+
+    def test_protocol_in_template_evaluation(self) -> None:
+        """Test protocol() function in template evaluation."""
+        context = TemplateContext(
+            uri=parse_uri("https://gitlab.com/user/repo.git"),
+        )
+
+        result = evaluate_template("~/sources/protocol()/path(-1)", context)
+
+        assert "https" in result
+        assert "repo" in result
+
+    def test_uri_functions_combined_in_template(self) -> None:
+        """Test combining URI functions in template."""
+        context = TemplateContext(
+            uri=parse_uri("ssh://git@myhost:3000/org/project.git"),
+        )
+
+        result = evaluate_template("~/sources/protocol()/host()/path(-1)", context)
+
+        assert "ssh" in result
+        assert "myhost" in result
+        assert "project" in result
+
+
+class TestPathFunctionDualSignature:
+    """Tests for path() function with dual signature (list vs string)."""
+
+    def test_path_with_no_args_returns_list(self) -> None:
+        """Test path() with no arguments returns list of segments."""
+        context = TemplateContext(uri=parse_uri("https://github.com/user/repo.git"))
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        result = functions["path"]()
+
+        assert result == ["user", "repo"]
+        assert isinstance(result, list)
+
+    def test_path_with_index_returns_string(self) -> None:
+        """Test path(index) returns single segment string."""
+        context = TemplateContext(uri=parse_uri("https://github.com/user/repo.git"))
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        result = functions["path"](-1)
+
+        assert result == "repo"
+        assert isinstance(result, str)
+
+    def test_path_with_positive_index(self) -> None:
+        """Test path() with positive index."""
+        context = TemplateContext(uri=parse_uri("https://github.com/user/repo.git"))
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        assert functions["path"](0) == "user"
+        assert functions["path"](1) == "repo"
+
+    def test_path_with_negative_index(self) -> None:
+        """Test path() with negative index."""
+        context = TemplateContext(
+            uri=parse_uri("https://gitlab.com/group/subgroup/project.git")
+        )
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        assert functions["path"](-1) == "project"
+        assert functions["path"](-2) == "subgroup"
+        assert functions["path"](-3) == "group"
+
+    def test_path_with_out_of_range_index_raises_error(self) -> None:
+        """Test path() with out-of-range index raises ValueError."""
+        context = TemplateContext(uri=parse_uri("https://github.com/user/repo.git"))
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        with pytest.raises(ValueError, match="out of range"):
+            functions["path"](5)
+
+    def test_path_without_uri_raises_error(self) -> None:
+        """Test path() without URI context raises ValueError."""
+        context = TemplateContext()
+        registry = FunctionRegistry(context)
+        functions = registry.get_functions()
+
+        with pytest.raises(ValueError, match="No URI context available"):
+            functions["path"]()
+
+    def test_path_list_access_in_predicates(self) -> None:
+        """Test path() list can be indexed in predicate context."""
+        context = TemplateContext(uri=parse_uri("https://github.com/myorg/repo.git"))
+        functions = create_function_registry(context)
+
+        # Simulate predicate evaluation: path()[0] == "myorg"
+        result = functions["path"]()[0]
+
+        assert result == "myorg"
+
+    def test_path_index_in_template(self) -> None:
+        """Test path(index) works in templates."""
+        context = TemplateContext(
+            uri=parse_uri("https://github.com/user/repo.git"),
+        )
+
+        result = evaluate_template("~/sources/path(-2)/path(-1)", context)
+
+        assert "user" in result
+        assert "repo" in result
+
+
+class TestProjectFunctions:
+    """Tests for project-specific functions."""
+
+    def test_create_project_functions_returns_all_functions(self, tmp_path: Path) -> None:
+        """Test create_project_functions returns all project functions."""
+        functions = create_project_functions(tmp_path)
+
+        assert "source_path" in functions
+        assert "file_exists" in functions
+        assert "dir_exists" in functions
+        assert "path_exists" in functions
+
+    def test_source_path_returns_absolute_path(self, tmp_path: Path) -> None:
+        """Test source_path() returns absolute path string."""
+        functions = create_project_functions(tmp_path)
+
+        result = functions["source_path"]()
+
+        assert result == str(tmp_path)
+
+    def test_file_exists_returns_true_for_existing_file(self, tmp_path: Path) -> None:
+        """Test file_exists() returns True for existing file."""
+        test_file = tmp_path / "package.json"
+        test_file.touch()
+
+        functions = create_project_functions(tmp_path)
+
+        assert functions["file_exists"]("package.json") is True
+
+    def test_file_exists_returns_false_for_missing_file(self, tmp_path: Path) -> None:
+        """Test file_exists() returns False for missing file."""
+        functions = create_project_functions(tmp_path)
+
+        assert functions["file_exists"]("nonexistent.txt") is False
+
+    def test_file_exists_returns_false_for_directory(self, tmp_path: Path) -> None:
+        """Test file_exists() returns False for directory."""
+        test_dir = tmp_path / "src"
+        test_dir.mkdir()
+
+        functions = create_project_functions(tmp_path)
+
+        assert functions["file_exists"]("src") is False
+
+    def test_dir_exists_returns_true_for_existing_directory(self, tmp_path: Path) -> None:
+        """Test dir_exists() returns True for existing directory."""
+        test_dir = tmp_path / "src"
+        test_dir.mkdir()
+
+        functions = create_project_functions(tmp_path)
+
+        assert functions["dir_exists"]("src") is True
+
+    def test_dir_exists_returns_false_for_missing_directory(self, tmp_path: Path) -> None:
+        """Test dir_exists() returns False for missing directory."""
+        functions = create_project_functions(tmp_path)
+
+        assert functions["dir_exists"]("nonexistent") is False
+
+    def test_dir_exists_returns_false_for_file(self, tmp_path: Path) -> None:
+        """Test dir_exists() returns False for file."""
+        test_file = tmp_path / "package.json"
+        test_file.touch()
+
+        functions = create_project_functions(tmp_path)
+
+        assert functions["dir_exists"]("package.json") is False
+
+    def test_path_exists_returns_true_for_file(self, tmp_path: Path) -> None:
+        """Test path_exists() returns True for existing file."""
+        test_file = tmp_path / "package.json"
+        test_file.touch()
+
+        functions = create_project_functions(tmp_path)
+
+        assert functions["path_exists"]("package.json") is True
+
+    def test_path_exists_returns_true_for_directory(self, tmp_path: Path) -> None:
+        """Test path_exists() returns True for existing directory."""
+        test_dir = tmp_path / "src"
+        test_dir.mkdir()
+
+        functions = create_project_functions(tmp_path)
+
+        assert functions["path_exists"]("src") is True
+
+    def test_path_exists_returns_false_for_missing_path(self, tmp_path: Path) -> None:
+        """Test path_exists() returns False for missing path."""
+        functions = create_project_functions(tmp_path)
+
+        assert functions["path_exists"]("nonexistent") is False
+
+
+class TestFunctionRegistryContainsAllFunctions:
+    """Tests verifying the function registry contains expected functions."""
+
+    def test_registry_contains_uri_functions(self) -> None:
+        """Test registry includes all URI functions."""
+        context = TemplateContext(uri=parse_uri("https://github.com/user/repo.git"))
+        functions = create_function_registry(context)
+
+        assert "host" in functions
+        assert "port" in functions
+        assert "protocol" in functions
+        assert "uri" in functions
+        assert "path" in functions
+
+    def test_registry_contains_branch_functions(self) -> None:
+        """Test registry includes all branch functions."""
+        context = TemplateContext(branch="feature/test")
+        functions = create_function_registry(context)
+
+        assert "branch" in functions
+        assert "norm_branch" in functions
+
+    def test_registry_contains_tag_functions(self) -> None:
+        """Test registry includes all tag functions."""
+        context = TemplateContext(tags={"env": "prod"})
+        functions = create_function_registry(context)
+
+        assert "tag" in functions
+        assert "tag_exist" in functions

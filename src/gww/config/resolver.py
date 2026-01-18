@@ -7,7 +7,7 @@ from typing import Optional
 
 from gww.config.validator import Config, SourceRule
 from gww.template.evaluator import TemplateError, evaluate_predicate, evaluate_template
-from gww.template.functions import TemplateContext
+from gww.template.functions import TemplateContext, create_function_registry
 from gww.utils.uri import ParsedURI
 
 
@@ -34,6 +34,10 @@ def _expand_home(path: str) -> str:
 def _build_uri_context(uri: ParsedURI, tags: dict[str, str] = {}) -> dict[str, object]:
     """Build evaluation context for URI predicates.
 
+    Uses the unified FunctionRegistry to provide shared functions:
+    - URI functions: host(), port(), protocol(), uri(), path(), path(index)
+    - Tag functions: tag(name), tag_exist(name)
+
     Args:
         uri: Parsed URI object.
         tags: Optional dictionary of tag key-value pairs.
@@ -41,17 +45,8 @@ def _build_uri_context(uri: ParsedURI, tags: dict[str, str] = {}) -> dict[str, o
     Returns:
         Dictionary of context functions for predicate evaluation.
     """
-    return {
-        # URI functions
-        "host": lambda: uri.host,
-        "port": lambda: uri.port,
-        "protocol": lambda: uri.protocol,
-        "path": lambda: uri.path_segments,
-        "uri": lambda: uri.uri,
-        # Tag functions
-        "tag": lambda name: tags.get(name, ""),
-        "tag_exist": lambda name: name in tags,
-    }
+    context = TemplateContext(uri=uri, tags=tags)
+    return create_function_registry(context)
 
 
 def find_matching_source_rule(

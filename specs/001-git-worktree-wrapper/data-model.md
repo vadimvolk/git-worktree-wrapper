@@ -48,11 +48,8 @@ Represents a predicate-based routing rule for determining source and worktree lo
 - At least one source rule must match for any valid URI (or default is used)
 
 **Context Functions** (available during predicate evaluation):
-- `host() -> str`: Hostname from URI (e.g., "github.com", "rulez.netbird.selfhosted")
-- `port() -> str`: Port from URI, empty string if missing (e.g., "3000", "")
-- `protocol() -> str`: Protocol from URI (e.g., "http", "https", "ssh", "git", "file")
-- `path() -> list[str]`: URI path segments (e.g., ["vadimvolk", "ansible"] from "/vadimvolk/ansible.git")
-- `uri() -> str`: Full URI string
+- URI functions: `host()`, `port()`, `protocol()`, `uri()`, `path()`, `path(index)` (see TemplateFunction section)
+- Tag functions: `tag(name)`, `tag_exist(name)` (see TemplateFunction section)
 
 **Relationships**:
 - Belongs to `Config` (many-to-one)
@@ -75,8 +72,12 @@ Represents a project type detection rule with associated actions to execute duri
 - At least one action type must be specified
 
 **Context Functions** (available during predicate evaluation):
-- `source_path() -> str`: Absolute path to source repository
-- File system functions: `file_exists(path)`, `dir_exists(path)`, etc.
+- Shared functions: URI functions (`host()`, `port()`, `protocol()`, `uri()`, `path()`, `path(index)`), tag functions (`tag(name)`, `tag_exist(name)`) - see TemplateFunction section
+- Project-specific functions (only in project predicates):
+  - `source_path() -> str`: Absolute path to source repository
+  - `file_exists(path: str) -> bool`: Check if file exists in source repository (relative to repo root)
+  - `dir_exists(path: str) -> bool`: Check if directory exists in source repository (relative to repo root)
+  - `path_exists(path: str) -> bool`: Check if path exists (file or directory) in source repository (relative to repo root)
 
 **Relationships**:
 - Belongs to `Config` (many-to-one)
@@ -198,17 +199,36 @@ Context object passed to template evaluator for resolving template variables.
 
 ### 8. TemplateFunction
 
-Built-in functions available in template expressions.
+Built-in functions available in template expressions, URI predicates, and project predicates.
 
-**Functions**:
+**Function Availability**:
+- **Shared functions** (available in templates, URI predicates, and project predicates):
+  - URI functions: `host()`, `port()`, `protocol()`, `uri()`, `path()`, `path(index)`
+  - Branch functions: `branch()`, `norm_branch(replacement)`
+  - Tag functions: `tag(name)`, `tag_exist(name)`
+- **Project-specific functions** (only available in project predicates):
+  - `source_path()`, `file_exists(path)`, `dir_exists(path)`, `path_exists(path)`
+
+**URI Functions**:
+- `host() -> str`: Hostname from URI (e.g., "github.com", "rulez.netbird.selfhosted")
+- `port() -> str`: Port from URI, empty string if missing (e.g., "3000", "")
+- `protocol() -> str`: Protocol from URI (e.g., "http", "https", "ssh", "git", "file")
+- `uri() -> str`: Full URI string
+- `path() -> list[str]`: URI path segments as list (e.g., ["vadimvolk", "ansible"] from "/vadimvolk/ansible.git")
+  - Use `path()[0]` to access first segment, `path()[-1]` for last segment
 - `path(index: int) -> str`: Get URI path segment by index (0-based, negative for reverse)
   - `path(-1)`: Last path segment
   - `path(-2)`: Second-to-last path segment
   - `path(0)`: First path segment
+  - Note: `path()` with no args returns list, `path(index)` with index returns string
+
+**Branch Functions** (require branch context):
 - `branch() -> str`: Current branch name (as-is)
 - `norm_branch(replacement: str = "-") -> str`: Branch name with "/" replaced with `replacement` (default: "-")
   - `norm_branch()`: Branch name with "/" replaced with "-"
   - `norm_branch("_")`: Branch name with "/" replaced with "_"
+
+**Tag Functions**:
 - `tag(name: str) -> str`: Get tag value by name. Returns empty string if tag doesn't exist or has no value
   - `tag("env")`: Returns value of tag "env" (e.g., "prod", "dev")
   - `tag("project")`: Returns value of tag "project" if set, empty string otherwise
@@ -216,14 +236,11 @@ Built-in functions available in template expressions.
   - `tag_exist("env")`: Returns True if tag "env" was provided via `--tag env` or `--tag env=value`
   - Useful in predicates: `tag_exist("env") and tag("env") == "prod"`
 
-**Context Functions** (available during predicate evaluation):
-- `host() -> str`: Hostname from URI (e.g., "github.com", "rulez.netbird.selfhosted")
-- `port() -> str`: Port from URI, empty string if missing (e.g., "3000", "")
-- `protocol() -> str`: Protocol from URI (e.g., "http", "https", "ssh", "git", "file")
-- `path() -> list[str]`: URI path segments (e.g., ["vadimvolk", "ansible"] from "/vadimvolk/ansible.git")
-- `uri() -> str`: Full URI string
-- `tag(name: str) -> str`: Get tag value by name (same as template function)
-- `tag_exist(name: str) -> bool`: Check if tag exists (same as template function)
+**Project Functions** (only in project predicates):
+- `source_path() -> str`: Absolute path to source repository
+- `file_exists(path: str) -> bool`: Check if file exists in source repository (path relative to repo root)
+- `dir_exists(path: str) -> bool`: Check if directory exists in source repository (path relative to repo root)
+- `path_exists(path: str) -> bool`: Check if path exists (file or directory) in source repository (path relative to repo root)
 
 **Validation Rules**:
 - Function names must be valid identifiers

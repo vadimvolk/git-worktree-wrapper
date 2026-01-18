@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable
 
 from gww.config.validator import ProjectRule
 from gww.template.evaluator import TemplateError, evaluate_predicate
+from gww.template.functions import (
+    TemplateContext,
+    create_function_registry,
+    create_project_functions,
+)
 
 
 class MatcherError(Exception):
@@ -15,96 +19,33 @@ class MatcherError(Exception):
     pass
 
 
-def _file_exists(path: str, base_path: Path) -> bool:
-    """Check if a file exists relative to base path.
-
-    Args:
-        path: Relative path to check.
-        base_path: Base directory path.
-
-    Returns:
-        True if file exists.
-    """
-    full_path = base_path / path
-    return full_path.is_file()
-
-
-def _dir_exists(path: str, base_path: Path) -> bool:
-    """Check if a directory exists relative to base path.
-
-    Args:
-        path: Relative path to check.
-        base_path: Base directory path.
-
-    Returns:
-        True if directory exists.
-    """
-    full_path = base_path / path
-    return full_path.is_dir()
-
-
-def _path_exists(path: str, base_path: Path) -> bool:
-    """Check if a path exists (file or directory) relative to base path.
-
-    Args:
-        path: Relative path to check.
-        base_path: Base directory path.
-
-    Returns:
-        True if path exists.
-    """
-    full_path = base_path / path
-    return full_path.exists()
-
-
 def _create_predicate_context(
     source_path: Path,
     tags: dict[str, str] = {},
 ) -> dict[str, object]:
     """Create evaluation context for project predicates.
 
+    Uses the unified FunctionRegistry for shared functions and adds
+    project-specific functions (source_path, file_exists, dir_exists, path_exists).
+
     Args:
         source_path: Path to source repository.
         tags: Optional dictionary of tag key-value pairs.
 
     Returns:
-        Dictionary of context functions.
+        Dictionary of context functions including:
+        - Shared functions: tag(), tag_exist() (URI and branch functions available but may raise if no context)
+        - Project-specific functions: source_path(), file_exists(), dir_exists(), path_exists()
     """
-    # Create bound functions for file system checks
-    def file_exists(path: str) -> bool:
-        return _file_exists(path, source_path)
+    # Create shared functions from unified registry (tags only, no URI/branch)
+    context = TemplateContext(source_path=source_path, tags=tags)
+    functions: dict[str, object] = create_function_registry(context)
 
-    def dir_exists(path: str) -> bool:
-        return _dir_exists(path, source_path)
+    # Add project-specific functions
+    project_functions = create_project_functions(source_path)
+    functions.update(project_functions)
 
-    def path_exists(path: str) -> bool:
-        return _path_exists(path, source_path)
-
-    def source_path_func() -> str:
-        """Get absolute path to source repository."""
-        return str(source_path)
-
-    context: dict[str, object] = {
-        "source_path": source_path_func,
-        "file_exists": file_exists,
-        "dir_exists": dir_exists,
-        "path_exists": path_exists,
-    }
-
-    # Add tag functions
-
-    def tag(name: str) -> str:
-        """Get tag value by name."""
-        return tags.get(name, "")
-
-    def tag_exist(name: str) -> bool:
-        """Check if tag exists."""
-        return name in tags
-
-    context["tag"] = tag
-    context["tag_exist"] = tag_exist
-
-    return context
+    return functions
 
 
 def find_matching_projects(

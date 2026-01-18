@@ -113,7 +113,7 @@ default_worktrees: {target_dir}/worktrees
 
 sources:
   local:
-    predicate: 'protocol == "file"'
+    predicate: 'protocol() == "file"'
     sources: {target_dir}/local/path(-1)
 """)
 

@@ -120,7 +120,7 @@ def config_exists(config_path: Optional[Path] = None) -> bool:
     return config_path.exists()
 
 
-DEFAULT_CONFIG_TEMPLATE = f"""\
+DEFAULT_CONFIG_TEMPLATE = """\
 # GWW (Git Worktree Wrapper) Configuration
 # =========================================
 #
@@ -130,8 +130,30 @@ DEFAULT_CONFIG_TEMPLATE = f"""\
 # Template Functions and Variables Available
 # ===========================================
 #
-# Path Template Functions (used in default_sources, default_worktrees, and source rule paths):
-# ---------------------------------------------------------------------------------------------
+# SHARED FUNCTIONS (available in templates, URI predicates, and project predicates):
+# ----------------------------------------------------------------------------------
+#
+# URI Functions:
+#   path()               - URI path segments (dual signature)
+#                         - path(): returns list of all segments
+#                           Example: path() returns ["user", "repo"]
+#                           Use path()[0] to access first segment, path()[-1] for last
+#                         - path(n): returns single segment at index n
+#                           Example: path(-1) returns "repo", path(0) returns "user"
+#
+#   host()               - URI hostname (string)
+#                         Example: host() returns "github.com" from "https://github.com/user/repo"
+#
+#   uri()                - Full URI string (string)
+#                         Example: uri() returns "https://github.com/user/repo.git"
+#
+#   port()               - URI port number (string, empty if not specified)
+#                         Example: port() returns "3000" from "http://git.example.com:3000/path"
+#
+#   protocol()           - URI protocol/scheme (string)
+#                         Example: protocol() returns "https", "ssh", "git"
+#
+# Branch Functions (require branch context, available in worktree templates):
 #   branch()             - Current branch name (as-is)
 #                         Example: branch() from "feature/new-ui" → "feature/new-ui"
 #
@@ -140,38 +162,20 @@ DEFAULT_CONFIG_TEMPLATE = f"""\
 #                         - norm_branch("_"): replaces "/" with "_"
 #                         Example: norm_branch() from "feature/new-ui" → "feature-new-ui"
 #
-#   path(n)              - Get URI path segment by index
-#                         - path(0): first segment
-#                         - path(-1): last segment
-#                         - path(-2): second-to-last segment
-#                         Example: path(-2)/path(-1) from "github.com/user/repo" → "user/repo"
+# Tag Functions:
+#   tag(name)            - Get tag value by name (returns empty string if not set)
+#                         Tags are passed via --tag option: gww clone <uri> --tag env=prod
+#                         Example: tag("env") returns "prod" if --tag env=prod was used
 #
-# URI Predicate Functions (available in source rule predicates):
-# -----------------------------------------------------------------------------
-# Functions:
-#   host()               - URI hostname (string)
-#                         Example: host() returns "github.com" from "https://github.com/user/repo"
+#   tag_exist(name)      - Check if tag exists (returns True/False)
+#                         Useful in predicates for conditional routing and path templates
+#                         Example: tag_exist("env") returns True if --tag env was used
 #
-#   port()               - URI port number (string, empty if not specified)
-#                         Example: port() returns "22" from "ssh://git@host:22/path"
-#
-#   protocol()           - URI protocol/scheme (string)
-#                         Example: protocol() returns "https", "ssh", "git"
-#
-#   path()               - URI path segments as list (list of strings)
-#                         Example: path() returns ["user", "repo"] from "github.com/user/repo"
-#                         Use path()[0] to access first segment, path()[-1] for last
-#
-#   uri()                - Full URI string (string)
-#                         Example: uri() returns "https://github.com/user/repo.git"
-#
-# Project Predicate Functions (available in project rule predicates):
-# ----------------------------------------------------------------------------------
-# Functions:
+# PROJECT-SPECIFIC FUNCTIONS (only in project predicates):
+# ---------------------------------------------------------
 #   source_path()        - Absolute path to source repository (string)
 #                         Example: source_path() returns "/home/user/Developer/sources/github/user/repo"
 #
-# Functions:
 #   file_exists(path)    - Check if file exists in source repository (returns True/False)
 #                         Path is relative to source repository root
 #                         Example: file_exists("package.json") checks for package.json in repo
@@ -180,21 +184,9 @@ DEFAULT_CONFIG_TEMPLATE = f"""\
 #                         Path is relative to source repository root
 #                         Example: dir_exists("src") checks for src/ directory in repo
 #
-#   path_exists(path)    - Check if path exists (file or directory) in source repository (returns True/False)
+#   path_exists(path)    - Check if path exists (file or directory) in source repository
 #                         Path is relative to source repository root
 #                         Example: path_exists("README.md") checks for README.md in repo
-#
-# Tag Functions (available in path templates, URI predicates, and project predicates):
-# -----------------------------------------------------------------------------------
-#   tag(name)            - Get tag value by name (returns empty string if not set)
-#                         Tags are passed via --tag option: gww clone <uri> --tag env=prod
-#                         Available in: path templates, URI predicates, project predicates
-#                         Example: tag("env") returns "prod" if --tag env=prod was used
-#
-#   tag_exist(name)      - Check if tag exists (returns True/False)
-#                         Useful in predicates for conditional routing and path templates
-#                         Available in: path templates, URI predicates, project predicates
-#                         Example: tag_exist("env") returns True if --tag env was used
 
 # Default paths for sources (cloned repositories) and worktrees
 default_sources: ~/Developer/sources/default/path(-2)/path(-1)
