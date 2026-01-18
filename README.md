@@ -84,7 +84,8 @@ This installs shell completion and aliases (`gwc`, `gwa`, `gwr`) for easier work
 
 ```bash
 gwc https://github.com/user/repo.git
-# Automatically navigates to: ~/Developer/sources/github/user/repo
+# Prompts: "Navigate to ~/Developer/sources/github/user/repo? [Y/n]"
+# Navigates if you confirm (default: yes)
 ```
 
 ### 4. ➕ Add a Worktree
@@ -92,13 +93,18 @@ gwc https://github.com/user/repo.git
 ```bash
 cd ~/Developer/sources/github/user/repo
 gwa feature-branch
-# Automatically navigates to: ~/Developer/worktrees/github/user/repo/feature-branch
+# Prompts: "Navigate to ~/Developer/worktrees/github/user/repo/feature-branch? [Y/n]"
+# Navigates if you confirm (default: yes)
 ```
 
 ### 5. ➖ Remove a Worktree
 
 ```bash
 gwr feature-branch
+# If worktree has uncommitted changes or untracked files:
+#   Prompts: "Force removal? [y/N]"
+#   Removes with --force if you confirm
+# Otherwise: Removes worktree immediately
 # Output: Removed worktree: ~/Developer/worktrees/github/user/repo/feature-branch
 ```
 
