@@ -106,10 +106,14 @@ def execute_command(
 ) -> None:
     """Execute a command action.
 
+    Commands always execute with dest_path as the current working directory:
+    - For clone operations: working_dir is the cloned repository path
+    - For add operations: working_dir is the new worktree path
+
     Args:
         command: Command to execute.
         args: Command arguments.
-        working_dir: Working directory for command.
+        working_dir: Working directory for command (always dest_path).
 
     Raises:
         ActionError: If command fails.

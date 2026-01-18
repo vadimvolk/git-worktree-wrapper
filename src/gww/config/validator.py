@@ -129,19 +129,32 @@ def _validate_action(action_data: Any, context: str) -> Action:
             f"Must be one of: {', '.join(sorted(valid_types))}"
         )
 
-    if isinstance(args, str):
-        args = [args]
-    elif not isinstance(args, list):
-        raise ConfigValidationError(
-            f"{context}: action arguments must be a string or list"
-        )
-
-    # Validate args are strings
-    for i, arg in enumerate(args):
-        if not isinstance(arg, str):
+    # Command action requires a single string (can contain template functions)
+    if action_type == "command":
+        if not isinstance(args, str):
             raise ConfigValidationError(
-                f"{context}: argument {i} must be a string, got {type(arg).__name__}"
+                f"{context}: command action must be a single string, "
+                f"got {type(args).__name__}"
             )
+        if not args.strip():
+            raise ConfigValidationError(f"{context}: command string cannot be empty")
+        # Store as single-element list for consistency
+        args = [args]
+    else:
+        # abs_copy and rel_copy accept string or list
+        if isinstance(args, str):
+            args = [args]
+        elif not isinstance(args, list):
+            raise ConfigValidationError(
+                f"{context}: action arguments must be a string or list"
+            )
+
+        # Validate args are strings
+        for i, arg in enumerate(args):
+            if not isinstance(arg, str):
+                raise ConfigValidationError(
+                    f"{context}: argument {i} must be a string, got {type(arg).__name__}"
+                )
 
     return Action(action_type=action_type, args=list(args))
 

@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
-from gww.config.validator import ProjectRule
-from gww.template.evaluator import TemplateError, evaluate_predicate
+from gww.config.validator import Action, ProjectRule
+from gww.template.evaluator import (
+    TemplateError,
+    evaluate_command_template,
+    evaluate_predicate,
+)
 from gww.template.functions import (
     TemplateContext,
     create_function_registry,
@@ -50,6 +55,51 @@ def _create_predicate_context(
     functions.update(project_functions)
 
     return functions
+
+
+def _process_action(
+    action: Action,
+    context: dict[str, Any],
+) -> tuple[str, list[str]]:
+    """Process an action, evaluating command templates if needed.
+
+    For command actions, evaluates the template functions in the command string
+    and parses the result with shlex.split() for proper argument handling.
+
+    For other action types (abs_copy, rel_copy), returns args as-is.
+
+    Args:
+        action: The action to process.
+        context: Evaluation context with functions for template evaluation.
+
+    Returns:
+        Tuple of (action_type, processed_args).
+
+    Raises:
+        MatcherError: If command template evaluation fails.
+    """
+    if action.action_type == "command":
+        # Command has single string in args[0] that may contain template functions
+        command_template = action.args[0]
+        try:
+            evaluated_command = evaluate_command_template(command_template, context)
+        except TemplateError as e:
+            raise MatcherError(
+                f"Error evaluating command template '{command_template}': {e}"
+            ) from e
+
+        # Parse the evaluated command string with shlex for proper argument handling
+        try:
+            parsed_args = shlex.split(evaluated_command)
+        except ValueError as e:
+            raise MatcherError(
+                f"Error parsing command '{evaluated_command}': {e}"
+            ) from e
+
+        return (action.action_type, parsed_args)
+    else:
+        # For abs_copy and rel_copy, return args as-is
+        return (action.action_type, action.args)
 
 
 def find_matching_projects(
@@ -96,6 +146,9 @@ def get_source_actions(
 ) -> list[tuple[str, list[str]]]:
     """Get all source actions for matching project rules.
 
+    For command actions, evaluates template functions in the command string
+    and parses with shlex.split() for proper argument handling.
+
     Args:
         rules: List of project rules to evaluate.
         source_path: Path to source repository.
@@ -104,17 +157,19 @@ def get_source_actions(
             the same as source_path (the cloned repository location).
 
     Returns:
-        List of (action_type, args) tuples.
+        List of (action_type, args) tuples. Command actions have their templates
+        evaluated and parsed into separate arguments.
 
     Raises:
-        MatcherError: If predicate evaluation fails.
+        MatcherError: If predicate evaluation or command template evaluation fails.
     """
+    context = _create_predicate_context(source_path, tags, dest_path)
     matching = find_matching_projects(rules, source_path, tags, dest_path)
 
     actions: list[tuple[str, list[str]]] = []
     for rule in matching:
         for action in rule.source_actions:
-            actions.append((action.action_type, action.args))
+            actions.append(_process_action(action, context))
 
     return actions
 
@@ -127,6 +182,9 @@ def get_worktree_actions(
 ) -> list[tuple[str, list[str]]]:
     """Get all worktree actions for matching project rules.
 
+    For command actions, evaluates template functions in the command string
+    and parses with shlex.split() for proper argument handling.
+
     Args:
         rules: List of project rules to evaluate.
         source_path: Path to source repository.
@@ -135,16 +193,18 @@ def get_worktree_actions(
             the worktree path.
 
     Returns:
-        List of (action_type, args) tuples.
+        List of (action_type, args) tuples. Command actions have their templates
+        evaluated and parsed into separate arguments.
 
     Raises:
-        MatcherError: If predicate evaluation fails.
+        MatcherError: If predicate evaluation or command template evaluation fails.
     """
+    context = _create_predicate_context(source_path, tags, dest_path)
     matching = find_matching_projects(rules, source_path, tags, dest_path)
 
     actions: list[tuple[str, list[str]]] = []
     for rule in matching:
         for action in rule.worktree_actions:
-            actions.append((action.action_type, action.args))
+            actions.append(_process_action(action, context))
 
     return actions

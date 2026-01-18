@@ -241,6 +241,14 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 #
 # Project rules (optional)
 # Execute actions after clone or worktree creation based on project detection
+#
+# Command action syntax:
+#   - command: "single string with optional template functions"
+#   - Template functions are evaluated first, then the string is parsed as shell arguments
+#   - Commands always execute with dest_path() as the current working directory
+#   - Use quotes for arguments with spaces: command: "echo 'hello world'"
+#   - Available functions: dest_path(), source_path(), tag("name"), etc.
+#
 # Uncomment and customize as needed:
 
 # projects:
@@ -249,19 +257,24 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 #       - abs_copy: ["~/sources/default-local.properties", "local.properties"]
 #     worktree_actions:
 #       - rel_copy: ["local.properties"]
-#       - command: ["./setup-env.sh"]
+#       - command: "./setup-env.sh"
 #
 #   # Tag-based project actions:
 #   - predicate: not file_exists("CLAUDE.md") and tag_exist("use-claude")
 #     source_actions:
-#       - command: ["claude", "init"]
+#       - command: "claude init"
 #     worktree_actions:
 #       - rel_copy: ["CLAUDE.md"]
 #
-#   # Tag-based project actions:
+#   # Commands with template functions:
 #   - predicate: file_exists("CLAUDE.md") and tag_exist("use-claude") and tag_exist("review")
 #     worktree_actions:
-#       - command: ["claude", "-p", "/review"] # it's better to create slash command to avoid prompt repetion
+#       - command: "claude -p tag('prompt') --cwd dest_path()"
+#
+#   # Simple command with dest_path:
+#   - predicate: 'file_exists("package.json")'
+#     worktree_actions:
+#       - command: "npm install --prefix dest_path()"
 """
 
 

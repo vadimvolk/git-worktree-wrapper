@@ -215,3 +215,67 @@ def evaluate_predicate(
         )
 
     return result
+
+
+def evaluate_command_template(
+    command: str,
+    variables: dict[str, Any],
+) -> str:
+    """Evaluate a command template string with function calls.
+
+    Command template syntax:
+    - Function calls: dest_path(), tag("name"), source_path()
+    - Escaped parentheses: (( -> (
+    - Static text: passed through as-is
+
+    This is similar to evaluate_template() but accepts a pre-built context
+    dictionary (like evaluate_predicate()) instead of a TemplateContext.
+
+    Args:
+        command: Command template string to evaluate.
+        variables: Dictionary of variables and functions for evaluation.
+                   Callable values are treated as functions, others as variables.
+
+    Returns:
+        Evaluated command string with all functions replaced.
+
+    Raises:
+        TemplateError: If evaluation fails.
+        FunctionTypeError: If function arguments are invalid.
+        ContextError: If required context is missing.
+    """
+    # Separate functions from variables
+    functions: dict[str, Callable[..., Any]] = {}
+    names: dict[str, Any] = {}
+
+    for key, value in variables.items():
+        if callable(value):
+            functions[key] = value
+        else:
+            names[key] = value
+
+    # Preprocess template to extract function calls
+    processed, function_calls = _preprocess_template(command)
+
+    # Evaluate each function call
+    evaluator = StrictSimpleEval(functions=functions, names=names)
+
+    for placeholder, expression in function_calls:
+        try:
+            result = evaluator.eval(expression)
+            if not isinstance(result, str):
+                result = str(result)
+            processed = processed.replace(placeholder, result)
+        except FunctionNotDefined as e:
+            raise TemplateError(f"Unknown function in command: {e}") from e
+        except NameNotDefined as e:
+            raise TemplateError(f"Unknown variable in command: {e}") from e
+        except ValueError as e:
+            raise ContextError(str(e)) from e
+        except TypeError as e:
+            raise FunctionTypeError(f"Invalid argument types: {e}") from e
+        except Exception as e:
+            raise TemplateError(f"Command template evaluation failed: {e}") from e
+
+    # Postprocess to restore escaped parentheses
+    return _postprocess_template(processed)

@@ -57,7 +57,7 @@ default_worktrees: ~/worktrees/default
 projects:
   - predicate: 'file_exists("package.json")'
     source_actions:
-      - command: ["npm", "install"]
+      - command: "npm install"
 """)
 
         result = load_config(config_file)

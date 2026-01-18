@@ -25,7 +25,7 @@ class TestFindMatchingProjects:
         """Test matching project with always-true predicate."""
         rule = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["echo", "found"])],
+            source_actions=[Action(action_type="command", args=["echo found"])],
         )
 
         result = find_matching_projects([rule], tmp_path)
@@ -44,6 +44,51 @@ class TestFindMatchingProjects:
 
         assert len(result) == 0
 
+    def test_command_with_template_functions(self, tmp_path: Path) -> None:
+        """Test command action with template functions gets evaluated."""
+        dest = tmp_path / "worktree"
+        dest.mkdir()
+        rule = ProjectRule(
+            predicate='True',
+            source_actions=[Action(action_type="command", args=["./setup.sh dest_path()"])],
+        )
+
+        result = get_source_actions([rule], tmp_path, dest_path=dest)
+
+        assert len(result) == 1
+        action_type, args = result[0]
+        assert action_type == "command"
+        # dest_path() should be evaluated and shlex.split applied
+        assert args == ["./setup.sh", str(dest.resolve())]
+
+    def test_command_with_tag_function(self, tmp_path: Path) -> None:
+        """Test command action with tag() function."""
+        rule = ProjectRule(
+            predicate='True',
+            source_actions=[Action(action_type="command", args=["claude -p tag('prompt')"])],
+        )
+
+        result = get_source_actions([rule], tmp_path, tags={"prompt": "/review"})
+
+        assert len(result) == 1
+        action_type, args = result[0]
+        assert action_type == "command"
+        assert args == ["claude", "-p", "/review"]
+
+    def test_command_with_quoted_args(self, tmp_path: Path) -> None:
+        """Test command action with quoted arguments."""
+        rule = ProjectRule(
+            predicate='True',
+            source_actions=[Action(action_type="command", args=["echo 'hello world'"])],
+        )
+
+        result = get_source_actions([rule], tmp_path)
+
+        assert len(result) == 1
+        action_type, args = result[0]
+        assert action_type == "command"
+        assert args == ["echo", "hello world"]
+
     def test_matches_source_path_predicate(self, tmp_path: Path) -> None:
         """Test matching project with source_path variable predicate."""
         rule = ProjectRule(
@@ -59,11 +104,11 @@ class TestFindMatchingProjects:
         """Test matching multiple project rules."""
         rule1 = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["npm", "install"])],
+            source_actions=[Action(action_type="command", args=["npm install"])],
         )
         rule2 = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["pip", "install"])],
+            source_actions=[Action(action_type="command", args=["pip install"])],
         )
 
         result = find_matching_projects([rule1, rule2], tmp_path)
@@ -283,6 +328,7 @@ class TestGetSourceActions:
 
         assert len(result) == 2
         assert result[0] == ("abs_copy", ["~/default.properties", "local.properties"])
+        # Command is now a single string that gets parsed with shlex
         assert result[1] == ("command", ["./setup.sh"])
 
     def test_returns_empty_for_no_matches(self, tmp_path: Path) -> None:
@@ -310,6 +356,7 @@ class TestGetSourceActions:
         result = get_source_actions([rule1, rule2], tmp_path)
 
         assert len(result) == 2
+        # Commands are parsed with shlex, single words remain as single-element lists
         assert ("command", ["action1"]) in result
         assert ("command", ["action2"]) in result
 
@@ -317,14 +364,14 @@ class TestGetSourceActions:
         """Test that get_source_actions ignores worktree_actions."""
         rule = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["source"])],
-            worktree_actions=[Action(action_type="command", args=["worktree"])],
+            source_actions=[Action(action_type="command", args=["source-cmd"])],
+            worktree_actions=[Action(action_type="command", args=["worktree-cmd"])],
         )
 
         result = get_source_actions([rule], tmp_path)
 
         assert len(result) == 1
-        assert result[0] == ("command", ["source"])
+        assert result[0] == ("command", ["source-cmd"])
 
 
 class TestGetWorktreeActions:
@@ -345,6 +392,7 @@ class TestGetWorktreeActions:
 
         assert len(result) == 2
         assert result[0] == ("rel_copy", ["local.properties"])
+        # Command is now a single string that gets parsed with shlex
         assert result[1] == ("command", ["./init-worktree.sh"])
 
     def test_returns_empty_for_no_matches(self, tmp_path: Path) -> None:
@@ -362,14 +410,14 @@ class TestGetWorktreeActions:
         """Test that get_worktree_actions ignores source_actions."""
         rule = ProjectRule(
             predicate='True',
-            source_actions=[Action(action_type="command", args=["source"])],
-            worktree_actions=[Action(action_type="command", args=["worktree"])],
+            source_actions=[Action(action_type="command", args=["source-cmd"])],
+            worktree_actions=[Action(action_type="command", args=["worktree-cmd"])],
         )
 
         result = get_worktree_actions([rule], tmp_path)
 
         assert len(result) == 1
-        assert result[0] == ("command", ["worktree"])
+        assert result[0] == ("command", ["worktree-cmd"])
 
 
 class TestActionsExecution:
@@ -412,11 +460,12 @@ class TestActionsExecution:
         assert args[1] == "settings.properties"
 
     def test_command_action_with_multiple_args(self, tmp_path: Path) -> None:
-        """Test command action with multiple arguments."""
+        """Test command action with multiple arguments (single string, parsed with shlex)."""
         rule = ProjectRule(
             predicate='True',
             source_actions=[
-                Action(action_type="command", args=["make", "build", "--verbose"])
+                # Command is now a single string that gets parsed with shlex
+                Action(action_type="command", args=["make build --verbose"])
             ],
         )
 
@@ -432,15 +481,15 @@ class TestActionsExecution:
         rule = ProjectRule(
             predicate='True',
             source_actions=[
-                Action(action_type="command", args=["first"]),
+                Action(action_type="command", args=["first-cmd"]),
                 Action(action_type="abs_copy", args=["src", "dst"]),
-                Action(action_type="command", args=["third"]),
+                Action(action_type="command", args=["third-cmd"]),
             ],
         )
 
         result = get_source_actions([rule], tmp_path)
 
         assert len(result) == 3
-        assert result[0][1] == ["first"]
+        assert result[0][1] == ["first-cmd"]
         assert result[1][0] == "abs_copy"
-        assert result[2][1] == ["third"]
+        assert result[2][1] == ["third-cmd"]
