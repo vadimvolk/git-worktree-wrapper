@@ -106,7 +106,7 @@ class TestFindMatchingSourceRule:
         """Test predicate that accesses path segments."""
         rule = SourceRule(
             name="myorg",
-            predicate='path()[0] == "myorg"',
+            predicate='path(0) == "myorg"',
         )
         config = Config(
             default_sources="~/sources/default",

@@ -134,12 +134,8 @@ DEFAULT_CONFIG_TEMPLATE = """\
 # ----------------------------------------------------------------------------------
 #
 # URI Functions:
-#   path()               - URI path segments (dual signature)
-#                         - path(): returns list of all segments
-#                           Example: path() returns ["user", "repo"]
-#                           Use path()[0] to access first segment, path()[-1] for last
-#                         - path(n): returns single segment at index n
-#                           Example: path(-1) returns "repo", path(0) returns "user"
+#   path(n)              - URI path segment at index n (0-based, negative for reverse)
+#                         Example: path(-1) returns "repo", path(0) returns "user"
 #
 #   host()               - URI hostname (string)
 #                         Example: host() returns "github.com" from "https://github.com/user/repo"
@@ -224,7 +220,7 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 #     worktrees: ~/Developer/worktrees/gitlab/path(-3)/path(-2)/path(-1)/norm_branch()
 #
 #   custom:
-#     predicate: 'path()[0] == "myorg"'
+#     predicate: 'path(0) == "myorg"'
 #     sources: ~/Developer/sources/custom/path(-2)/path(-1)
 #
 #   # Tag-based routing examples:

@@ -359,16 +359,12 @@ gww migrate ~/old-repos --move
 
 **Function Availability**:
 - **Shared functions** (available in templates, URI predicates, and project predicates):
-  - URI functions: `host()`, `port()`, `protocol()`, `uri()`, `path()`, `path(index)`
+  - URI functions: `host()`, `port()`, `protocol()`, `uri()`, `path(index)`
   - Branch functions: `branch()`, `norm_branch(replacement)` (when branch context available)
   - Tag functions: `tag(name)`, `tag_exist(name)`
 - **Project-specific functions** (only in project predicates):
   - `source_path()` - returns current repository/worktree root path (detects from cwd, returns empty string if not in git repo)
   - `file_exists(path)`, `dir_exists(path)`, `path_exists(path)` - check paths relative to source repository
-
-**Note on `path()` function**:
-- `path()` with no arguments returns a list of all path segments (use in predicates: `path()[0]`, `path()[-1]`)
-- `path(index)` with an index returns a single path segment string (use in templates: `path(-1)`, `path(0)`)
 
 ### Path Functions
 
@@ -420,7 +416,7 @@ sources:
     sources: ~/Developer/sources/github/path(-2)/path(-1)
   
   custom:
-    predicate: 'path()[0] == "myorg"'
+    predicate: 'path(0) == "myorg"'
     sources: ~/Developer/sources/custom/path(-2)/path(-1)
 ```
 

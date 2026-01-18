@@ -425,19 +425,8 @@ class TestURIFunctions:
         assert "project" in result
 
 
-class TestPathFunctionDualSignature:
-    """Tests for path() function with dual signature (list vs string)."""
-
-    def test_path_with_no_args_returns_list(self) -> None:
-        """Test path() with no arguments returns list of segments."""
-        context = TemplateContext(uri=parse_uri("https://github.com/user/repo.git"))
-        registry = FunctionRegistry(context)
-        functions = registry.get_functions()
-
-        result = functions["path"]()
-
-        assert result == ["user", "repo"]
-        assert isinstance(result, list)
+class TestPathFunction:
+    """Tests for path(index) function."""
 
     def test_path_with_index_returns_string(self) -> None:
         """Test path(index) returns single segment string."""
@@ -487,15 +476,15 @@ class TestPathFunctionDualSignature:
         functions = registry.get_functions()
 
         with pytest.raises(ValueError, match="No URI context available"):
-            functions["path"]()
+            functions["path"](0)
 
-    def test_path_list_access_in_predicates(self) -> None:
-        """Test path() list can be indexed in predicate context."""
+    def test_path_in_predicate(self) -> None:
+        """Test path(index) works in predicate context."""
         context = TemplateContext(uri=parse_uri("https://github.com/myorg/repo.git"))
         functions = create_function_registry(context)
 
-        # Simulate predicate evaluation: path()[0] == "myorg"
-        result = functions["path"]()[0]
+        # Simulate predicate evaluation: path(0) == "myorg"
+        result = functions["path"](0)
 
         assert result == "myorg"
 

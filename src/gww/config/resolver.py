@@ -35,7 +35,7 @@ def _build_uri_context(uri: ParsedURI, tags: dict[str, str] = {}) -> dict[str, o
     """Build evaluation context for URI predicates.
 
     Uses the unified FunctionRegistry to provide shared functions:
-    - URI functions: host(), port(), protocol(), uri(), path(), path(index)
+    - URI functions: host(), port(), protocol(), uri(), path(index)
     - Tag functions: tag(name), tag_exist(name)
 
     Args:

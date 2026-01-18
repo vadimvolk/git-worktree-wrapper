@@ -48,7 +48,7 @@ Represents a predicate-based routing rule for determining source and worktree lo
 - At least one source rule must match for any valid URI (or default is used)
 
 **Context Functions** (available during predicate evaluation):
-- URI functions: `host()`, `port()`, `protocol()`, `uri()`, `path()`, `path(index)` (see TemplateFunction section)
+- URI functions: `host()`, `port()`, `protocol()`, `uri()`, `path(index)` (see TemplateFunction section)
 - Tag functions: `tag(name)`, `tag_exist(name)` (see TemplateFunction section)
 
 **Relationships**:
@@ -72,7 +72,7 @@ Represents a project type detection rule with associated actions to execute duri
 - At least one action type must be specified
 
 **Context Functions** (available during predicate evaluation):
-- Shared functions: URI functions (`host()`, `port()`, `protocol()`, `uri()`, `path()`, `path(index)`), tag functions (`tag(name)`, `tag_exist(name)`) - see TemplateFunction section
+- Shared functions: URI functions (`host()`, `port()`, `protocol()`, `uri()`, `path(index)`), tag functions (`tag(name)`, `tag_exist(name)`) - see TemplateFunction section
 - Project-specific functions (only in project predicates):
   - `source_path() -> str`: Absolute path to current repository or worktree root (detects from cwd)
   - `dest_path() -> str`: Absolute path to destination (clone target or worktree). During clone: returns source_path. During add: returns worktree path.
@@ -204,7 +204,7 @@ Built-in functions available in template expressions, URI predicates, and projec
 
 **Function Availability**:
 - **Shared functions** (available in templates, URI predicates, and project predicates):
-  - URI functions: `host()`, `port()`, `protocol()`, `uri()`, `path()`, `path(index)`
+  - URI functions: `host()`, `port()`, `protocol()`, `uri()`, `path(index)`
   - Branch functions: `branch()`, `norm_branch(replacement)`
   - Tag functions: `tag(name)`, `tag_exist(name)`
 - **Project-specific functions** (only available in project predicates):
@@ -215,13 +215,10 @@ Built-in functions available in template expressions, URI predicates, and projec
 - `port() -> str`: Port from URI, empty string if missing (e.g., "3000", "")
 - `protocol() -> str`: Protocol from URI (e.g., "http", "https", "ssh", "git", "file")
 - `uri() -> str`: Full URI string
-- `path() -> list[str]`: URI path segments as list (e.g., ["vadimvolk", "ansible"] from "/vadimvolk/ansible.git")
-  - Use `path()[0]` to access first segment, `path()[-1]` for last segment
 - `path(index: int) -> str`: Get URI path segment by index (0-based, negative for reverse)
   - `path(-1)`: Last path segment
   - `path(-2)`: Second-to-last path segment
   - `path(0)`: First path segment
-  - Note: `path()` with no args returns list, `path(index)` with index returns string
 
 **Branch Functions** (require branch context):
 - `branch() -> str`: Current branch name (as-is)

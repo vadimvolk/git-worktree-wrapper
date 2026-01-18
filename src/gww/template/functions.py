@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional
 
 from gww.git.repository import (
     NotGitRepositoryError,
@@ -35,7 +35,7 @@ class FunctionRegistry:
     """Registry of template functions available during evaluation.
 
     Provides shared functions available in templates, URI predicates, and project predicates:
-    - URI functions: host(), port(), protocol(), uri(), path(), path(index)
+    - URI functions: host(), port(), protocol(), uri(), path(index)
     - Branch functions: branch(), norm_branch(replacement)
     - Tag functions: tag(name), tag_exist(name)
     """
@@ -127,17 +127,15 @@ class FunctionRegistry:
             raise ValueError("No URI context available for uri() function")
         return self._context.uri.uri
 
-    def _path(self, *args: int) -> Union[list[str], str]:
-        """Get URI path segment(s).
-
-        With no arguments: returns list of all path segments.
-        With index argument: returns single path segment at index.
+    def _path(self, index: int) -> str:
+        """Get URI path segment by index.
 
         Args:
-            *args: Optional index (0-based, negative for reverse).
+            index: Path segment index (0-based, negative for reverse).
+                   Example: path(-1) returns last segment, path(0) returns first.
 
         Returns:
-            List of path segments (no args) or single segment string (with index).
+            Path segment string at the specified index.
 
         Raises:
             ValueError: If no URI context or index out of range.
@@ -145,19 +143,13 @@ class FunctionRegistry:
         if self._context.uri is None:
             raise ValueError("No URI context available for path() function")
 
-        if len(args) == 0:
-            # path() with no args returns list of all segments
-            return self._context.uri.path_segments
-        else:
-            # path(index) returns single segment
-            index = args[0]
-            try:
-                return self._context.uri.path(index)
-            except IndexError:
-                raise ValueError(
-                    f"Path segment index {index} out of range. "
-                    f"Available segments: {self._context.uri.path_segments}"
-                )
+        try:
+            return self._context.uri.path(index)
+        except IndexError:
+            raise ValueError(
+                f"Path segment index {index} out of range. "
+                f"Available segments: {self._context.uri.path_segments}"
+            )
 
     def _branch(self) -> str:
         """Get current branch name as-is.
