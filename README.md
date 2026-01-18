@@ -1,3 +1,6 @@
+<!-- Language switcher -->
+**English** | [Русский](README.ru.md)
+
 # GWW - Git Worktree Wrapper
 
 A CLI tool that wraps git worktree functionality with configurable path templates, predicate-based routing, and project-specific actions.
@@ -139,7 +142,7 @@ projects:
 
 | Function | Description | Example |
 |----------|-------------|---------|
-| `branch()` | Get current branch name | `branch()` → `"feature/new-ui"` |
+| `branch()` | Get current branch name | `branch()` → `"feature/new/ui"` |
 | `norm_branch(replacement)` | Branch name with `/` replaced (default: `"-"`) | `norm_branch()` → `"feature-new-ui"`, `norm_branch("_")` → `"feature_new_ui"` |
 
 #### Tag Functions (available in templates, URI predicates, and project predicates)
