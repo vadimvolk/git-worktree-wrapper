@@ -34,7 +34,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --extra dev
       
       - name: Run tests
         run: uv run pytest
@@ -58,7 +58,7 @@ jobs:
           python-version: '3.11'
       
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --extra dev
       
       - name: Run mypy
         run: uv run mypy src/gww
