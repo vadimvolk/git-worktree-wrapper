@@ -1,6 +1,102 @@
 # Git worktree wrapper with additional fuctions
 Name of console command is gww
 
+## High-Level Architecture
+
+```mermaid
+graph TB
+    subgraph "User Interface Layer"
+        CLI[CLI Entry Point<br/>gww main.py]
+        Commands[Command Handlers<br/>clone, add, remove, pull, migrate, init]
+    end
+
+    subgraph "Core Services Layer"
+        ConfigMgr[Config Manager<br/>loader, validator, resolver]
+        TemplateEngine[Template Engine<br/>evaluator, functions]
+        GitOps[Git Operations<br/>repository, worktree, branch]
+        ActionSys[Action System<br/>matcher, executor]
+    end
+
+    subgraph "Utilities Layer"
+        Utils[Utilities<br/>shell, URI parsing, XDG paths]
+    end
+
+    subgraph "External Dependencies"
+        Git[Git CLI]
+        ConfigFile[YAML Config File<br/>~/.config/gww/config.yml]
+        FileSystem[File System]
+    end
+
+    CLI --> Commands
+    Commands --> ConfigMgr
+    Commands --> GitOps
+    Commands --> ActionSys
+    
+    ConfigMgr --> TemplateEngine
+    ConfigMgr --> ConfigFile
+    ConfigMgr --> Utils
+    
+    TemplateEngine --> Utils
+    
+    GitOps --> Git
+    GitOps --> FileSystem
+    GitOps --> Utils
+    
+    ActionSys --> TemplateEngine
+    ActionSys --> FileSystem
+    ActionSys --> Utils
+    
+    Commands --> TemplateEngine
+
+    style CLI fill:#e1f5ff
+    style Commands fill:#e1f5ff
+    style ConfigMgr fill:#fff4e1
+    style TemplateEngine fill:#fff4e1
+    style GitOps fill:#fff4e1
+    style ActionSys fill:#fff4e1
+    style Utils fill:#e8f5e9
+    style Git fill:#fce4ec
+    style ConfigFile fill:#fce4ec
+    style FileSystem fill:#fce4ec
+```
+
+### Component Descriptions
+
+**CLI Layer** (`src/gww/cli/`)
+- **main.py**: Entry point, argument parsing, command routing
+- **commands/**: Individual command implementations (clone, add, remove, pull, migrate, init)
+
+**Config Layer** (`src/gww/config/`)
+- **loader.py**: YAML config file loading/saving using ruamel.yaml
+- **validator.py**: Config structure validation
+- **resolver.py**: Path resolution based on URI conditions and templates
+
+**Template Layer** (`src/gww/template/`)
+- **evaluator.py**: Template evaluation engine using simpleeval with strict type checking
+- **functions.py**: Template function registry (URI, branch, tag, utility, project-specific functions)
+
+**Git Layer** (`src/gww/git/`)
+- **repository.py**: Git repository operations (clone, pull, status checks)
+- **worktree.py**: Git worktree management (add, remove, list)
+- **branch.py**: Branch operations and normalization
+
+**Actions Layer** (`src/gww/actions/`)
+- **matcher.py**: Match project rules based on `when` conditions
+- **executor.py**: Execute actions (abs_copy, rel_copy, command)
+
+**Utils Layer** (`src/gww/utils/`)
+- **shell.py**: Shell completion generation
+- **uri.py**: URI parsing and manipulation
+- **xdg.py**: XDG config directory resolution
+
+### Data Flow
+
+1. **Clone Flow**: `CLI` → `clone` command → `ConfigMgr` resolves path → `TemplateEngine` evaluates template → `GitOps` clones repo → `ActionSys` matches and executes `after_clone` actions
+
+2. **Add Worktree Flow**: `CLI` → `add` command → `ConfigMgr` resolves worktree path → `TemplateEngine` evaluates template → `GitOps` creates worktree → `ActionSys` matches and executes `after_add` actions
+
+3. **Config Resolution**: `ConfigMgr` loads YAML → evaluates `when` conditions using `TemplateEngine` → selects matching source rule → evaluates path templates → returns resolved paths
+
 # Configuration
 Works with configuration file gww.yml located in $XDG_CONFIG_HOME compliant manner
 

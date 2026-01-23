@@ -198,14 +198,14 @@ actions:
 ```yaml
 sources:
   # Temporary checkout: Clone repositories to ~/Downloads/temp for quick access
-  # Usage: gww clone <uri> --tag temp
+  # Usage: gwc <uri> --tag temp
   temp:
     when: 'tag_exist("temp")'
     sources: ~/Downloads/temp/path(-1)
     worktrees: ~/Downloads/temp/path(-1)/norm_branch()
 
   # Code review worktrees: Add worktrees to ~/Developer/worktree/code-review for review tasks
-  # Usage: gww add <branch> --tag review
+  # Usage: gwa <branch> --tag review
   review:
     when: 'tag_exist("review")'
     sources: ~/Developer/sources/path(-2)/path(-1)
@@ -214,12 +214,12 @@ sources:
 
 ```bash
 # Clone to temporary location
-gww clone https://github.com/user/repo.git --tag temp
+gwc https://github.com/user/repo.git --tag temp
 # Output: ~/Downloads/temp/repo
 
 # Add worktree for code review
 cd ~/Developer/sources/github/user/repo
-gww add feature-branch --tag review
+gwa feature-branch --tag review
 # Output: ~/Developer/worktree/code-review/repo/feature-branch
 ```
 
@@ -227,13 +227,15 @@ gww add feature-branch --tag review
 
 | Command | Description |
 |---------|-------------|
-| `gww clone <uri> [--tag key=value]...` | 📥 Clone repository to configured location (tags available in templates/conditions) |
-| `gww add <branch> [-c] [--tag key=value]...` | ➕ Add worktree for branch (optionally create branch, tags available in templates/conditions) |
-| `gww remove <branch\|path> [-f]` | ➖ Remove worktree |
+| `gwc <uri> [--tag key=value]...` | 📥 Clone repository to configured location (tags available in templates/conditions) |
+| `gwa <branch> [-c] [--tag key=value]...` | ➕ Add worktree for branch (optionally create branch, tags available in templates/conditions) |
+| `gwr <branch\|path> [-f]` | ➖ Remove worktree |
 | `gww pull` | 🔄 Update source repository (works from worktrees if source is clean and on main/master) |
 | `gww migrate <path> [--dry-run] [--move]` | 🚚 Migrate repositories to new locations |
 | `gww init config` | ⚙️ Create default configuration file |
 | `gww init shell <shell>` | 🐚 Install shell completion (bash/zsh/fish) |
+
+**Note**: `gwc`, `gwa`, and `gwr` are convenient shell aliases for `gww clone`, `gww add`, and `gww remove` respectively. They provide the same functionality with automatic navigation prompts. Install them with `gww init shell <shell>`.
 
 **Common Options**:
 - `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times).
