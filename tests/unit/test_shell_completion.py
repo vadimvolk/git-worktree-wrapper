@@ -174,6 +174,16 @@ class TestGenerateFishCompletion:
         script = generate_fish_completion()
         assert "__fish_seen_subcommand_from" in script
 
+    def test_sources_git_completion(self) -> None:
+        """Test that script sources git.fish to import __fish_git_branches."""
+        script = generate_fish_completion()
+        # Should source git.fish to make __fish_git_branches available
+        assert "source" in script
+        assert "git.fish" in script
+        assert "__fish_data_dir" in script
+        # Should use __fish_git_branches for branch completion
+        assert "__fish_git_branches" in script
+
 
 class TestGenerateCompletion:
     """Tests for generate_completion function."""
