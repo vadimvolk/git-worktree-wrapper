@@ -29,7 +29,7 @@ def _create_predicate_context(
     source_path: Path,
     tags: dict[str, str] = {},
     dest_path: Optional[Path] = None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Create evaluation context for project predicates.
 
     Uses the unified FunctionRegistry for shared functions and adds
@@ -48,7 +48,7 @@ def _create_predicate_context(
     """
     # Create shared functions from unified registry (tags only, no URI/branch)
     context = TemplateContext(source_path=source_path, tags=tags)
-    functions: dict[str, object] = create_function_registry(context)
+    functions: dict[str, Any] = create_function_registry(context)
 
     # Add project-specific functions
     project_functions = create_project_functions(source_path, dest_path)

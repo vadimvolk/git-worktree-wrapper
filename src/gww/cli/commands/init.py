@@ -10,6 +10,7 @@ from gww.utils.shell import (
     generate_completion,
     get_completion_path,
     get_installation_instructions,
+    install_aliases,
     install_completion,
 )
 from gww.utils.xdg import get_config_path
@@ -79,7 +80,7 @@ def run_init_shell(args: argparse.Namespace) -> int:
 
     # Install completion
     try:
-        path = install_completion(shell)
+        completion_path = install_completion(shell)
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
@@ -87,9 +88,19 @@ def run_init_shell(args: argparse.Namespace) -> int:
         print(f"Error installing completion: {e}", file=sys.stderr)
         return 1
 
+    # Install aliases
+    try:
+        aliases_path = install_aliases(shell)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except OSError as e:
+        print(f"Error installing aliases: {e}", file=sys.stderr)
+        return 1
+
     # Print instructions
     if not quiet:
-        instructions = get_installation_instructions(shell, path)
+        instructions = get_installation_instructions(shell, completion_path, aliases_path)
         print(instructions)
 
     return 0
