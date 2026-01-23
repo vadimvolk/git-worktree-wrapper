@@ -41,7 +41,8 @@ cat > "$TMP_FILE" <<EOF
   "required_pull_request_reviews": {
     "required_approving_review_count": 1,
     "dismiss_stale_reviews": true,
-    "require_code_owner_reviews": false
+    "require_code_owner_reviews": false,
+    "require_last_push_approval": false
   },
   "restrictions": null,
   "allow_force_pushes": false,
@@ -64,7 +65,7 @@ rm "$TMP_FILE"
 echo "✅ Branch protection configured successfully!"
 echo ""
 echo "Branch protection rules:"
-echo "  - Require pull request reviews (1 approval)"
+echo "  - Require pull request reviews (1 approval, author can merge own PRs)"
 echo "  - Require conversation resolution before merging"
 echo "  - Require status checks to pass"
 echo "  - Require branches to be up to date"
