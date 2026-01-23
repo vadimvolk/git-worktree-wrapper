@@ -5,6 +5,8 @@
 
 # 🚀 GWW - Git Worktree Wrapper
 
+![Tests](https://github.com/vadimvolk/git-worktree-wrapper/actions/workflows/ci.yml/badge.svg)
+
 A CLI tool that wraps git worktree functionality with configurable path templates, condition-based routing, and project-specific actions.
 
 ## ✨ Features
