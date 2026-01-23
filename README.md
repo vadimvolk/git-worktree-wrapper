@@ -5,6 +5,8 @@
 
 # 🚀 GWW - Git Worktree Wrapper
 
+[![CI](https://github.com/vadimvolk/git-worktree-wrapper/actions/workflows/ci.yml/badge.svg)](https://github.com/vadimvolk/git-worktree-wrapper/actions/workflows/ci.yml)
+
 A CLI tool that wraps git worktree functionality with configurable path templates, condition-based routing, and project-specific actions.
 
 ## ✨ Features
@@ -70,76 +72,126 @@ gww --help
 gww init config
 ```
 
-This creates a default configuration file at `~/.config/gww/config.yml` (Linux) or `~/Library/Application Support/gww/config.yml` (macOS).
+This creates a default configuration file at `~/.config/gww/config.yml` (Linux) or `~/Library/Application Support/gww/config.yml` (macOS). Edit these 2 values: `default_sources` and `default_worktrees`. Check the [tutorial section](#tutorial) for routing details.
 
-### 2. 📥 Clone a Repository
+### 2. 🐚 Initialize Shell Integration
 
 ```bash
-gww clone https://github.com/user/repo.git
-# Output: ~/Developer/sources/github/user/repo
+gww init shell zsh  # or bash, or fish
 ```
 
-### 3. ➕ Add a Worktree
+This installs shell completion and aliases (`gwc`, `gwa`, `gwr`) for easier workflow. Follow the instructions printed by the command to enable them in your shell.
+
+### 3. 📥 Clone a Repository
+
+```bash
+gwc https://github.com/user/repo.git
+# Prompts: "Navigate to ~/Developer/sources/github/user/repo? [Y/n]"
+# Navigates if you confirm (default: yes)
+```
+
+### 4. ➕ Add a Worktree
 
 ```bash
 cd ~/Developer/sources/github/user/repo
-gww add feature-branch
-# Output: ~/Developer/worktrees/github/user/repo/feature-branch
+gwa feature-branch
+# Prompts: "Navigate to ~/Developer/worktrees/github/user/repo/feature-branch? [Y/n]"
+# Navigates if you confirm (default: yes)
 ```
 
-### 4. ➖ Remove a Worktree
+### 5. ➖ Remove a Worktree
 
 ```bash
-gww remove feature-branch
+gwr feature-branch
+# If worktree has uncommitted changes or untracked files:
+#   Prompts: "Force removal? [y/N]"
+#   Removes with --force if you confirm
+# Otherwise: Removes worktree immediately
 # Output: Removed worktree: ~/Developer/worktrees/github/user/repo/feature-branch
 ```
 
-### 5. 🔄 Update Source Repository
+### 6. 🔄 Update Source Repository
 
 ```bash
 gww pull
 # Output: Updated source repository: ~/Developer/sources/github/user/repo
 ```
 
-**Note**: `gww pull` will pull the source repository even if it's called from a worktree, as long as the source repository is clean and has `main` or `master` branch checked out. This is useful for merge/rebase scenarios where you want to update the source repository while working in a worktree.
-
-## ⚙️ Configuration
-
-Example `config.yml`:
-
-```yaml
-default_sources: ~/Developer/sources/default/path(-2)/path(-1)
-default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
-
-sources:
-  github:
-    when: '"github" in host()'
-    sources: ~/Developer/sources/github/path(-2)/path(-1)
-    worktrees: ~/Developer/worktrees/github/path(-2)/path(-1)/norm_branch()
-
-  gitlab:
-    when: '"gitlab" in host()'
-    sources: ~/Developer/sources/gitlab/path(-3)/path(-2)/path(-1)
-    worktrees: ~/Developer/worktrees/gitlab/path(-3)/path(-2)/path(-1)/norm_branch()
-
-actions:
-  - when: file_exists("local.properties")
-    after_clone:
-      - abs_copy: ["~/sources/default-local.properties", "local.properties"]
-    after_add:
-      - rel_copy: ["local.properties"]
+**Note**: `gww pull` updates the source repository even from a worktree, as long as the source is clean and has `main` or `master` checked out. Useful for merge/rebase workflows.
+```bash
+gww pull # from any repository worktree
+git rebase main # rebase your current changes to updated main branch
 ```
 
-### 📝 Template Functions
+### 7. 🚚 Migrate Repositories
+Create a backup first!
+
+```bash
+gww migrate ~/old-repos --dry-run
+# Output:
+# Would migrate 5 repositories:
+#   ~/old-repos/repo1 -> ~/Developer/sources/github/user/repo1
+#   ~/old-repos/repo2 -> ~/Developer/sources/github/user/repo2
+#   ...
+
+gww migrate ~/old-repos
+# Output:
+# Migrated 5 repositories
+# Repaired 2 worktrees
+```
+
+The `migrate` command scans a directory for git repositories and migrates them to locations based on your current configuration. It's useful when:
+- You've updated your configuration and want to reorganize existing repositories
+- You're moving from manual repository management to GWW
+- You need to consolidate repositories from different locations
+
+**Options**:
+- `--dry-run`, `-n`: Show what would be migrated without making changes
+- `--move`: Move repositories instead of copying (default is copy)
+
+**Behavior**:
+- Recursively scans the specified directory for git repositories
+- Extracts the remote URI from each repository
+- Calculates the expected location using your current config
+- Migrates repositories that are in different locations than expected
+- Automatically repairs worktree paths if migrating worktrees
+- Skips repositories without remotes or that are already in the correct location
+
+## Tutorial
+
+A minimal config file looks like:
+```yaml
+# Folder where all sources are checked out with gwc. path(-2)/path(-1) generates 2-level subfolders based on repository URI. Like https://github.com/user/repo.git -> ~/Developer/sources/user/repo
+default_sources: ~/Developer/other/sources/path(-2)/path(-1)
+# Folder where all worktrees are checked out with gwa. norm_branch() works better with remote branches, e.g. origin/remote-branch -> origin-remote-branch
+default_worktrees: ~/Developer/other/worktrees/path(-2)/path(-1)/norm_branch()
+```
+The generated file will have more options commented out, including the functions reference. 
+
+### Checkout based on where repository is hosted
+Useful to separate e.g. open source projects (where you learn or get inspired) from your work projects.
+```yaml
+# Still needed in case the config fails to find a section. You may prefer a non-nested sources structure, but make sure the result folder is unique
+default_sources: ~/Developer/sources/host()-path(-2)-path(-1)
+default_worktrees: ~/Developer/worktrees/host()-path(-2)-path(-1)-norm_branch()
+sources:
+  # ... other rules
+  work:
+    when: "your.org.host" in host()
+    sources: ~/Developer/work/sources/path(-2)-path(-1)
+    worktrees: ~/Developer/work/sources/path(-2)-path(-1)-norm_branch()
+  
+```
+That's enough to separate work sources from all others, but you can create more sections with various rules. The library uses [simpleeval](https://github.com/danthedeckie/simpleeval) to evaluate templates, so you can use its [operators](https://github.com/danthedeckie/simpleeval?tab=readme-ov-file#operators) and functions below to get necessary routing. 
 
 #### 🌐 URI Functions (available in templates and `when` conditions)
 
 | Function | Description | Example |
 |----------|-------------|---------|
-| `host()` | Get URI hostname | `host()` → `"github.com"` |
-| `port()` | Get URI port (empty string if not specified) | `port()` → `""` or `"22"` |
-| `protocol()` | Get URI protocol/scheme | `protocol()` → `"https"` or `"ssh"` |
-| `uri()` | Get full URI string | `uri()` → `"https://github.com/user/repo.git"` |
+| `uri()` | Get full URI string | `uri()` → `"https://loca-repo-manager.com:8081/user/repo.git"` |
+| `host()` | Get URI hostname | `host()` → `"loca-repo-manager.com"` |
+| `port()` | Get URI port (empty string if not specified) | `port()` → `"8081"` or `""` usually |
+| `protocol()` | Get URI protocol/scheme | `protocol()` → `"https"` / `"ssh"` / `git` |
 | `path(n)` | Get URI path segment by index (0-based, negative for reverse) | `path(-1)` → `"repo"`, `path(0)` → `"user"` |
 
 #### 🌿 Branch Functions (available in templates)
@@ -149,14 +201,34 @@ actions:
 | `branch()` | Get current branch name | `branch()` → `"feature/new/ui"` |
 | `norm_branch(replacement)` | Branch name with `/` replaced (default: `"-"`) | `norm_branch()` → `"feature-new-ui"`, `norm_branch("_")` → `"feature_new_ui"` |
 
-#### ⏰ Utility Functions (available in templates)
+Need to checkout temporary projects separately? Add this to your config:
+```yml
+sources:
+  # ... other rules
+  temp:
+    when: tag_exist("temp")  # See [tags section](#-tags) for details about tags
+    sources: ~/Downloads/temp/sources/time_id()-host()-path(-2)-path(-1) 
+    worktrees: ~/Downloads/temp/worktrees/time_id()-host()-path(-2)-path(-1)-norm-branch()
+```
+`time_id(fmt)` generates a datetime-based identifier (cached per template evaluation). Default format is `"20260120-2134.03"` (short, seconds accuracy unique). Use [format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes) for more detailed/nested results. Works properly if used multiple times.
+```yml
+worktrees: ~/Downloads/temp/worktrees/time_id("%Y")/time_id("%m")/time_id("%H-%M$.%S")/host()-path(-2)-path(-1)-norm-branch()
+```
+Generates nested structure: `YYYY/HH-MM.ss/host()-path(-2)-path(-1)-norm-branch()`
 
-| Function | Description | Example |
-|----------|-------------|---------|
-| `time_id(fmt)` | Generate datetime-based identifier (cached per template evaluation). See [format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes). | `time_id()` → `"20260120-2134.03"`, `time_id("%Y-%m-%d")` → `"2026-01-20"` |
 
 #### ⚙️ Actions (available in `actions` section)
-
+Run actions after checking out a repository or adding a worktree. Common example: copying `local.properties` for Gradle projects.
+```yml
+actions:
+  - when: file_exists("settings.gradle") # Check if it's actually a Gradle project
+    after_clone:
+      - abs_copy: ["~/sources/default-local.properties", "local.properties"] # Copies your default file right after cloning the repo
+    after_add: 
+      - rel_copy: ["local.properties"] # Inherit existing repository file to worktree
+```
+You can have multiple `when` subsections in actions. After clone/add, the library goes top-to-bottom and executes all actions with matching `when` conditions.
+Other functions available in the actions section: 
 | Action | Description | Example |
 |--------|-------------|---------|
 | `abs_copy` | Copy file from absolute path to relative destination in target directory | `abs_copy: ["~/sources/default-local.properties", "local.properties"]` |
@@ -173,7 +245,9 @@ actions:
 | `dir_exists(path)` | Check if directory exists relative to source repository | `dir_exists("config")` → `True` |
 | `path_exists(path)` | Check if path exists (file or directory) relative to source repository | `path_exists("local.properties")` → `True` |
 
-#### 🏷️ Tag Functions (available in templates and `when` conditions)
+#### 🏷️ Tags
+
+Still not flexible enough? Here comes tags. Tags specified using command line param `-t <tag-name>[=optional value]` (or `--tag`) for clone / add commands. Tags available in configuration with:
 
 | Function | Description | Example |
 |----------|-------------|---------|
@@ -184,28 +258,29 @@ actions:
 ```yaml
 sources:
   # Temporary checkout: Clone repositories to ~/Downloads/temp for quick access
-  # Usage: gww clone <uri> --tag temp
+  # Usage: gwc <uri> -t temp
   temp:
     when: 'tag_exist("temp")'
-    sources: ~/Downloads/temp/path(-1)
-    worktrees: ~/Downloads/temp/path(-1)/norm_branch()
+    sources: ~/Downloads/temp/time_id()-host()-path(-1)
+    worktrees: ~/Downloads/temp/time_id()-host()-path(-1)/norm_branch()
 
   # Code review worktrees: Add worktrees to ~/Developer/worktree/code-review for review tasks
-  # Usage: gww add <branch> --tag review
+  # Usage: gwa <branch> --tag review
   review:
     when: 'tag_exist("review")'
-    sources: ~/Developer/sources/path(-2)/path(-1)
-    worktrees: ~/Developer/worktree/code-review/path(-1)/norm_branch()
+    worktrees: ~/Developer/review/worktree/path(-1)/norm_branch()
+    # If used during clone, default source path is used
+```
 ```
 
 ```bash
 # Clone to temporary location
-gww clone https://github.com/user/repo.git --tag temp
+gwc https://github.com/user/repo.git -t temp
 # Output: ~/Downloads/temp/repo
 
 # Add worktree for code review
 cd ~/Developer/sources/github/user/repo
-gww add feature-branch --tag review
+gwa feature-branch --tag review
 # Output: ~/Developer/worktree/code-review/repo/feature-branch
 ```
 
@@ -213,16 +288,18 @@ gww add feature-branch --tag review
 
 | Command | Description |
 |---------|-------------|
-| `gww clone <uri> [--tag key=value]...` | 📥 Clone repository to configured location (tags available in templates/conditions) |
-| `gww add <branch> [-c] [--tag key=value]...` | ➕ Add worktree for branch (optionally create branch, tags available in templates/conditions) |
-| `gww remove <branch\|path> [-f]` | ➖ Remove worktree |
+| `gwc <uri> [--tag key=value]...` | 📥 Clone repository to configured location (tags available in templates/conditions) |
+| `gwa <branch> [-c] [--tag key=value]...` | ➕ Add worktree for branch (optionally create branch, tags available in templates/conditions) |
+| `gwr <branch\|path> [-f]` | ➖ Remove worktree |
 | `gww pull` | 🔄 Update source repository (works from worktrees if source is clean and on main/master) |
 | `gww migrate <path> [--dry-run] [--move]` | 🚚 Migrate repositories to new locations |
 | `gww init config` | ⚙️ Create default configuration file |
 | `gww init shell <shell>` | 🐚 Install shell completion (bash/zsh/fish) |
 
+**Note**: `gwc`, `gwa`, and `gwr` are convenient shell aliases for `gww clone`, `gww add`, and `gww remove` respectively. They provide the same functionality with automatic navigation prompts. Install them with `gww init shell <shell>`.
+
 **Common Options**:
-- `--tag`, `-t`: Tag in format `key=value` or just `key` (can be specified multiple times).
+- `--tag`, `-t`: Tag in the format `key=value` or just `key` (can be specified multiple times).
 
 ## 🔄 Update
 

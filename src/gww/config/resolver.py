@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from gww.config.validator import Config, SourceRule
 from gww.template.evaluator import TemplateError, evaluate_predicate, evaluate_template
@@ -31,7 +31,7 @@ def _expand_home(path: str) -> str:
     return path
 
 
-def _build_uri_context(uri: ParsedURI, tags: dict[str, str] = {}) -> dict[str, object]:
+def _build_uri_context(uri: ParsedURI, tags: dict[str, str] = {}) -> dict[str, Any]:
     """Build evaluation context for URI predicates.
 
     Uses the unified FunctionRegistry to provide shared functions:

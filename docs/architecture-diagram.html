@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GWW Architecture Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .mermaid {
+            background: white;
+            padding: 20px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Git Worktree Wrapper (GWW) - High-Level Architecture</h1>
+        <p class="subtitle">Component relationships and data flow</p>
+        <div class="mermaid">
+graph TB
+    subgraph "User Interface Layer"
+        CLI[CLI Entry Point<br/>gww main.py]
+        Commands[Command Handlers<br/>clone, add, remove, pull, migrate, init]
+    end
+
+    subgraph "Core Services Layer"
+        ConfigMgr[Config Manager<br/>loader, validator, resolver]
+        TemplateEngine[Template Engine<br/>evaluator, functions]
+        GitOps[Git Operations<br/>repository, worktree, branch]
+        ActionSys[Action System<br/>matcher, executor]
+    end
+
+    subgraph "Utilities Layer"
+        Utils[Utilities<br/>shell, URI parsing, XDG paths]
+    end
+
+    subgraph "External Dependencies"
+        Git[Git CLI]
+        ConfigFile[YAML Config File<br/>~/.config/gww/config.yml]
+        FileSystem[File System]
+    end
+
+    CLI --> Commands
+    Commands --> ConfigMgr
+    Commands --> GitOps
+    Commands --> ActionSys
+    
+    ConfigMgr --> TemplateEngine
+    ConfigMgr --> ConfigFile
+    ConfigMgr --> Utils
+    
+    TemplateEngine --> Utils
+    
+    GitOps --> Git
+    GitOps --> FileSystem
+    GitOps --> Utils
+    
+    ActionSys --> TemplateEngine
+    ActionSys --> FileSystem
+    ActionSys --> Utils
+    
+    Commands --> TemplateEngine
+
+    style CLI fill:#e1f5ff
+    style Commands fill:#e1f5ff
+    style ConfigMgr fill:#fff4e1
+    style TemplateEngine fill:#fff4e1
+    style GitOps fill:#fff4e1
+    style ActionSys fill:#fff4e1
+    style Utils fill:#e8f5e9
+    style Git fill:#fce4ec
+    style ConfigFile fill:#fce4ec
+    style FileSystem fill:#fce4ec
+        </div>
+    </div>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>
