@@ -6,9 +6,10 @@ import argparse
 import os
 import shutil
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from gww.config.loader import ConfigLoadError, ConfigNotFoundError, load_config
 from gww.config.resolver import ResolverError, resolve_source_path, resolve_worktree_path
@@ -37,11 +38,17 @@ class MigrationPlan:
     source_path: Optional[Path] = None  # main repo path (for worktrees only)
 
 
-def _find_git_repositories(directory: Path) -> list[Path]:
+def _find_git_repositories(
+    directory: Path,
+    *,
+    progress_callback: Optional[Callable[[Path], None]] = None,
+) -> list[Path]:
     """Find all git repositories in a directory tree.
 
     Args:
         directory: Directory to scan.
+        progress_callback: Optional callback invoked with current directory path
+            at the start of each os.walk iteration.
 
     Returns:
         List of paths to git repository roots.
@@ -50,6 +57,8 @@ def _find_git_repositories(directory: Path) -> list[Path]:
 
     for root, dirs, files in os.walk(directory):
         root_path = Path(root)
+        if progress_callback is not None:
+            progress_callback(root_path)
 
         # Check if this is a git repository (skip submodules - they move with parent)
         if (root_path / ".git").exists() and not is_submodule(root_path):
@@ -62,11 +71,15 @@ def _find_git_repositories(directory: Path) -> list[Path]:
 
 def _collect_all_repos(
     input_paths: list[Path],
+    *,
+    progress_callback: Optional[Callable[[Path], None]] = None,
 ) -> tuple[list[Path], list[Path]]:
     """Collect and merge repo roots from multiple input directories.
 
     Args:
         input_paths: List of directories to scan.
+        progress_callback: Optional callback invoked with current directory path
+            during the scan (passed to _find_git_repositories).
 
     Returns:
         Tuple of (deduplicated repo paths, input roots for cleanup).
@@ -74,7 +87,9 @@ def _collect_all_repos(
     seen: set[Path] = set()
     repos: list[Path] = []
     for directory in input_paths:
-        for repo_path in _find_git_repositories(directory):
+        for repo_path in _find_git_repositories(
+            directory, progress_callback=progress_callback
+        ):
             resolved = repo_path.resolve()
             if resolved not in seen:
                 seen.add(resolved)
@@ -447,7 +462,23 @@ def run_migrate(args: argparse.Namespace) -> int:
         print(f"Config validation error: {e}", file=sys.stderr)
         return 2
 
-    repos, input_roots = _collect_all_repos(input_paths)
+    progress_callback: Optional[Callable[[Path], None]] = None
+    if not quiet:
+        last_progress_time: list[float] = [0.0]
+
+        def _progress_cb(path: Path) -> None:
+            now = time.time()
+            if now - last_progress_time[0] >= 1.0:
+                print(f"\rExamining: {path}   ", end="", file=sys.stderr, flush=True)
+                last_progress_time[0] = now
+
+        progress_callback = _progress_cb
+
+    repos, input_roots = _collect_all_repos(
+        input_paths, progress_callback=progress_callback
+    )
+    if not quiet:
+        print("\n", file=sys.stderr, end="")
     if verbose > 0 and not quiet:
         print(f"Scanning {len(input_paths)} path(s) for repositories...", file=sys.stderr)
 
