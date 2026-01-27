@@ -468,8 +468,9 @@ def run_migrate(args: argparse.Namespace) -> int:
 
         def _progress_cb(path: Path) -> None:
             now = time.time()
-            if now - last_progress_time[0] >= 1.0:
-                print(f"\rExamining: {path}   ", end="", file=sys.stderr, flush=True)
+            if now - last_progress_time[0] >= 1.0 / 3.0:
+                # \r = carriage return (same line), \033[K = erase to end of line
+                print(f"\r\033[KExamining: {path}", end="", file=sys.stderr, flush=True)
                 last_progress_time[0] = now
 
         progress_callback = _progress_cb
@@ -478,7 +479,7 @@ def run_migrate(args: argparse.Namespace) -> int:
         input_paths, progress_callback=progress_callback
     )
     if not quiet:
-        print("\n", file=sys.stderr, end="")
+        print("\r\033[K\n", file=sys.stderr, end="")
     if verbose > 0 and not quiet:
         print(f"Scanning {len(input_paths)} path(s) for repositories...", file=sys.stderr)
 
