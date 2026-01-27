@@ -43,7 +43,10 @@ def _find_git_repositories(
     *,
     progress_callback: Optional[Callable[[Path], None]] = None,
 ) -> list[Path]:
-    """Find all git repositories in a directory tree.
+    """Find all git repositories and worktrees in a directory tree.
+
+    Repository and worktree interiors are not traversed; each repo or worktree
+    is treated as a single unit (no descent into subdirectories).
 
     Args:
         directory: Directory to scan.
@@ -60,11 +63,11 @@ def _find_git_repositories(
         if progress_callback is not None:
             progress_callback(root_path)
 
-        # Check if this is a git repository (skip submodules - they move with parent)
+        # Check if this is a git repository or worktree (skip submodules - they move with parent)
         if (root_path / ".git").exists() and not is_submodule(root_path):
             repos.append(root_path)
-            # Don't descend into the .git directory
-            dirs[:] = [d for d in dirs if d != ".git"]
+            # Do not descend into the repository or worktree (treat as single unit)
+            dirs.clear()
 
     return repos
 
@@ -469,8 +472,24 @@ def run_migrate(args: argparse.Namespace) -> int:
         def _progress_cb(path: Path) -> None:
             now = time.time()
             if now - last_progress_time[0] >= 1.0 / 3.0:
+                path_str = str(path)
+                prefix = "Examining: "
+                try:
+                    max_width = shutil.get_terminal_size(fallback=(80, 24)).columns
+                except Exception:
+                    max_width = 80
+                msg = prefix + path_str
+                if len(msg) > max_width:
+                    available = max_width - len(prefix) - 3
+                    if available > 0:
+                        end_len = (available - 3) // 2
+                        start_len = (available - 3) - end_len
+                        path_display = path_str[:start_len] + "..." + path_str[-end_len:]
+                    else:
+                        path_display = "..."
+                    msg = prefix + path_display
                 # \r = carriage return (same line), \033[K = erase to end of line
-                print(f"\r\033[KExamining: {path}", end="", file=sys.stderr, flush=True)
+                print(f"\r\033[K{msg}", end="", file=sys.stderr, flush=True)
                 last_progress_time[0] = now
 
         progress_callback = _progress_cb
