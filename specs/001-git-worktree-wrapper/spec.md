@@ -146,30 +146,34 @@ Users can migrate existing repositories from old locations to new locations base
 **Acceptance Criteria**:
 - Command: `gww migrate <old_repos> [--dry-run] [--move]`
 - Verify `old_repos` path exists and is a directory
-- Recursively scan directory tree for git repositories
+- Recursively scan directory tree for git repositories (exclude git submodules; only top-level repos and worktrees are considered)
 - For each repository found:
   - Extract URI from remote origin (if available)
   - Calculate expected location using current config
   - Compare current location with expected location
+  - If same: Output "Already at target: \<path\>" and include in summary count
   - If different:
-    - If `--dry-run`: Print migration plan
+    - Output path (e.g. old_path -> new_path) immediately when processing that repository, before copy/move
+    - If `--dry-run`: Output each path immediately; at the end print "Would migrate N repositories" (and "Would skip N repositories" if any)
     - Else: Copy or move repository to expected location
     - If repository is a worktree: After moving/copying, call `git worktree repair` on the source repository to update worktree paths
     - If repository is a source repository: No repair needed (worktrees are not migrated with source)
-- Report summary: repositories scanned, migrated, skipped
+- Report summary: repositories migrated, repaired, skipped, already at target
 - Handle errors: invalid path, migration failed (exit code 1)
 - Handle configuration errors (exit code 2)
 
 **Examples**:
 ```bash
 gww migrate ~/old-repos --dry-run
-# Output:
-# Would migrate 5 repositories:
+# Output (each path first, then summary at end):
 #   ~/old-repos/repo1 -> ~/Developer/sources/github/user/repo1
 #   ...
+# Would migrate 5 repositories
 
 gww migrate ~/old-repos --move
-# Output:
+# Output (each path as processed, then summary):
+#   ~/old-repos/repo1 -> ~/Developer/sources/github/user/repo1
+#   ...
 # Moved 5 repositories
 # Repaired 2 worktrees
 ```

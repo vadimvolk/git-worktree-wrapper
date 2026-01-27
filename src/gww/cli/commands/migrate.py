@@ -17,7 +17,7 @@ from gww.git.repository import (
     GitCommandError,
     get_remote_uri,
     get_source_repository,
-    is_git_repository,
+    is_submodule,
     is_worktree,
 )
 from gww.git.worktree import repair_worktrees
@@ -48,8 +48,8 @@ def _find_git_repositories(directory: Path) -> list[Path]:
     for root, dirs, files in os.walk(directory):
         root_path = Path(root)
 
-        # Check if this is a git repository
-        if (root_path / ".git").exists():
+        # Check if this is a git repository (skip submodules - they move with parent)
+        if (root_path / ".git").exists() and not is_submodule(root_path):
             repos.append(root_path)
             # Don't descend into the .git directory
             dirs[:] = [d for d in dirs if d != ".git"]
@@ -61,7 +61,7 @@ def _plan_migration(
     old_repos: Path,
     config: "Config",  # type: ignore[name-defined]
     verbose: int = 0,
-) -> list[MigrationPlan]:
+) -> tuple[list[MigrationPlan], list[Path]]:
     """Plan migrations for all repositories in a directory.
 
     Args:
@@ -70,9 +70,10 @@ def _plan_migration(
         verbose: Verbosity level.
 
     Returns:
-        List of migration plans.
+        Tuple of (migration plans, paths already at target).
     """
     plans: list[MigrationPlan] = []
+    already_at_target: list[Path] = []
     repos = _find_git_repositories(old_repos)
 
     for repo_path in repos:
@@ -104,8 +105,7 @@ def _plan_migration(
 
         # Check if migration needed
         if repo_path.resolve() == expected_path.resolve():
-            if verbose > 1:
-                print(f"Skipping {repo_path}: Already at correct location", file=sys.stderr)
+            already_at_target.append(repo_path)
             continue
 
         # Check if destination exists
@@ -122,7 +122,7 @@ def _plan_migration(
             )
         )
 
-    return plans
+    return plans, already_at_target
 
 
 def run_migrate(args: argparse.Namespace) -> int:
@@ -172,9 +172,9 @@ def run_migrate(args: argparse.Namespace) -> int:
     if verbose > 0 and not quiet:
         print(f"Scanning {old_repos} for repositories...", file=sys.stderr)
 
-    plans = _plan_migration(old_repos, config, verbose)
+    plans, already_at_target = _plan_migration(old_repos, config, verbose)
 
-    if not plans:
+    if not plans and not already_at_target:
         if not quiet:
             print("No repositories to migrate.")
         return 0
@@ -183,17 +183,22 @@ def run_migrate(args: argparse.Namespace) -> int:
     valid_plans = [p for p in plans if not p.reason]
     skipped_plans = [p for p in plans if p.reason]
 
+    # Output "already at target" paths when not quiet
+    if already_at_target and not quiet:
+        for path in already_at_target:
+            print(f"Already at target: {path}")
+
     if dry_run:
-        # Show migration plan
-        print(f"Would migrate {len(valid_plans)} repositories:")
-        for plan in valid_plans:
-            print(f"  {plan.old_path} -> {plan.new_path}")
-
-        if skipped_plans:
-            print(f"\nWould skip {len(skipped_plans)} repositories:")
+        # Output each path immediately, then summary at the end
+        if not quiet:
+            for plan in valid_plans:
+                print(f"{plan.old_path} -> {plan.new_path}")
             for plan in skipped_plans:
-                print(f"  {plan.old_path}: {plan.reason}")
-
+                print(f"{plan.old_path}: {plan.reason}")
+        if not quiet:
+            print(f"Would migrate {len(valid_plans)} repositories")
+            if skipped_plans:
+                print(f"Would skip {len(skipped_plans)} repositories")
         return 0
 
     # Execute migrations
@@ -203,6 +208,8 @@ def run_migrate(args: argparse.Namespace) -> int:
 
     for plan in valid_plans:
         try:
+            if not quiet:
+                print(f"{plan.old_path} -> {plan.new_path}")
             # Ensure parent directory exists
             plan.new_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -254,6 +261,8 @@ def run_migrate(args: argparse.Namespace) -> int:
             print(f"Repaired {repaired} worktrees")
         if skipped_plans:
             print(f"Skipped {len(skipped_plans)} repositories")
+        if already_at_target:
+            print(f"Already at target: {len(already_at_target)} repositories")
         if failed:
             print(f"Failed {failed} repositories")
 

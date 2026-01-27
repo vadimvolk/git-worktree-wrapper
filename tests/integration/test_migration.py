@@ -170,6 +170,68 @@ def repo_with_worktree(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, 
     return worktrees_dir, source_repo, worktree_path
 
 
+@pytest.fixture
+def repo_with_submodule(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> tuple[Path, Path, Path]:
+    """Create a directory with a main repo that has a git submodule.
+
+    Returns:
+        Tuple of (old_repos_dir, main_repo_path, submodule_path)
+    """
+    old_dir = tmp_path_factory.mktemp("old_repos_with_submodule")
+    main_repo = old_dir / "main_repo"
+    main_repo.mkdir()
+    subprocess.run(["git", "init"], cwd=main_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=main_repo,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=main_repo,
+        check=True,
+        capture_output=True,
+    )
+    (main_repo / "README.md").write_text("# Main")
+    subprocess.run(["git", "add", "."], cwd=main_repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=main_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/user/main-repo.git"],
+        cwd=main_repo,
+        check=True,
+        capture_output=True,
+    )
+    # Create second repo to add as submodule
+    sub_repo = tmp_path_factory.mktemp("sub_repo")
+    subprocess.run(["git", "init"], cwd=sub_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=sub_repo,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=sub_repo,
+        check=True,
+        capture_output=True,
+    )
+    (sub_repo / "file.txt").write_text("sub content")
+    subprocess.run(["git", "add", "."], cwd=sub_repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Sub"], cwd=sub_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(sub_repo), "submod"],
+        cwd=main_repo,
+        check=True,
+        capture_output=True,
+    )
+    submodule_path = main_repo / "submod"
+    return old_dir, main_repo, submodule_path
+
+
 class TestMigrateCommand:
     """Integration tests for migrate command (T056)."""
 
@@ -390,6 +452,63 @@ default_worktrees: {target_dir}/worktrees
         captured = capsys.readouterr()
         assert "No repositories to migrate" in captured.out
 
+    def test_migrate_outputs_already_at_target(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that migrate outputs specific message when repo is already at target."""
+        # Place a repo at the exact path that config would resolve to
+        expected_base = target_dir / "github" / "user"
+        expected_base.mkdir(parents=True, exist_ok=True)
+        repo_at_target = expected_base / "project1"
+        repo_at_target.mkdir()
+        subprocess.run(["git", "init"], cwd=repo_at_target, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo_at_target,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=repo_at_target,
+            check=True,
+            capture_output=True,
+        )
+        (repo_at_target / "README.md").write_text("# Here")
+        subprocess.run(["git", "add", "."], cwd=repo_at_target, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial"], cwd=repo_at_target, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/user/project1.git"],
+            cwd=repo_at_target,
+            check=True,
+            capture_output=True,
+        )
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/github/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+""")
+
+        class Args:
+            old_repos = str(target_dir)
+            dry_run = False
+            move = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Already at target:" in captured.out
+        assert "project1" in captured.out or str(repo_at_target) in captured.out
+        assert "Already at target: 1 repositories" in captured.out
+
     def test_migrate_verbose_output(
         self,
         old_repos_dir: Path,
@@ -542,3 +661,71 @@ sources:
         assert "Repairing worktree paths" not in captured.err
         # Output should NOT mention "Repaired" since no worktrees were involved
         assert "Repaired" not in captured.out
+
+    def test_migrate_dry_run_skips_submodules(
+        self,
+        repo_with_submodule: tuple[Path, Path, Path],
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that migrate dry-run only plans the main repo, not the submodule as separate repo."""
+        old_dir, main_repo, submodule_path = repo_with_submodule
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/github/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+""")
+
+        class Args:
+            old_repos = str(old_dir)
+            dry_run = True
+            move = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        captured = capsys.readouterr()
+        # Should plan to migrate main_repo only (one repo)
+        assert "Would migrate" in captured.out
+        assert "1 repositories" in captured.out
+        # Submodule path must not appear as a separate migration target
+        assert str(submodule_path) not in captured.out or "main_repo" in captured.out
+
+    def test_migrate_with_submodule_copies_parent_and_keeps_submodule(
+        self,
+        repo_with_submodule: tuple[Path, Path, Path],
+        config_dir: Path,
+        target_dir: Path,
+    ) -> None:
+        """Test that migrating a repo with submodule copies parent; submodule stays inside."""
+        old_dir, main_repo, submodule_path = repo_with_submodule
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/github/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+""")
+
+        class Args:
+            old_repos = str(old_dir)
+            dry_run = False
+            move = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        # URI path segment is "main-repo" (from main-repo.git)
+        migrated_main = target_dir / "github" / "user" / "main-repo"
+        assert migrated_main.exists()
+        assert (migrated_main / ".gitmodules").exists()
+        migrated_submod = migrated_main / "submod"
+        assert migrated_submod.exists()
+        assert (migrated_submod / "file.txt").exists()
+        # Submodule .git should be file pointing to parent's .git/modules
+        assert (migrated_submod / ".git").is_file()

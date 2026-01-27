@@ -233,19 +233,21 @@ gww pull
 
 **Behavior**:
 1. Verify `old_repos` path exists and is a directory
-2. Recursively scan directory tree for git repositories (directories containing `.git`)
+2. Recursively scan directory tree for git repositories (directories containing `.git`). Git submodules are excluded (only top-level repos and worktrees are considered for migration).
 3. For each repository found:
    - Extract URI from remote origin (if available)
    - Calculate expected location using current config
    - Compare current location with expected location
+   - If same: Output "Already at target: \<path\>" (when not quiet) and include in summary count
    - If different:
-     - If `--dry-run`: Print migration plan
+     - Output path (e.g. `old_path -> new_path`) immediately when processing that repository, before copy/move
+     - If `--dry-run`: Output each path immediately; at the end print "Would migrate N repositories" (and "Would skip N repositories" if any skipped)
      - Else: Copy or move repository to expected location
      - If the repository being migrated is a worktree:
        - After moving/copying, call `git worktree repair` on the source repository to update the worktree path
        - Handle repair errors gracefully (log warning, don't fail migration)
      - If the repository is a source repository: No repair action needed
-4. Report summary: repositories scanned, migrated, repaired, skipped
+4. Report summary: repositories migrated, repaired, skipped, already at target
 
 **Exit Codes**:
 - `0`: Success
@@ -259,13 +261,15 @@ gww pull
 **Examples**:
 ```bash
 gww migrate ~/old-repos --dry-run
-# Output:
-# Would migrate 5 repositories:
+# Output (each path first, then summary at end):
 #   ~/old-repos/repo1 -> ~/Developer/sources/github/user/repo1
 #   ...
+# Would migrate 5 repositories
 
 gww migrate ~/old-repos --move
-# Output:
+# Output (each path as processed, then summary):
+#   ~/old-repos/repo1 -> ~/Developer/sources/github/user/repo1
+#   ...
 # Moved 5 repositories
 # Repaired 2 worktrees
 ```
