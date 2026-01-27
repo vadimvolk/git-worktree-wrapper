@@ -163,7 +163,7 @@ GWW is a CLI tool (`gww`) that wraps git worktree functionality with:
 - `gww add <branch> [-c] [--tag key=value]...` - Add worktree
 - `gww remove <branch|path> [-f]` - Remove worktree
 - `gww pull` - Update source repository
-- `gww migrate <path> [--dry-run] [--move]` - Migrate repositories
+- `gww migrate <path>... [--dry-run] [--copy | --inplace]` - Migrate repositories
 - `gww init config` - Create default config
 - `gww init shell <shell>` - Install shell completion
 

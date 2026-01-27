@@ -220,34 +220,33 @@ gww pull
 
 ---
 
-### 5. `gww migrate <old_repos> [--dry-run] [--move]`
+### 5. `gww migrate <path>... [--dry-run] [--copy | --inplace]`
 
-**Purpose**: Scan old repositories directory and migrate them to new locations based on current configuration.
+**Purpose**: Scan one or more directories for git repositories and migrate them to new locations based on current configuration.
 
 **Arguments**:
-- `old_repos` (str, required): Path to directory containing old repositories
+- `path` (one or more, required): Path(s) to directory(ies) containing old repositories. Multiple paths are processed as a single combined set (repos from all paths are merged and deduplicated).
 
 **Options**:
 - `--dry-run`, `-n`: Show what would be migrated without making changes
-- `--move`: Move repositories instead of copying (default is copy)
+- `--copy` (default): Copy repositories to new locations. List sources and worktrees, validate destinations, copy sources then worktrees, run `git worktree repair` to recover relations, then report summary. No folder cleanup.
+- `--inplace`: Move repositories in place. First pass: move worktrees and run `git worktree repair` in each source. Second pass: move sources and run `git worktree repair` in each moved source (for sources that had worktrees). Then recursively clean empty source folders (remove vacated dirs and empty parents up to input roots). Dry-run outputs destination path when changed or "Already at target: \<path\>" when not.
 
 **Behavior**:
-1. Verify `old_repos` path exists and is a directory
-2. Recursively scan directory tree for git repositories (directories containing `.git`). Git submodules are excluded (only top-level repos and worktrees are considered for migration).
-3. For each repository found:
-   - Extract URI from remote origin (if available)
-   - Calculate expected location using current config
-   - Compare current location with expected location
-   - If same: Output "Already at target: \<path\>" (when not quiet) and include in summary count
-   - If different:
-     - Output path (e.g. `old_path -> new_path`) immediately when processing that repository, before copy/move
-     - If `--dry-run`: Output each path immediately; at the end print "Would migrate N repositories" (and "Would skip N repositories" if any skipped)
-     - Else: Copy or move repository to expected location
-     - If the repository being migrated is a worktree:
-       - After moving/copying, call `git worktree repair` on the source repository to update the worktree path
-       - Handle repair errors gracefully (log warning, don't fail migration)
-     - If the repository is a source repository: No repair action needed
-4. Report summary: repositories migrated, repaired, skipped, already at target
+1. Verify each `path` exists and is a directory
+2. Recursively scan each directory for git repositories (directories containing `.git`; submodules excluded). Merge and deduplicate repo lists by resolved path.
+3. Classify each repo as **source** or **worktree**. Expected path: sources use `resolve_source_path`; worktrees use `resolve_worktree_path` (branch from current branch; detached HEAD worktrees are skipped).
+4. **If `--inplace`**:
+   - First pass: for each worktree whose path differs, move to new path and run `git worktree repair` in its source (at current path).
+   - Second pass: for each source whose path differs, move to new path and run `git worktree repair` in the moved source (only for sources that had worktrees moved in pass 1).
+   - Then (if not dry-run): recursively remove vacated directories and empty parents up to input roots.
+   - Dry-run: output destination path per item when changed, or "Already at target: \<path\>" when same.
+5. **If `--copy`** (default):
+   - Output each found source and worktree (e.g. "Source: \<path\> -> \<path\>", "Worktree: ...").
+   - Validate that each destination does not exist (plans with "destination exists" are skipped; rest are migrated).
+   - If not dry-run: copy sources, then copy worktrees; fix copied worktrees' `.git` to point to new source and run `git worktree repair`; report summary (N repositories, M worktrees, skipped, already at target). No folder cleanup.
+   - Dry-run: list and validate only; output "Would migrate N repositories".
+6. Report summary: repositories migrated/moved, repaired, skipped, already at target
 
 **Exit Codes**:
 - `0`: Success
@@ -261,17 +260,18 @@ gww pull
 **Examples**:
 ```bash
 gww migrate ~/old-repos --dry-run
-# Output (each path first, then summary at end):
+# Output (each path, then summary):
 #   ~/old-repos/repo1 -> ~/Developer/sources/github/user/repo1
 #   ...
 # Would migrate 5 repositories
 
-gww migrate ~/old-repos --move
-# Output (each path as processed, then summary):
-#   ~/old-repos/repo1 -> ~/Developer/sources/github/user/repo1
-#   ...
-# Moved 5 repositories
-# Repaired 2 worktrees
+gww migrate ~/old-repos
+# Copy (default): list, copy sources then worktrees, repair, summary
+
+gww migrate ~/old-repos --inplace
+# Move worktrees then sources, repair, clean empty folders
+# Moved N repositories
+# Already at target: M repositories
 ```
 
 ---

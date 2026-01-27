@@ -261,7 +261,7 @@ sources:
         class Args:
             old_repos = str(old_repos_dir)
             dry_run = True
-            move = False
+            inplace = False
             verbose = 0
             quiet = False
 
@@ -299,7 +299,7 @@ sources:
         class Args:
             old_repos = str(old_repos_dir)
             dry_run = False
-            move = False
+            inplace = False
             verbose = 0
             quiet = False
 
@@ -319,7 +319,7 @@ sources:
         config_dir: Path,
         target_dir: Path,
     ) -> None:
-        """Test that migrate with --move moves repositories."""
+        """Test that migrate with --inplace moves repositories."""
         config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
@@ -338,7 +338,7 @@ sources:
         class Args:
             old_repos = str(old_repos_dir)
             dry_run = False
-            move = True
+            inplace = True
             verbose = 0
             quiet = False
 
@@ -370,7 +370,7 @@ default_worktrees: {target_dir}/worktrees
         class Args:
             old_repos = str(old_repos_dir)
             dry_run = False
-            move = False
+            inplace = False
             verbose = 1  # Verbose to see skip messages
             quiet = False
 
@@ -397,7 +397,7 @@ default_worktrees: {target_dir}/worktrees
         class Args:
             old_repos = "/nonexistent/path"
             dry_run = False
-            move = False
+            inplace = False
             verbose = 0
             quiet = False
 
@@ -416,7 +416,7 @@ default_worktrees: {target_dir}/worktrees
         class Args:
             old_repos = str(old_repos_dir)
             dry_run = False
-            move = False
+            inplace = False
             verbose = 0
             quiet = False
 
@@ -442,7 +442,7 @@ default_worktrees: {target_dir}/worktrees
         class Args:
             old_repos = str(tmp_path)
             dry_run = False
-            move = False
+            inplace = False
             verbose = 0
             quiet = False
 
@@ -497,7 +497,7 @@ default_worktrees: {target_dir}/worktrees
         class Args:
             old_repos = str(target_dir)
             dry_run = False
-            move = False
+            inplace = False
             verbose = 0
             quiet = False
 
@@ -532,7 +532,7 @@ sources:
         class Args:
             old_repos = str(old_repos_dir)
             dry_run = False
-            move = False
+            inplace = False
             verbose = 1
             quiet = False
 
@@ -557,12 +557,18 @@ sources:
         config_path.write_text(f"""
 default_sources: {target_dir}/github/path(-2)/path(-1)
 default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+    worktrees: {target_dir}/github/path(-2)/path(-1)
 """)
 
         class Args:
             old_repos = str(worktrees_dir)
             dry_run = False
-            move = True
+            inplace = True
             verbose = 1
             quiet = False
 
@@ -599,12 +605,18 @@ default_worktrees: {target_dir}/worktrees
         config_path.write_text(f"""
 default_sources: {target_dir}/github/path(-2)/path(-1)
 default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+    worktrees: {target_dir}/github/path(-2)/path(-1)
 """)
 
         class Args:
             old_repos = str(worktrees_dir)
             dry_run = False
-            move = False  # Copy, not move
+            inplace = False  # Copy (default)
             verbose = 1
             quiet = False
 
@@ -615,7 +627,7 @@ default_worktrees: {target_dir}/worktrees
 
         # Verify original worktree still exists (copy, not move)
         assert worktree_path.exists()
-        # Verify copy was created
+        # Verify copy was created (worktree path from rule)
         new_worktree_path = target_dir / "github" / "user" / "feature-worktree"
         assert new_worktree_path.exists()
 
@@ -645,7 +657,7 @@ sources:
         class Args:
             old_repos = str(old_repos_dir)
             dry_run = False
-            move = True
+            inplace = True
             verbose = 1
             quiet = False
 
@@ -681,7 +693,7 @@ default_worktrees: {target_dir}/worktrees
         class Args:
             old_repos = str(old_dir)
             dry_run = True
-            move = False
+            inplace = False
             verbose = 0
             quiet = False
 
@@ -713,7 +725,7 @@ default_worktrees: {target_dir}/worktrees
         class Args:
             old_repos = str(old_dir)
             dry_run = False
-            move = False
+            inplace = False
             verbose = 0
             quiet = False
 
@@ -729,3 +741,144 @@ default_worktrees: {target_dir}/worktrees
         assert (migrated_submod / "file.txt").exists()
         # Submodule .git should be file pointing to parent's .git/modules
         assert (migrated_submod / ".git").is_file()
+
+    def test_migrate_multiple_input_folders(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+        tmp_path_factory: pytest.TempPathFactory,
+    ) -> None:
+        """Test that migrate with multiple paths merges repos and processes as one set."""
+        # Second folder with one repo
+        other_dir = tmp_path_factory.mktemp("old_repos_other")
+        repo3 = other_dir / "project3"
+        repo3.mkdir()
+        subprocess.run(["git", "init"], cwd=repo3, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo3,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=repo3,
+            check=True,
+            capture_output=True,
+        )
+        (repo3 / "README.md").write_text("# Project 3")
+        subprocess.run(["git", "add", "."], cwd=repo3, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial"], cwd=repo3, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/user/project3.git"],
+            cwd=repo3,
+            check=True,
+            capture_output=True,
+        )
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+  gitlab:
+    when: '"gitlab" in host()'
+    sources: {target_dir}/gitlab/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = [str(old_repos_dir), str(other_dir)]
+            dry_run = False
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        assert (target_dir / "github" / "user" / "project1").exists()
+        assert (target_dir / "gitlab" / "group" / "project2").exists()
+        assert (target_dir / "github" / "user" / "project3").exists()
+
+    def test_migrate_inplace_cleans_empty_folders(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+    ) -> None:
+        """Test that --inplace removes vacated dirs and empty parents recursively."""
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+  gitlab:
+    when: '"gitlab" in host()'
+    sources: {target_dir}/gitlab/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = str(old_repos_dir)
+            dry_run = False
+            inplace = True
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        assert not (old_repos_dir / "project1").exists()
+        assert not (old_repos_dir / "project2").exists()
+        assert (target_dir / "github" / "user" / "project1").exists()
+        assert (target_dir / "gitlab" / "group" / "project2").exists()
+
+    def test_migrate_copy_validation_destination_exists(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that copy mode reports all validation errors (e.g. destination exists)."""
+        # Pre-create one destination so validation fails
+        dest = target_dir / "github" / "user" / "project1"
+        dest.mkdir(parents=True, exist_ok=True)
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+  gitlab:
+    when: '"gitlab" in host()'
+    sources: {target_dir}/gitlab/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = str(old_repos_dir)
+            dry_run = False
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+        captured = capsys.readouterr()
+        # When destination exists we skip that plan; output mentions skip or destination
+        assert "destination exists" in captured.out or "Skipped" in captured.out
+        # project2 (no conflict) should still be migrated
+        assert (target_dir / "gitlab" / "group" / "project2").exists()
+        assert result == 0

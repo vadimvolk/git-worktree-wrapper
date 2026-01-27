@@ -156,7 +156,7 @@ gww remove <branch|worktree folder> [--force] - remove worktree folder by branch
 
 gww pull - check that sources has main / master branch checkout, it's clean and if it is execute git pull. Can be executed from source or worktree folder. If executed from inside worktree folder will update source folder
 
-gww migrate <old-repos> [--dry-run] [--move] - scan old-repos folder, check it against current config and if location is incorrent copy (default) or move (if --move specified) to new position
+gww migrate <path>... [--dry-run] [--copy | --inplace] - scan path(s) for repos, merge and dedupe; copy (default) or inplace move (worktrees then sources, repair, clean empty folders) to new positions
 
 gww init config - create default settings file, gww.yml in $XDG_CONFIG_HOME compliant location. Came up with simple config with default_sources and default_worktrees filled and large comment block with examples covering other cases and function with documentation. 
 
