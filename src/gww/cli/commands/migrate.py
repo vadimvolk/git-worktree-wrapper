@@ -336,7 +336,7 @@ def _run_copy(
             if not quiet:
                 print(f"Copying repository {plan.old_path} -> {plan.new_path}")
             plan.new_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(str(plan.old_path), str(plan.new_path))
+            shutil.copytree(str(plan.old_path), str(plan.new_path), symlinks=True)
             migrated_sources += 1
         except OSError as e:
             print(f"Error migrating {plan.old_path}: {e}", file=sys.stderr)
@@ -347,7 +347,7 @@ def _run_copy(
             if not quiet:
                 print(f"Copying worktree {plan.old_path} -> {plan.new_path}")
             plan.new_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(str(plan.old_path), str(plan.new_path))
+            shutil.copytree(str(plan.old_path), str(plan.new_path), symlinks=True)
             migrated_worktrees += 1
             # Recover relation: point copied worktree's .git to new source (if any) and repair
             if plan.source_path is not None:

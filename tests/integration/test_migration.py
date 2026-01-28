@@ -313,6 +313,68 @@ sources:
         assert (target_dir / "github" / "user" / "project1").exists()
         assert (target_dir / "gitlab" / "group" / "project2").exists()
 
+    def test_migrate_copy_preserves_symlinks(
+        self,
+        tmp_path_factory: pytest.TempPathFactory,
+        config_dir: Path,
+        target_dir: Path,
+    ) -> None:
+        """Test that migrate --copy copies symbolic links as symlinks, not resolved."""
+        old_dir = tmp_path_factory.mktemp("old_repos_symlink")
+        repo = old_dir / "symlink_repo"
+        repo.mkdir()
+        subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+        (repo / "README.md").write_text("# Repo with symlink")
+        (repo / "mylink").symlink_to("README.md")
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/user/symlink_repo.git"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = str(old_dir)
+            dry_run = False
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        migrated = target_dir / "github" / "user" / "symlink_repo"
+        assert migrated.exists()
+        mylink = migrated / "mylink"
+        assert mylink.is_symlink(), "Symlink should be copied as symlink, not resolved"
+        assert Path(mylink.readlink()) == Path("README.md")
+
     def test_migrate_moves_repositories(
         self,
         old_repos_dir: Path,

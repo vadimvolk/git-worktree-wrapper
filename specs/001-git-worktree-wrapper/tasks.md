@@ -184,6 +184,7 @@
 - [X] T060 [US5] Add error handling for invalid paths, migration failures, and worktree updates in src/gww/cli/commands/migrate.py
 - [X] T061 [US5] Add output formatting (print migration summary to stdout, errors to stderr) in src/gww/cli/commands/migrate.py
 - [X] [US5] Migrate refactor: immediate path output when processing each repo; "Already at target: \<path\>" when source equals destination; submodules excluded from scan; dry-run outputs paths first then "Would migrate N repositories" at end; unit test for is_submodule; integration tests for submodules
+- [X] [US5] Migrate copy: preserve symbolic links (copy as symlinks, do not resolve); integration test test_migrate_copy_preserves_symlinks
 
 **Checkpoint**: At this point, User Stories 1-5 should all work independently. Users can clone, add, remove worktrees, update sources, and migrate repositories.
 

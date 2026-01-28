@@ -353,7 +353,7 @@ gww migrate ~/old-repos --inplace
 **Test Case**:
 - **Given**: Old repositories
 - **When**: `gww migrate ~/old-repos`
-- **Then**: Repositories copied to new locations based on current config
+- **Then**: Repositories copied to new locations based on current config; symbolic links are copied as symlinks (not resolved)
 
 ## Template Function Examples
 

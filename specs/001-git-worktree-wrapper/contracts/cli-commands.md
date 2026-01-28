@@ -244,7 +244,7 @@ gww pull
 5. **If `--copy`** (default):
    - Output each found source and worktree (e.g. "Source: \<path\> -> \<path\>", "Worktree: ...").
    - Validate that each destination does not exist (plans with "destination exists" are skipped; rest are migrated).
-   - If not dry-run: copy sources, then copy worktrees; fix copied worktrees' `.git` to point to new source and run `git worktree repair`; report summary (N repositories, M worktrees, skipped, already at target). No folder cleanup.
+   - If not dry-run: copy sources, then copy worktrees (symbolic links are copied as symlinks, not resolved); fix copied worktrees' `.git` to point to new source and run `git worktree repair`; report summary (N repositories, M worktrees, skipped, already at target). No folder cleanup.
    - Dry-run: list and validate only; output "Would migrate N repositories".
 6. Report summary: repositories migrated/moved, repaired, skipped, already at target
 
