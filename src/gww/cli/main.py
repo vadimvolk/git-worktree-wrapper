@@ -127,17 +127,24 @@ def create_parser() -> argparse.ArgumentParser:
     )
     migrate_parser.add_argument(
         "old_repos",
-        help="Path to directory containing old repositories",
+        nargs="+",
+        help="Path(s) to directory(ies) containing old repositories",
     )
     migrate_parser.add_argument(
         "-n", "--dry-run",
         action="store_true",
         help="Show what would be migrated without making changes",
     )
-    migrate_parser.add_argument(
-        "--move",
+    migrate_group = migrate_parser.add_mutually_exclusive_group()
+    migrate_group.add_argument(
+        "--copy",
         action="store_true",
-        help="Move repositories instead of copying",
+        help="Copy repositories to new locations (default)",
+    )
+    migrate_group.add_argument(
+        "--inplace",
+        action="store_true",
+        help="Move repositories in place and clean empty source folders",
     )
 
     # init command (with subcommands)

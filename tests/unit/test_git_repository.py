@@ -12,6 +12,7 @@ from gww.git.repository import (
     is_git_repository,
     get_repository_root,
     is_worktree,
+    is_submodule,
     get_source_repository,
     get_remote_uri,
     get_current_branch,
@@ -136,6 +137,64 @@ class TestIsWorktree:
         """Test that is_worktree returns True for worktree."""
         _, worktree = git_repo_with_worktree
         assert is_worktree(worktree) is True
+
+
+class TestIsSubmodule:
+    """Tests for is_submodule function."""
+
+    def test_returns_false_for_main_repo(self, git_repo: Path) -> None:
+        """Test that is_submodule returns False for main repository."""
+        assert is_submodule(git_repo) is False
+
+    def test_returns_false_for_worktree(self, git_repo_with_worktree: tuple[Path, Path]) -> None:
+        """Test that is_submodule returns False for worktree (.git points to worktrees)."""
+        _, worktree = git_repo_with_worktree
+        assert is_submodule(worktree) is False
+
+    def test_returns_true_for_submodule(
+        self, git_repo: Path, tmp_path_factory: pytest.TempPathFactory
+    ) -> None:
+        """Test that is_submodule returns True for a git submodule."""
+        # Create a second repo to use as submodule
+        sub_repo = tmp_path_factory.mktemp("sub_repo")
+        subprocess.run(["git", "init"], cwd=sub_repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=sub_repo,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=sub_repo,
+            check=True,
+            capture_output=True,
+        )
+        (sub_repo / "file.txt").write_text("sub")
+        subprocess.run(["git", "add", "."], cwd=sub_repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial"],
+            cwd=sub_repo,
+            check=True,
+            capture_output=True,
+        )
+        # Add as submodule to main repo (allow file protocol for local path)
+        subprocess.run(
+            ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(sub_repo), "submod"],
+            cwd=git_repo,
+            check=True,
+            capture_output=True,
+        )
+        submodule_path = git_repo / "submod"
+        assert is_submodule(submodule_path) is True
+
+    def test_returns_false_for_nonexistent_path(self, tmp_path: Path) -> None:
+        """Test that is_submodule returns False for path without .git."""
+        assert is_submodule(tmp_path) is False
+
+    def test_returns_false_when_git_is_directory(self, git_repo: Path) -> None:
+        """Test that is_submodule returns False when .git is a directory (main repo)."""
+        assert is_submodule(git_repo) is False
 
 
 class TestGetSourceRepository:
