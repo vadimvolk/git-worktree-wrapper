@@ -144,6 +144,34 @@ def is_worktree(path: Path) -> bool:
     return git_path.is_file()
 
 
+def is_submodule(path: Path) -> bool:
+    """Check if a path is a git submodule (not a standalone repository).
+
+    A submodule has a .git file pointing to the parent's .git/modules/<name>/,
+    while a worktree has a .git file pointing to .git/worktrees/<name>/.
+
+    Args:
+        path: Path to repository root (directory containing .git).
+
+    Returns:
+        True if path is a submodule.
+    """
+    git_path = path / ".git"
+    if not git_path.is_file():
+        return False
+    try:
+        content = git_path.read_text().strip()
+    except OSError:
+        return False
+    if not content.startswith("gitdir:"):
+        return False
+    gitdir = content.split(":", 1)[1].strip()
+    resolved = (path / gitdir).resolve()
+    # Submodules point to parent's .git/modules/<name>; worktrees point to .git/worktrees/<name>
+    path_str = str(resolved).replace("\\", "/")
+    return ".git/modules" in path_str
+
+
 def get_source_repository(worktree_path: Path) -> Path:
     """Get the source (main) repository for a worktree.
 

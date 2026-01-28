@@ -309,7 +309,10 @@ def prune_worktrees(repo_path: Path, dry_run: bool = False) -> list[str]:
     return pruned
 
 
-def repair_worktrees(repo_path: Path) -> None:
+def repair_worktrees(
+    repo_path: Path,
+    worktree_paths: Optional[list[Path]] = None,
+) -> None:
     """Repair worktree administrative files after worktrees have been moved.
 
     This updates the worktree paths stored in the source repository's
@@ -317,8 +320,14 @@ def repair_worktrees(repo_path: Path) -> None:
 
     Args:
         repo_path: Path to repository (source or worktree).
+        worktree_paths: Optional list of worktree paths to repair. When provided,
+            git worktree repair is called with these paths so the repo updates
+            to point to the new locations.
 
     Raises:
         GitCommandError: If repair command fails.
     """
-    _run_git(["worktree", "repair"], cwd=repo_path, check=True)
+    args = ["worktree", "repair"]
+    if worktree_paths:
+        args.extend(str(p) for p in worktree_paths)
+    _run_git(args, cwd=repo_path, check=True)

@@ -170,6 +170,68 @@ def repo_with_worktree(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, 
     return worktrees_dir, source_repo, worktree_path
 
 
+@pytest.fixture
+def repo_with_submodule(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> tuple[Path, Path, Path]:
+    """Create a directory with a main repo that has a git submodule.
+
+    Returns:
+        Tuple of (old_repos_dir, main_repo_path, submodule_path)
+    """
+    old_dir = tmp_path_factory.mktemp("old_repos_with_submodule")
+    main_repo = old_dir / "main_repo"
+    main_repo.mkdir()
+    subprocess.run(["git", "init"], cwd=main_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=main_repo,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=main_repo,
+        check=True,
+        capture_output=True,
+    )
+    (main_repo / "README.md").write_text("# Main")
+    subprocess.run(["git", "add", "."], cwd=main_repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=main_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/user/main-repo.git"],
+        cwd=main_repo,
+        check=True,
+        capture_output=True,
+    )
+    # Create second repo to add as submodule
+    sub_repo = tmp_path_factory.mktemp("sub_repo")
+    subprocess.run(["git", "init"], cwd=sub_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=sub_repo,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=sub_repo,
+        check=True,
+        capture_output=True,
+    )
+    (sub_repo / "file.txt").write_text("sub content")
+    subprocess.run(["git", "add", "."], cwd=sub_repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Sub"], cwd=sub_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "protocol.file.allow=always", "submodule", "add", str(sub_repo), "submod"],
+        cwd=main_repo,
+        check=True,
+        capture_output=True,
+    )
+    submodule_path = main_repo / "submod"
+    return old_dir, main_repo, submodule_path
+
+
 class TestMigrateCommand:
     """Integration tests for migrate command (T056)."""
 
@@ -199,7 +261,7 @@ sources:
         class Args:
             old_repos = str(old_repos_dir)
             dry_run = True
-            move = False
+            inplace = False
             verbose = 0
             quiet = False
 
@@ -237,7 +299,7 @@ sources:
         class Args:
             old_repos = str(old_repos_dir)
             dry_run = False
-            move = False
+            inplace = False
             verbose = 0
             quiet = False
 
@@ -251,13 +313,75 @@ sources:
         assert (target_dir / "github" / "user" / "project1").exists()
         assert (target_dir / "gitlab" / "group" / "project2").exists()
 
+    def test_migrate_copy_preserves_symlinks(
+        self,
+        tmp_path_factory: pytest.TempPathFactory,
+        config_dir: Path,
+        target_dir: Path,
+    ) -> None:
+        """Test that migrate --copy copies symbolic links as symlinks, not resolved."""
+        old_dir = tmp_path_factory.mktemp("old_repos_symlink")
+        repo = old_dir / "symlink_repo"
+        repo.mkdir()
+        subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+        (repo / "README.md").write_text("# Repo with symlink")
+        (repo / "mylink").symlink_to("README.md")
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial"], cwd=repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/user/symlink_repo.git"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        )
+
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = str(old_dir)
+            dry_run = False
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        migrated = target_dir / "github" / "user" / "symlink_repo"
+        assert migrated.exists()
+        mylink = migrated / "mylink"
+        assert mylink.is_symlink(), "Symlink should be copied as symlink, not resolved"
+        assert Path(mylink.readlink()) == Path("README.md")
+
     def test_migrate_moves_repositories(
         self,
         old_repos_dir: Path,
         config_dir: Path,
         target_dir: Path,
     ) -> None:
-        """Test that migrate with --move moves repositories."""
+        """Test that migrate with --inplace moves repositories."""
         config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(f"""
@@ -276,7 +400,7 @@ sources:
         class Args:
             old_repos = str(old_repos_dir)
             dry_run = False
-            move = True
+            inplace = True
             verbose = 0
             quiet = False
 
@@ -308,7 +432,7 @@ default_worktrees: {target_dir}/worktrees
         class Args:
             old_repos = str(old_repos_dir)
             dry_run = False
-            move = False
+            inplace = False
             verbose = 1  # Verbose to see skip messages
             quiet = False
 
@@ -335,7 +459,7 @@ default_worktrees: {target_dir}/worktrees
         class Args:
             old_repos = "/nonexistent/path"
             dry_run = False
-            move = False
+            inplace = False
             verbose = 0
             quiet = False
 
@@ -354,7 +478,7 @@ default_worktrees: {target_dir}/worktrees
         class Args:
             old_repos = str(old_repos_dir)
             dry_run = False
-            move = False
+            inplace = False
             verbose = 0
             quiet = False
 
@@ -380,7 +504,7 @@ default_worktrees: {target_dir}/worktrees
         class Args:
             old_repos = str(tmp_path)
             dry_run = False
-            move = False
+            inplace = False
             verbose = 0
             quiet = False
 
@@ -389,6 +513,63 @@ default_worktrees: {target_dir}/worktrees
         assert result == 0
         captured = capsys.readouterr()
         assert "No repositories to migrate" in captured.out
+
+    def test_migrate_outputs_already_at_target(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that migrate outputs specific message when repo is already at target."""
+        # Place a repo at the exact path that config would resolve to
+        expected_base = target_dir / "github" / "user"
+        expected_base.mkdir(parents=True, exist_ok=True)
+        repo_at_target = expected_base / "project1"
+        repo_at_target.mkdir()
+        subprocess.run(["git", "init"], cwd=repo_at_target, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo_at_target,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=repo_at_target,
+            check=True,
+            capture_output=True,
+        )
+        (repo_at_target / "README.md").write_text("# Here")
+        subprocess.run(["git", "add", "."], cwd=repo_at_target, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial"], cwd=repo_at_target, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/user/project1.git"],
+            cwd=repo_at_target,
+            check=True,
+            capture_output=True,
+        )
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/github/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+""")
+
+        class Args:
+            old_repos = str(target_dir)
+            dry_run = False
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Already at target:" in captured.out
+        assert "project1" in captured.out or str(repo_at_target) in captured.out
+        assert "Already at target: 1 repositories" in captured.out
 
     def test_migrate_verbose_output(
         self,
@@ -413,7 +594,7 @@ sources:
         class Args:
             old_repos = str(old_repos_dir)
             dry_run = False
-            move = False
+            inplace = False
             verbose = 1
             quiet = False
 
@@ -438,12 +619,18 @@ sources:
         config_path.write_text(f"""
 default_sources: {target_dir}/github/path(-2)/path(-1)
 default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+    worktrees: {target_dir}/github/path(-2)/path(-1)
 """)
 
         class Args:
             old_repos = str(worktrees_dir)
             dry_run = False
-            move = True
+            inplace = True
             verbose = 1
             quiet = False
 
@@ -480,12 +667,18 @@ default_worktrees: {target_dir}/worktrees
         config_path.write_text(f"""
 default_sources: {target_dir}/github/path(-2)/path(-1)
 default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+    worktrees: {target_dir}/github/path(-2)/path(-1)
 """)
 
         class Args:
             old_repos = str(worktrees_dir)
             dry_run = False
-            move = False  # Copy, not move
+            inplace = False  # Copy (default)
             verbose = 1
             quiet = False
 
@@ -496,7 +689,7 @@ default_worktrees: {target_dir}/worktrees
 
         # Verify original worktree still exists (copy, not move)
         assert worktree_path.exists()
-        # Verify copy was created
+        # Verify copy was created (worktree path from rule)
         new_worktree_path = target_dir / "github" / "user" / "feature-worktree"
         assert new_worktree_path.exists()
 
@@ -526,7 +719,7 @@ sources:
         class Args:
             old_repos = str(old_repos_dir)
             dry_run = False
-            move = True
+            inplace = True
             verbose = 1
             quiet = False
 
@@ -542,3 +735,212 @@ sources:
         assert "Repairing worktree paths" not in captured.err
         # Output should NOT mention "Repaired" since no worktrees were involved
         assert "Repaired" not in captured.out
+
+    def test_migrate_dry_run_skips_submodules(
+        self,
+        repo_with_submodule: tuple[Path, Path, Path],
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that migrate dry-run only plans the main repo, not the submodule as separate repo."""
+        old_dir, main_repo, submodule_path = repo_with_submodule
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/github/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+""")
+
+        class Args:
+            old_repos = str(old_dir)
+            dry_run = True
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        captured = capsys.readouterr()
+        # Should plan to migrate main_repo only (one repo)
+        assert "Would migrate" in captured.out
+        assert "1 repositories" in captured.out
+        # Submodule path must not appear as a separate migration target
+        assert str(submodule_path) not in captured.out or "main_repo" in captured.out
+
+    def test_migrate_with_submodule_copies_parent_and_keeps_submodule(
+        self,
+        repo_with_submodule: tuple[Path, Path, Path],
+        config_dir: Path,
+        target_dir: Path,
+    ) -> None:
+        """Test that migrating a repo with submodule copies parent; submodule stays inside."""
+        old_dir, main_repo, submodule_path = repo_with_submodule
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/github/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+""")
+
+        class Args:
+            old_repos = str(old_dir)
+            dry_run = False
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        # URI path segment is "main-repo" (from main-repo.git)
+        migrated_main = target_dir / "github" / "user" / "main-repo"
+        assert migrated_main.exists()
+        assert (migrated_main / ".gitmodules").exists()
+        migrated_submod = migrated_main / "submod"
+        assert migrated_submod.exists()
+        assert (migrated_submod / "file.txt").exists()
+        # Submodule .git should be file pointing to parent's .git/modules
+        assert (migrated_submod / ".git").is_file()
+
+    def test_migrate_multiple_input_folders(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+        tmp_path_factory: pytest.TempPathFactory,
+    ) -> None:
+        """Test that migrate with multiple paths merges repos and processes as one set."""
+        # Second folder with one repo
+        other_dir = tmp_path_factory.mktemp("old_repos_other")
+        repo3 = other_dir / "project3"
+        repo3.mkdir()
+        subprocess.run(["git", "init"], cwd=repo3, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo3,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=repo3,
+            check=True,
+            capture_output=True,
+        )
+        (repo3 / "README.md").write_text("# Project 3")
+        subprocess.run(["git", "add", "."], cwd=repo3, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial"], cwd=repo3, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/user/project3.git"],
+            cwd=repo3,
+            check=True,
+            capture_output=True,
+        )
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+  gitlab:
+    when: '"gitlab" in host()'
+    sources: {target_dir}/gitlab/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = [str(old_repos_dir), str(other_dir)]
+            dry_run = False
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        assert (target_dir / "github" / "user" / "project1").exists()
+        assert (target_dir / "gitlab" / "group" / "project2").exists()
+        assert (target_dir / "github" / "user" / "project3").exists()
+
+    def test_migrate_inplace_cleans_empty_folders(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+    ) -> None:
+        """Test that --inplace removes vacated dirs and empty parents recursively."""
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+  gitlab:
+    when: '"gitlab" in host()'
+    sources: {target_dir}/gitlab/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = str(old_repos_dir)
+            dry_run = False
+            inplace = True
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+
+        assert result == 0
+        assert not (old_repos_dir / "project1").exists()
+        assert not (old_repos_dir / "project2").exists()
+        assert (target_dir / "github" / "user" / "project1").exists()
+        assert (target_dir / "gitlab" / "group" / "project2").exists()
+
+    def test_migrate_copy_validation_destination_exists(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that copy mode reports all validation errors (e.g. destination exists)."""
+        # Pre-create one destination so validation fails
+        dest = target_dir / "github" / "user" / "project1"
+        dest.mkdir(parents=True, exist_ok=True)
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+  gitlab:
+    when: '"gitlab" in host()'
+    sources: {target_dir}/gitlab/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = str(old_repos_dir)
+            dry_run = False
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+        captured = capsys.readouterr()
+        # When destination exists we skip that plan; output mentions skip or destination
+        assert "destination exists" in captured.out or "Skipped" in captured.out
+        # project2 (no conflict) should still be migrated
+        assert (target_dir / "gitlab" / "group" / "project2").exists()
+        assert result == 0

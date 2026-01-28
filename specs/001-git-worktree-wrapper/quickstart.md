@@ -338,11 +338,11 @@ gww migrate ~/old-repos --dry-run
 #   ~/old-repos/repo2 -> ~/Developer/sources/gitlab/group/repo2
 #   ~/old-repos/repo3 -> ~/Developer/sources/default/org/repo3
 
-# Actual migration (copy)
+# Actual migration (copy, default)
 gww migrate ~/old-repos
 
-# Or move instead of copy
-gww migrate ~/old-repos --move
+# Or move in place and clean empty folders
+gww migrate ~/old-repos --inplace
 ```
 
 **Test Case**:
@@ -353,7 +353,7 @@ gww migrate ~/old-repos --move
 **Test Case**:
 - **Given**: Old repositories
 - **When**: `gww migrate ~/old-repos`
-- **Then**: Repositories copied to new locations based on current config
+- **Then**: Repositories copied to new locations based on current config; symbolic links are copied as symlinks (not resolved)
 
 ## Template Function Examples
 

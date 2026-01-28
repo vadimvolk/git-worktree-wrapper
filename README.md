@@ -131,31 +131,31 @@ gww migrate ~/old-repos --dry-run
 # Output:
 # Would migrate 5 repositories:
 #   ~/old-repos/repo1 -> ~/Developer/sources/github/user/repo1
-#   ~/old-repos/repo2 -> ~/Developer/sources/github/user/repo2
 #   ...
 
 gww migrate ~/old-repos
-# Output:
-# Migrated 5 repositories
-# Repaired 2 worktrees
+# Copy (default): list, copy sources then worktrees, repair, summary
+
+gww migrate ~/old-repos --inplace
+# Move worktrees then sources, repair, clean empty folders
 ```
 
-The `migrate` command scans a directory for git repositories and migrates them to locations based on your current configuration. It's useful when:
+The `migrate` command scans one or more directories for git repositories and migrates them to locations based on your current configuration. It's useful when:
 - You've updated your configuration and want to reorganize existing repositories
 - You're moving from manual repository management to GWW
 - You need to consolidate repositories from different locations
 
 **Options**:
 - `--dry-run`, `-n`: Show what would be migrated without making changes
-- `--move`: Move repositories instead of copying (default is copy)
+- `--copy` (default): Copy repositories to new locations; list, validate, copy sources then worktrees, run `git worktree repair`, then report summary. No folder cleanup.
+- `--inplace`: Move repositories in place (worktrees first, then sources), run `git worktree repair`, then recursively clean empty source folders.
 
 **Behavior**:
-- Recursively scans the specified directory for git repositories
-- Extracts the remote URI from each repository
-- Calculates the expected location using your current config
-- Migrates repositories that are in different locations than expected
-- Automatically repairs worktree paths if migrating worktrees
-- Skips repositories without remotes or that are already in the correct location
+- Accepts one or more paths; scans each and merges repo lists (deduplicated)
+- Classifies each repo as source or worktree; uses source path template for sources and worktree path template for worktrees
+- **--inplace**: Two passes (worktrees then sources), move and repair, then remove vacated dirs and empty parents up to input roots
+- **--copy**: List sources and worktrees, validate destinations, copy sources then worktrees, repair relations, report summary
+- Skips repositories without remotes, detached HEAD worktrees, or already at target
 
 ## Tutorial
 
@@ -292,7 +292,7 @@ gwa feature-branch --tag review
 | `gwa <branch> [-c] [--tag key=value]...` | ➕ Add worktree for branch (optionally create branch, tags available in templates/conditions) |
 | `gwr <branch\|path> [-f]` | ➖ Remove worktree |
 | `gww pull` | 🔄 Update source repository (works from worktrees if source is clean and on main/master) |
-| `gww migrate <path> [--dry-run] [--move]` | 🚚 Migrate repositories to new locations |
+| `gww migrate <path>... [--dry-run] [--copy \| --inplace]` | 🚚 Migrate repositories to new locations |
 | `gww init config` | ⚙️ Create default configuration file |
 | `gww init shell <shell>` | 🐚 Install shell completion (bash/zsh/fish) |
 
