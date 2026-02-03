@@ -939,8 +939,160 @@ sources:
 
         result = run_migrate(Args())
         captured = capsys.readouterr()
-        # When destination exists we skip that plan; output mentions skip or destination
-        assert "destination exists" in captured.out or "Skipped" in captured.out
-        # project2 (no conflict) should still be migrated
-        assert (target_dir / "gitlab" / "group" / "project2").exists()
+
+        # Copy mode should fail with exit code 1 when destination exists
+        assert result == 1
+
+        # Verify error messages in stderr
+        assert "Error: Destination already exists:" in captured.err
+        assert str(dest) in captured.err
+        assert "Cannot proceed:" in captured.err
+        assert "destination(s) already exist in copy mode" in captured.err
+
+        # project2 should NOT be migrated (fail-fast behavior)
+        assert not (target_dir / "gitlab" / "group" / "project2").exists()
+
+    def test_migrate_copy_fails_with_multiple_destinations_exist(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that copy mode shows ALL conflicts when multiple destinations exist."""
+        # Pre-create both destinations
+        dest1 = target_dir / "github" / "user" / "project1"
+        dest1.mkdir(parents=True, exist_ok=True)
+        dest2 = target_dir / "gitlab" / "group" / "project2"
+        dest2.mkdir(parents=True, exist_ok=True)
+
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+  gitlab:
+    when: '"gitlab" in host()'
+    sources: {target_dir}/gitlab/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = str(old_repos_dir)
+            dry_run = False
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+        captured = capsys.readouterr()
+
+        # Should fail with exit code 1
+        assert result == 1
+
+        # Both conflicts should be reported
+        assert captured.err.count("Error: Destination already exists:") == 2
+        assert str(dest1) in captured.err
+        assert str(dest2) in captured.err
+
+        # Summary should mention 2 destinations
+        assert "Cannot proceed: 2 destination(s) already exist" in captured.err
+
+    def test_migrate_copy_dry_run_fails_when_destination_exists(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that copy dry-run mode also fails when destination exists."""
+        # Pre-create one destination
+        dest = target_dir / "github" / "user" / "project1"
+        dest.mkdir(parents=True, exist_ok=True)
+
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+  gitlab:
+    when: '"gitlab" in host()'
+    sources: {target_dir}/gitlab/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = str(old_repos_dir)
+            dry_run = True  # Dry run mode
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+        captured = capsys.readouterr()
+
+        # Dry-run should also fail with exit code 1
+        assert result == 1
+
+        # Error messages should appear
+        assert "Error: Destination already exists:" in captured.err
+        assert str(dest) in captured.err
+        assert "Cannot proceed:" in captured.err
+
+        # Original repos should still exist (no migration occurred)
+        assert (old_repos_dir / "project1").exists()
+        assert (old_repos_dir / "project2").exists()
+
+    def test_migrate_inplace_continues_when_destination_exists(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that inplace mode keeps current behavior (skip conflicts, continue with others)."""
+        # Pre-create one destination to cause conflict
+        dest = target_dir / "github" / "user" / "project1"
+        dest.mkdir(parents=True, exist_ok=True)
+
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+  gitlab:
+    when: '"gitlab" in host()'
+    sources: {target_dir}/gitlab/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = str(old_repos_dir)
+            dry_run = False
+            inplace = True  # Inplace mode
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+        captured = capsys.readouterr()
+
+        # Inplace mode should succeed with exit code 0
         assert result == 0
+
+        # project2 should still be migrated
+        assert (target_dir / "gitlab" / "group" / "project2").exists()
+
+        # Output should mention project1 was skipped (current behavior)
+        # No error exit for inplace mode
