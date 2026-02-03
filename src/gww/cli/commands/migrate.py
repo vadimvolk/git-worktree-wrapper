@@ -82,13 +82,64 @@ def _collect_all_repos(input_paths: list[Path]) -> tuple[list[Path], list[Path]]
     return repos, [p.resolve() for p in input_paths]
 
 
+def _format_skipped_items(skipped_items: list[tuple[str, Path, bool]]) -> str:
+    """Format skipped items breakdown by type and reason.
+
+    Args:
+        skipped_items: List of (reason, path, is_worktree) tuples
+
+    Returns:
+        Formatted multi-line string with breakdown, or empty string if no skips
+    """
+    if not skipped_items:
+        return ""
+
+    # Group by reason, tracking sources vs worktrees
+    reason_counts: dict[str, tuple[int, int]] = {}  # reason -> (sources, worktrees)
+
+    for reason, path, is_worktree in skipped_items:
+        if reason not in reason_counts:
+            reason_counts[reason] = (0, 0)
+        sources, worktrees = reason_counts[reason]
+        if is_worktree:
+            reason_counts[reason] = (sources, worktrees + 1)
+        else:
+            reason_counts[reason] = (sources + 1, worktrees)
+
+    total_sources = sum(s for s, w in reason_counts.values())
+    total_worktrees = sum(w for s, w in reason_counts.values())
+
+    lines = []
+    if total_sources > 0 and total_worktrees > 0:
+        src_word = "source" if total_sources == 1 else "sources"
+        wt_word = "worktree" if total_worktrees == 1 else "worktrees"
+        lines.append(f"Ignored {total_sources} {src_word}, {total_worktrees} {wt_word}:")
+    elif total_sources > 0:
+        src_word = "source" if total_sources == 1 else "sources"
+        lines.append(f"Ignored {total_sources} {src_word}:")
+    elif total_worktrees > 0:
+        wt_word = "worktree" if total_worktrees == 1 else "worktrees"
+        lines.append(f"Ignored {total_worktrees} {wt_word}:")
+
+    # Format each reason with its breakdown
+    for reason, (sources, worktrees) in sorted(reason_counts.items()):
+        parts = []
+        if sources > 0:
+            parts.append(f"{sources} source{'s' if sources != 1 else ''}")
+        if worktrees > 0:
+            parts.append(f"{worktrees} worktree{'s' if worktrees != 1 else ''}")
+        lines.append(f"  - {reason}: {', '.join(parts)}")
+
+    return "\n".join(lines)
+
+
 def _plan_migration(
     repos: list[Path],
     config: Config,
     inplace: bool,
     verbose: int = 0,
     tags: Optional[dict[str, str]] = None,
-) -> tuple[list[MigrationPlan], list[tuple[str, Path, bool]]]:
+) -> tuple[list[MigrationPlan], list[tuple[str, Path, bool, bool]]]:
     """Plan migrations for all repositories.
 
     Classifies each repo as source or worktree; uses resolve_source_path for
@@ -102,19 +153,19 @@ def _plan_migration(
         tags: Optional tags for template evaluation.
 
     Returns:
-        Tuple of (valid migration plans, list of skips as (reason, path, is_fatal) tuples).
+        Tuple of (valid migration plans, list of skips as (reason, path, is_fatal, is_worktree) tuples).
         - is_fatal depends on mode: destination exists is fatal in copy mode, not fatal in inplace
         - Other skips (already at target, no remote, etc.) are always non-fatal
     """
     if tags is None:
         tags = {}
     plans: list[MigrationPlan] = []
-    skips: list[tuple[str, Path, bool]] = []  # (reason, path, is_fatal)
+    skips: list[tuple[str, Path, bool, bool]] = []  # (reason, path, is_fatal, is_worktree)
 
     for repo_path in repos:
         remote_uri = get_remote_uri(repo_path)
         if not remote_uri:
-            skips.append(("no remote origin configured", repo_path, False))
+            skips.append(("no remote origin configured", repo_path, False, False))
             if verbose > 0:
                 print(
                     f"Skipping {repo_path}: No remote origin configured",
@@ -125,7 +176,7 @@ def _plan_migration(
         try:
             uri_parsed = parse_uri(remote_uri)
         except ValueError as e:
-            skips.append((f"invalid remote URI: {e}", repo_path, False))
+            skips.append((f"invalid remote URI: {e}", repo_path, False, False))
             if verbose > 0:
                 print(f"Skipping {repo_path}: Invalid remote URI: {e}", file=sys.stderr)
             continue
@@ -136,21 +187,21 @@ def _plan_migration(
             try:
                 source_path = get_source_repository(repo_path)
             except Exception:
-                skips.append(("could not resolve source repository", repo_path, False))
+                skips.append(("could not resolve source repository", repo_path, False, is_wt))
                 if verbose > 0:
                     print(f"Skipping {repo_path}: Could not resolve source repository", file=sys.stderr)
                 continue
             try:
                 branch = get_current_branch(repo_path)
             except GitCommandError:
-                skips.append(("detached HEAD", repo_path, False))
+                skips.append(("detached HEAD", repo_path, False, is_wt))
                 if verbose > 0:
                     print(f"Skipping {repo_path}: Detached HEAD (branch required for worktree path)", file=sys.stderr)
                 continue
             try:
                 expected_path = resolve_worktree_path(config, uri_parsed, branch, tags)
             except ResolverError as e:
-                skips.append((str(e), repo_path, False))
+                skips.append((str(e), repo_path, False, is_wt))
                 if verbose > 0:
                     print(f"Skipping {repo_path}: {e}", file=sys.stderr)
                 continue
@@ -158,14 +209,14 @@ def _plan_migration(
             try:
                 expected_path = resolve_source_path(config, uri_parsed, tags)
             except ResolverError as e:
-                skips.append((str(e), repo_path, False))
+                skips.append((str(e), repo_path, False, is_wt))
                 if verbose > 0:
                     print(f"Skipping {repo_path}: {e}", file=sys.stderr)
                 continue
 
         # Check if already at target
         if repo_path.resolve() == expected_path.resolve():
-            skips.append(("already at target", repo_path, False))
+            skips.append(("already at target", repo_path, False, is_wt))
             continue
 
         # Check if destination exists
@@ -173,7 +224,7 @@ def _plan_migration(
         # In inplace mode: non-fatal skip (will skip this repo, continue with others)
         if expected_path.exists():
             is_fatal = not inplace  # Fatal only in copy mode
-            skips.append(("destination exists", expected_path, is_fatal))
+            skips.append(("destination exists", expected_path, is_fatal, is_wt))
             continue
 
         # Valid migration plan
@@ -273,8 +324,14 @@ def _run_inplace(
 
     if not quiet:
         if valid_plans:
-            moved = len(worktree_plans) + len(source_plans)
-            print(f"Moved {moved} repositories")
+            num_sources = len(source_plans)
+            num_worktrees = len(worktree_plans)
+            if num_sources > 0 and num_worktrees > 0:
+                print(f"Moved {num_sources} sources, {num_worktrees} worktrees")
+            elif num_sources > 0:
+                print(f"Moved {num_sources} sources")
+            elif num_worktrees > 0:
+                print(f"Moved {num_worktrees} worktrees")
         if already_at_target:
             print(f"Already at target: {len(already_at_target)} repositories")
     return 0
@@ -282,7 +339,7 @@ def _run_inplace(
 
 def _run_copy(
     valid_plans: list[MigrationPlan],
-    skipped_items: list[tuple[str, Path]],
+    skipped_items: list[tuple[str, Path, bool]],
     already_at_target: list[Path],
     dry_run: bool,
     quiet: bool,
@@ -297,13 +354,15 @@ def _run_copy(
 
     if not valid_plans:
         if skipped_items and not quiet:
-            for reason, path in skipped_items:
+            for reason, path, _ in skipped_items:
                 print(f"{path}: {reason}")
         if not quiet:
+            print("No repositories to migrate.")
+            skip_msg = _format_skipped_items(skipped_items)
+            if skip_msg:
+                print(skip_msg)
             if already_at_target:
                 print(f"Already at target: {len(already_at_target)} repositories")
-            else:
-                print("No repositories to migrate.")
         return 0
 
     # List and output each found source and worktree
@@ -311,7 +370,7 @@ def _run_copy(
         for plan in valid_plans:
             kind = "Worktree" if plan.is_worktree else "Source"
             print(f"{kind}: {plan.old_path} -> {plan.new_path}")
-        for reason, path in skipped_items:
+        for reason, path, _ in skipped_items:
             print(f"{path}: {reason}")
 
     if dry_run:
@@ -381,9 +440,17 @@ def _run_copy(
             failed += 1
 
     if not quiet:
-        print(f"Migrated {migrated_sources} repositories, {migrated_worktrees} worktrees")
-        if skipped_items:
-            print(f"Skipped {len(skipped_items)} repositories")
+        if migrated_sources > 0 and migrated_worktrees > 0:
+            print(f"Migrated {migrated_sources} sources, {migrated_worktrees} worktrees")
+        elif migrated_sources > 0:
+            print(f"Migrated {migrated_sources} sources")
+        elif migrated_worktrees > 0:
+            print(f"Migrated {migrated_worktrees} worktrees")
+
+        skip_msg = _format_skipped_items(skipped_items)
+        if skip_msg:
+            print(skip_msg)
+
         if already_at_target:
             print(f"Already at target: {len(already_at_target)} repositories")
         if failed:
@@ -470,8 +537,8 @@ def run_migrate(args: argparse.Namespace) -> int:
 
     # Separate fatal skips from informational skips
     # (destination exists is fatal only in copy mode, determined in _plan_migration)
-    fatal_skips = [(reason, path) for reason, path, is_fatal in skips if is_fatal]
-    info_skips = [(reason, path) for reason, path, is_fatal in skips if not is_fatal]
+    fatal_skips = [(reason, path) for reason, path, is_fatal, _ in skips if is_fatal]
+    info_skips = [(reason, path, is_worktree) for reason, path, is_fatal, is_worktree in skips if not is_fatal]
 
     # Fail if any fatal skips exist
     # Note: fatal_skips will only be non-empty in copy mode (destination exists is non-fatal in inplace)
@@ -496,9 +563,9 @@ def run_migrate(args: argparse.Namespace) -> int:
         return 0
 
     # Separate "already at target" from other skips for display
-    already_at_target = [path for reason, path, _ in skips if reason == "already at target"]
+    already_at_target = [path for reason, path, _, _ in skips if reason == "already at target"]
     # For copy mode, we already validated no fatal skips exist
-    skipped_for_display = [(reason, path) for reason, path, is_fatal in skips if reason != "already at target"]
+    skipped_for_display = [(reason, path, is_worktree) for reason, path, is_fatal, is_worktree in skips if reason != "already at target"]
 
     if inplace:
         return _run_inplace(
