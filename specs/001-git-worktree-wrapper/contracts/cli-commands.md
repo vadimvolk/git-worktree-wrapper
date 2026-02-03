@@ -234,7 +234,7 @@ gww pull
 
 **Behavior**:
 1. Verify each `path` exists and is a directory
-2. Recursively scan each directory for git repositories and worktrees (paths where `.git` exists; submodules excluded). Do not descend into repository or worktree interiors—each repo/worktree is treated as a single unit. Merge and deduplicate repo lists by resolved path. During the scan, when not `--quiet`, output the current examining directory to stderr on a single line (overwriting), updating at most once per second; clear the line after the scan completes.
+2. Recursively scan each directory for git repositories and worktrees (paths where `.git` exists; submodules excluded). Do not descend into repository or worktree interiors—each repo/worktree is treated as a single unit. Merge and deduplicate repo lists by resolved path.
 3. Classify each repo as **source** or **worktree**. Expected path: sources use `resolve_source_path`; worktrees use `resolve_worktree_path` (branch from current branch; detached HEAD worktrees are skipped).
 4. **If `--inplace`**:
    - First pass: for each worktree whose path differs, move to new path and run `git worktree repair` in its source (at current path).
@@ -255,7 +255,6 @@ gww pull
 
 **Output**:
 - Success: Print summary to stdout
-- Progress: When not `--quiet`, during directory scan print current examining folder to stderr on a single line (at most once per second); clear the line after the scan
 - Error: Print error message to stderr
 
 **Examples**:

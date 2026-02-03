@@ -6,10 +6,9 @@ import argparse
 import os
 import shutil
 import sys
-import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Optional
 
 from gww.config.loader import ConfigLoadError, ConfigNotFoundError, load_config
 from gww.config.resolver import ResolverError, resolve_source_path, resolve_worktree_path
@@ -38,11 +37,7 @@ class MigrationPlan:
     source_path: Optional[Path] = None  # main repo path (for worktrees only)
 
 
-def _find_git_repositories(
-    directory: Path,
-    *,
-    progress_callback: Optional[Callable[[Path], None]] = None,
-) -> list[Path]:
+def _find_git_repositories(directory: Path) -> list[Path]:
     """Find all git repositories and worktrees in a directory tree.
 
     Repository and worktree interiors are not traversed; each repo or worktree
@@ -50,8 +45,6 @@ def _find_git_repositories(
 
     Args:
         directory: Directory to scan.
-        progress_callback: Optional callback invoked with current directory path
-            at the start of each os.walk iteration.
 
     Returns:
         List of paths to git repository roots.
@@ -60,8 +53,6 @@ def _find_git_repositories(
 
     for root, dirs, files in os.walk(directory):
         root_path = Path(root)
-        if progress_callback is not None:
-            progress_callback(root_path)
 
         # Check if this is a git repository or worktree (skip submodules - they move with parent)
         if (root_path / ".git").exists() and not is_submodule(root_path):
@@ -72,17 +63,11 @@ def _find_git_repositories(
     return repos
 
 
-def _collect_all_repos(
-    input_paths: list[Path],
-    *,
-    progress_callback: Optional[Callable[[Path], None]] = None,
-) -> tuple[list[Path], list[Path]]:
+def _collect_all_repos(input_paths: list[Path]) -> tuple[list[Path], list[Path]]:
     """Collect and merge repo roots from multiple input directories.
 
     Args:
         input_paths: List of directories to scan.
-        progress_callback: Optional callback invoked with current directory path
-            during the scan (passed to _find_git_repositories).
 
     Returns:
         Tuple of (deduplicated repo paths, input roots for cleanup).
@@ -90,9 +75,7 @@ def _collect_all_repos(
     seen: set[Path] = set()
     repos: list[Path] = []
     for directory in input_paths:
-        for repo_path in _find_git_repositories(
-            directory, progress_callback=progress_callback
-        ):
+        for repo_path in _find_git_repositories(directory):
             resolved = repo_path.resolve()
             if resolved not in seen:
                 seen.add(resolved)
@@ -465,40 +448,7 @@ def run_migrate(args: argparse.Namespace) -> int:
         print(f"Config validation error: {e}", file=sys.stderr)
         return 2
 
-    progress_callback: Optional[Callable[[Path], None]] = None
-    if not quiet:
-        last_progress_time: list[float] = [0.0]
-
-        def _progress_cb(path: Path) -> None:
-            now = time.time()
-            if now - last_progress_time[0] >= 1.0 / 3.0:
-                path_str = str(path)
-                prefix = "Examining: "
-                try:
-                    max_width = shutil.get_terminal_size(fallback=(80, 24)).columns
-                except Exception:
-                    max_width = 80
-                msg = prefix + path_str
-                if len(msg) > max_width:
-                    available = max_width - len(prefix) - 3
-                    if available > 0:
-                        end_len = (available - 3) // 2
-                        start_len = (available - 3) - end_len
-                        path_display = path_str[:start_len] + "..." + path_str[-end_len:]
-                    else:
-                        path_display = "..."
-                    msg = prefix + path_display
-                # \r = carriage return (same line), \033[K = erase to end of line
-                print(f"\r\033[K{msg}", end="", file=sys.stderr, flush=True)
-                last_progress_time[0] = now
-
-        progress_callback = _progress_cb
-
-    repos, input_roots = _collect_all_repos(
-        input_paths, progress_callback=progress_callback
-    )
-    if not quiet:
-        print("\r\033[K\n", file=sys.stderr, end="")
+    repos, input_roots = _collect_all_repos(input_paths)
     if verbose > 0 and not quiet:
         print(f"Scanning {len(input_paths)} path(s) for repositories...", file=sys.stderr)
 
