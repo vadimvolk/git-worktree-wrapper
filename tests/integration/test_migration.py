@@ -1,6 +1,7 @@
 """Integration tests for migrate command end-to-end (T056)."""
 
 import pytest
+import shutil
 import subprocess
 import os
 from pathlib import Path
@@ -939,8 +940,386 @@ sources:
 
         result = run_migrate(Args())
         captured = capsys.readouterr()
-        # When destination exists we skip that plan; output mentions skip or destination
-        assert "destination exists" in captured.out or "Skipped" in captured.out
-        # project2 (no conflict) should still be migrated
-        assert (target_dir / "gitlab" / "group" / "project2").exists()
+
+        # Copy mode should fail with exit code 1 when destination exists
+        assert result == 1
+
+        # Verify error messages in stderr
+        assert "Error: Destination already exists:" in captured.err
+        assert str(dest) in captured.err
+        assert "Cannot proceed:" in captured.err
+        assert "destination(s) already exist in copy mode" in captured.err
+
+        # project2 should NOT be migrated (fail-fast behavior)
+        assert not (target_dir / "gitlab" / "group" / "project2").exists()
+
+    def test_migrate_copy_fails_with_multiple_destinations_exist(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that copy mode shows ALL conflicts when multiple destinations exist."""
+        # Pre-create both destinations
+        dest1 = target_dir / "github" / "user" / "project1"
+        dest1.mkdir(parents=True, exist_ok=True)
+        dest2 = target_dir / "gitlab" / "group" / "project2"
+        dest2.mkdir(parents=True, exist_ok=True)
+
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+  gitlab:
+    when: '"gitlab" in host()'
+    sources: {target_dir}/gitlab/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = str(old_repos_dir)
+            dry_run = False
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+        captured = capsys.readouterr()
+
+        # Should fail with exit code 1
+        assert result == 1
+
+        # Both conflicts should be reported
+        assert captured.err.count("Error: Destination already exists:") == 2
+        assert str(dest1) in captured.err
+        assert str(dest2) in captured.err
+
+        # Summary should mention 2 destinations
+        assert "Cannot proceed: 2 destination(s) already exist" in captured.err
+
+    def test_migrate_copy_dry_run_fails_when_destination_exists(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that copy dry-run mode also fails when destination exists."""
+        # Pre-create one destination
+        dest = target_dir / "github" / "user" / "project1"
+        dest.mkdir(parents=True, exist_ok=True)
+
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+  gitlab:
+    when: '"gitlab" in host()'
+    sources: {target_dir}/gitlab/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = str(old_repos_dir)
+            dry_run = True  # Dry run mode
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+        captured = capsys.readouterr()
+
+        # Dry-run should also fail with exit code 1
+        assert result == 1
+
+        # Error messages should appear
+        assert "Error: Destination already exists:" in captured.err
+        assert str(dest) in captured.err
+        assert "Cannot proceed:" in captured.err
+
+        # Original repos should still exist (no migration occurred)
+        assert (old_repos_dir / "project1").exists()
+        assert (old_repos_dir / "project2").exists()
+
+    def test_migrate_inplace_continues_when_destination_exists(
+        self,
+        old_repos_dir: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that inplace mode keeps current behavior (skip conflicts, continue with others)."""
+        # Pre-create one destination to cause conflict
+        dest = target_dir / "github" / "user" / "project1"
+        dest.mkdir(parents=True, exist_ok=True)
+
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/default/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+sources:
+  github:
+    when: '"github" in host()'
+    sources: {target_dir}/github/path(-2)/path(-1)
+  gitlab:
+    when: '"gitlab" in host()'
+    sources: {target_dir}/gitlab/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = str(old_repos_dir)
+            dry_run = False
+            inplace = True  # Inplace mode
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+        captured = capsys.readouterr()
+
+        # Inplace mode should succeed with exit code 0
         assert result == 0
+
+        # project2 should still be migrated
+        assert (target_dir / "gitlab" / "group" / "project2").exists()
+
+        # Output should mention project1 was skipped (current behavior)
+        # No error exit for inplace mode
+
+    def test_migrate_mixed_sources_and_worktrees(
+        self,
+        tmp_path_factory: pytest.TempPathFactory,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test migrating both source repos and worktrees in a single migration."""
+        mixed_dir = tmp_path_factory.mktemp("mixed_repos")
+
+        # Create a main source repository (will stay outside mixed_dir)
+        main_source = tmp_path_factory.mktemp("main_source")
+        subprocess.run(["git", "init"], cwd=main_source, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=main_source,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=main_source,
+            check=True,
+            capture_output=True,
+        )
+        (main_source / "README.md").write_text("# Main Source")
+        subprocess.run(["git", "add", "."], cwd=main_source, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial"], cwd=main_source, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/user/main-source.git"],
+            cwd=main_source,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create a worktree from main_source inside mixed_dir
+        subprocess.run(
+            ["git", "branch", "feature"],
+            cwd=main_source,
+            check=True,
+            capture_output=True,
+        )
+        worktree_path = mixed_dir / "feature-worktree"
+        subprocess.run(
+            ["git", "worktree", "add", str(worktree_path), "feature"],
+            cwd=main_source,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create a standalone source repo inside mixed_dir
+        standalone_repo = mixed_dir / "standalone"
+        standalone_repo.mkdir()
+        subprocess.run(["git", "init"], cwd=standalone_repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=standalone_repo,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=standalone_repo,
+            check=True,
+            capture_output=True,
+        )
+        (standalone_repo / "file.txt").write_text("standalone")
+        subprocess.run(["git", "add", "."], cwd=standalone_repo, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Init"], cwd=standalone_repo, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/user/standalone.git"],
+            cwd=standalone_repo,
+            check=True,
+            capture_output=True,
+        )
+
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/github/path(-2)/path(-1)
+default_worktrees: {target_dir}/github/path(-2)/path(-1)
+""")
+
+        class Args:
+            old_repos = str(mixed_dir)
+            dry_run = False
+            inplace = False
+            verbose = 1
+            quiet = False
+
+        result = run_migrate(Args())
+        captured = capsys.readouterr()
+
+        assert result == 0
+        # Worktree resolves based on main-source remote, not its directory name
+        # With template path(-2)/path(-1), it resolves to user/main-source
+        assert (target_dir / "github" / "user" / "main-source").exists()
+        assert (target_dir / "github" / "user" / "standalone").exists()
+
+        # Verify output mentions both sources and worktrees
+        assert "source" in captured.out.lower() or "Source" in captured.out
+        assert "worktree" in captured.out.lower() or "Worktree" in captured.out
+
+    def test_migrate_same_destination_for_different_repos(
+        self,
+        tmp_path_factory: pytest.TempPathFactory,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that collision during migration is handled - first repo copied, second fails."""
+        collision_dir = tmp_path_factory.mktemp("collision_repos")
+
+        # Create first repo
+        repo1 = collision_dir / "myproject-github"
+        repo1.mkdir()
+        subprocess.run(["git", "init"], cwd=repo1, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo1,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=repo1,
+            check=True,
+            capture_output=True,
+        )
+        (repo1 / "README.md").write_text("# From GitHub")
+        subprocess.run(["git", "add", "."], cwd=repo1, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial"], cwd=repo1, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/user/myproject.git"],
+            cwd=repo1,
+            check=True,
+            capture_output=True,
+        )
+
+        # Manually copy repo1 to its destination to simulate first migration
+        dest_path = target_dir / "repos" / "user" / "myproject"
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(repo1, dest_path)
+
+        # Create second repo with same remote (would resolve to same destination)
+        repo2 = collision_dir / "myproject-other"
+        repo2.mkdir()
+        subprocess.run(["git", "init"], cwd=repo2, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo2,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=repo2,
+            check=True,
+            capture_output=True,
+        )
+        (repo2 / "README.md").write_text("# Other")
+        subprocess.run(["git", "add", "."], cwd=repo2, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial"], cwd=repo2, check=True, capture_output=True)
+        # Same remote as repo1
+        subprocess.run(
+            ["git", "remote", "add", "origin", "https://github.com/user/myproject.git"],
+            cwd=repo2,
+            check=True,
+            capture_output=True,
+        )
+
+        # Config that resolves both to same path
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/repos/path(-2)/path(-1)
+default_worktrees: {target_dir}/worktrees
+""")
+
+        class Args:
+            old_repos = str(collision_dir)
+            dry_run = False
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+        captured = capsys.readouterr()
+
+        # Should fail in copy mode when destination already exists
+        assert result == 1
+
+        # Should report that destination exists
+        assert "Destination already exists" in captured.err
+        assert "Cannot proceed" in captured.err
+
+    def test_migrate_empty_input_list(
+        self,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Test that migrate handles empty list of input directories gracefully."""
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/sources
+default_worktrees: {target_dir}/worktrees
+""")
+
+        # Pass empty list - this simulates programmatic usage
+        # Note: CLI would require at least one path, but run_migrate accepts a list
+        class Args:
+            old_repos = []
+            dry_run = False
+            inplace = False
+            verbose = 0
+            quiet = False
+
+        result = run_migrate(Args())
+        captured = capsys.readouterr()
+
+        # Should succeed with no repositories found
+        assert result == 0
+        assert "No repositories to migrate" in captured.out

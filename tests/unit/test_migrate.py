@@ -38,16 +38,6 @@ class TestFindGitRepositories:
         (repo_a / "docs").mkdir()
         (repo_a / "docs" / "readme.txt").write_text("y")
 
-        visited: list[Path] = []
-
-        result = _find_git_repositories(
-            root, progress_callback=lambda p: visited.append(Path(p))
-        )
+        result = _find_git_repositories(root)
 
         assert result == [repo_a]
-        # Only root and repo_a should be visited; repo_a/src and repo_a/docs must not
-        visited_resolved = [p.resolve() for p in visited]
-        repo_a_resolved = repo_a.resolve()
-        assert repo_a_resolved in visited_resolved
-        assert (repo_a / "src").resolve() not in visited_resolved
-        assert (repo_a / "docs").resolve() not in visited_resolved
