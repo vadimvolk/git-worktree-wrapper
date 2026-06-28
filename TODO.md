@@ -1,9 +1,0 @@
-- [x] Fix not showing navigation message if ast-index rebuild executed - add test, it should work?!
-- [ ] Show output of all commands + silent flag (default disabled) for current behavior
-- [ ] Add 'before_remove' trigger for cleanup actions
-- [ ] sync-docs-en-to-ru migrate to use with opencode
-- [ ] Migration tests refactoring and expansion
-- [ ] Setup release pipeline in github
-- [ ] Update documentation: architecture diagram + architecture.md
-- [ ] Release 1.0.0
-- [ ] Release to PIP
