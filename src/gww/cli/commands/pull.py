@@ -2,90 +2,61 @@
 
 from __future__ import annotations
 
-import argparse
-import sys
 from pathlib import Path
 
+from gww.cli.context import (
+    CommandContext,
+    CommandExit,
+    exit_on_error,
+    resolve_source_repo,
+)
 from gww.git.branch import is_main_branch
 from gww.git.repository import (
     GitCommandError,
-    NotGitRepositoryError,
-    detect_repository,
     get_current_branch,
-    get_source_repository,
     is_clean,
     pull_repository,
 )
 
 
-def run_pull(args: argparse.Namespace) -> int:
+@exit_on_error
+def run_pull(ctx: CommandContext) -> int:
     """Execute the pull command.
 
     Args:
-        args: Parsed command line arguments.
+        ctx: Per-invocation command context.
 
     Returns:
         Exit code (0 for success, 1 for error).
     """
-    verbose = getattr(args, "verbose", 0)
-    quiet = getattr(args, "quiet", False)
+    source_path = resolve_source_repo(Path.cwd())
 
-    # Get current directory
-    cwd = Path.cwd()
-
-    # Detect current repository
-    try:
-        repo = detect_repository(cwd)
-    except NotGitRepositoryError:
-        print("Error: Not in a git repository.", file=sys.stderr)
-        return 1
-
-    # Get source repository
-    if repo.is_worktree:
-        try:
-            source_path = get_source_repository(repo.path)
-        except (NotGitRepositoryError, GitCommandError) as e:
-            print(f"Error finding source repository: {e}", file=sys.stderr)
-            return 1
-    else:
-        source_path = repo.path
-
-    # Check current branch
     try:
         current_branch = get_current_branch(source_path)
     except GitCommandError as e:
-        print(f"Error getting current branch: {e}", file=sys.stderr)
-        return 1
+        raise CommandExit(1, f"Error getting current branch: {e}") from e
 
     if not is_main_branch(current_branch):
-        print(
+        raise CommandExit(
+            1,
             f"Error: Source repository must be on 'main' or 'master' branch. "
             f"Current branch: {current_branch}",
-            file=sys.stderr,
         )
-        return 1
 
-    # Check if clean
     if not is_clean(source_path):
-        print(
+        raise CommandExit(
+            1,
             "Error: Source repository has uncommitted changes. "
             "Commit or stash changes first.",
-            file=sys.stderr,
         )
-        return 1
 
-    if verbose > 0 and not quiet:
-        print(f"Pulling updates for {source_path}...", file=sys.stderr)
+    ctx.verbose_msg(f"Pulling updates for {source_path}...")
 
-    # Pull
     try:
         pull_repository(source_path)
     except GitCommandError as e:
-        print(f"Error pulling updates: {e}", file=sys.stderr)
-        return 1
+        raise CommandExit(1, f"Error pulling updates: {e}") from e
 
-    # Output confirmation
-    if not quiet:
-        print(f"Updated source repository: {source_path}")
+    ctx.say(f"Updated source repository: {source_path}")
 
     return 0

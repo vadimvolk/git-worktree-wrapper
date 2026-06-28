@@ -2,96 +2,75 @@
 
 from __future__ import annotations
 
-import argparse
 import sys
-from pathlib import Path
 
-from gww.actions.executor import ActionError, execute_actions
-from gww.actions.matcher import MatcherError, get_source_actions
-from gww.config.loader import ConfigLoadError, ConfigNotFoundError, load_config
+from gww.actions import ActionError, apply_actions
+from gww.cli.context import (
+    CommandContext,
+    CommandExit,
+    exit_on_error,
+    load_config_or_exit,
+    parse_uri_or_exit,
+)
 from gww.config.resolver import ResolverError, resolve_source_path
-from gww.config.validator import ConfigValidationError, validate_config
 from gww.git.repository import GitCommandError, clone_repository
-from gww.utils.uri import ParsedURI, parse_uri
 
 
-def run_clone(args: argparse.Namespace) -> int:
+@exit_on_error
+def run_clone(ctx: CommandContext) -> int:
     """Execute the clone command.
 
     Args:
-        args: Parsed command line arguments.
+        ctx: Per-invocation command context.
 
     Returns:
         Exit code (0 for success, 1 for error, 2 for config error).
     """
-    uri_str = args.uri
-    verbose = getattr(args, "verbose", 0)
-    quiet = getattr(args, "quiet", False)
-    tags = getattr(args, "tags", {})
+    if ctx.uri is None:
+        raise CommandExit(1, "Error: Missing repository URI.")
 
-    # Parse URI
-    try:
-        uri = parse_uri(uri_str)
-    except ValueError as e:
-        print(f"Error: Invalid repository URI: {e}", file=sys.stderr)
-        return 1
+    uri = parse_uri_or_exit(ctx.uri)
+    config = load_config_or_exit()
 
-    # Load and validate config
     try:
-        raw_config = load_config()
-        config = validate_config(raw_config)
-    except ConfigNotFoundError:
-        print(
-            "Error: Config file not found. Run 'gww init config' to create one.",
-            file=sys.stderr,
-        )
-        return 2
-    except ConfigLoadError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 2
-    except ConfigValidationError as e:
-        print(f"Config validation error: {e}", file=sys.stderr)
-        return 2
-
-    # Resolve source path
-    try:
-        source_path = resolve_source_path(config, uri, tags)
+        source_path = resolve_source_path(config, uri, ctx.tags)
     except ResolverError as e:
-        print(f"Error resolving source path: {e}", file=sys.stderr)
-        return 2
+        raise CommandExit(2, f"Error resolving source path: {e}") from e
 
-    # Check if already exists
     if source_path.exists():
-        print(f"Error: Repository already exists at: {source_path}", file=sys.stderr)
-        return 1
+        raise CommandExit(
+            1,
+            f"Error: Repository already exists at: {source_path}",
+        )
 
-    if verbose > 0 and not quiet:
-        print(f"Cloning {uri_str} to {source_path}...", file=sys.stderr)
+    ctx.verbose_msg(f"Cloning {ctx.uri} to {source_path}...")
 
-    # Clone repository
     try:
-        clone_repository(uri_str, source_path)
+        clone_repository(ctx.uri, source_path)
     except GitCommandError as e:
-        print(f"Error cloning repository: {e}", file=sys.stderr)
-        return 1
+        raise CommandExit(1, f"Error cloning repository: {e}") from e
 
-    # Execute source actions if any action rules match
     if config.actions:
         try:
-            actions = get_source_actions(config.actions, source_path, tags, dest_path=source_path)
-            if actions:
-                if verbose > 0 and not quiet:
-                    print(f"Executing {len(actions)} source action(s)...", file=sys.stderr)
-                execute_actions(actions, None, source_path)
-        except MatcherError as e:
+            actions = apply_actions(
+                config.actions,
+                source_path,
+                ctx.tags,
+                dest_path=source_path,
+                kind="after_clone",
+            )
+        except Exception as e:  # MatcherError or its base
             print(f"Error matching project rules: {e}", file=sys.stderr)
-            # Continue - clone succeeded, just actions failed
-        except ActionError as e:
-            print(f"Error executing source action: {e}", file=sys.stderr)
-            # Continue - clone succeeded, just actions failed
+            actions = []
 
-    # Output clone path
-    if not quiet:
-        print(source_path)
+        if actions:
+            ctx.verbose_msg(f"Executing {len(actions)} source action(s)...")
+            for action in actions:
+                try:
+                    action.run(source_dir=None, target_dir=source_path)
+                except ActionError as e:
+                    print(f"Error executing source action: {e}", file=sys.stderr)
+
+    ctx.say(str(source_path))
 
     return 0
