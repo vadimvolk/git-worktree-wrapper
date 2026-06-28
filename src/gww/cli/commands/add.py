@@ -59,7 +59,7 @@ def run_add(ctx: CommandContext) -> int:
             raise CommandExit(
                 1,
                 f"Error: Branch '{ctx.branch}' not found. "
-                "Use --create-branch to create from current commit.",
+                "Use -c/--create-branch to create from current commit.",
             )
 
     try:
