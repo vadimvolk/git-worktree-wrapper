@@ -1,5 +1,7 @@
 - [x] Fix not showing navigation message if ast-index rebuild executed - add test, it should work?!
 - [ ] Show output of all commands + silent flag (default disabled) for current behavior
+- [ ] Fix gwr autocompletion to show only worktrees\
+- [ ] "Use --create-branch to create from current commit." replace with "Use -c or --create-branch to create from current commit."
 - [ ] Add 'before_remove' trigger for cleanup actions
 - [ ] sync-docs-en-to-ru migrate to use with opencode
 - [ ] Migration tests refactoring and expansion
