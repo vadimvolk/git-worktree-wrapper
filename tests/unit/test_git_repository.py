@@ -1,14 +1,17 @@
 """Unit tests for git repository operations in src/gww/git/repository.py."""
 
-import pytest
 import subprocess
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from gww.git.repository import (
     GitError,
     NotGitRepositoryError,
     GitCommandError,
     Repository,
+    _run_git,
     is_git_repository,
     get_repository_root,
     is_worktree,
@@ -20,6 +23,7 @@ from gww.git.repository import (
     get_current_commit,
     detect_repository,
     clone_repository,
+    pull_repository,
 )
 
 
@@ -432,3 +436,114 @@ class TestCloneRepository:
         assert result == target
         assert target.exists()
         assert (target / ".git").exists()
+
+
+class TestRunGitPassThroughStdout:
+    """``_run_git`` must let callers opt into streaming subprocess stdout.
+
+    The default keeps the historic capture-both behavior. When
+    ``pass_through_stdout=True``, stdout is inherited from the parent (None)
+    while stderr stays captured so ``GitCommandError`` can still surface it.
+    """
+
+    @staticmethod
+    def _fake_completed(returncode: int = 0, stderr: str = "") -> MagicMock:
+        result = MagicMock()
+        result.returncode = returncode
+        result.stdout = ""
+        result.stderr = stderr
+        return result
+
+    def test_default_captures_both_streams(self, tmp_path: Path) -> None:
+        """Without pass_through_stdout, subprocess.run captures both streams."""
+        with patch(
+            "gww.git.repository.subprocess.run",
+            return_value=self._fake_completed(),
+        ) as mock_run:
+            _run_git(["status"], cwd=tmp_path)
+
+        kwargs = mock_run.call_args.kwargs
+        assert kwargs["stdout"] == subprocess.PIPE
+        assert kwargs["stderr"] == subprocess.PIPE
+
+    def test_pass_through_stdout_inherits_parent_stdout(self, tmp_path: Path) -> None:
+        """pass_through_stdout=True streams stdout to the parent process."""
+        with patch(
+            "gww.git.repository.subprocess.run",
+            return_value=self._fake_completed(),
+        ) as mock_run:
+            _run_git(["status"], cwd=tmp_path, pass_through_stdout=True)
+
+        kwargs = mock_run.call_args.kwargs
+        assert kwargs["stdout"] is None
+        assert kwargs["stderr"] is None
+
+    def test_pass_through_stdout_streams_stderr_too(
+        self, tmp_path: Path
+    ) -> None:
+        """When streaming, stderr also inherits from parent — git writes
+        progress to stderr too (``Cloning into '…'``, ``Preparing worktree``)."""
+        with patch(
+            "gww.git.repository.subprocess.run",
+            return_value=self._fake_completed(returncode=128, stderr=""),
+        ):
+            with pytest.raises(GitCommandError):
+                _run_git(["bad"], cwd=tmp_path, pass_through_stdout=True)
+
+
+class TestCloneRepositoryPassThrough:
+    """``clone_repository`` must forward ``pass_through_stdout`` to ``_run_git``."""
+
+    def test_default_does_not_pass_through_stdout(self, tmp_path: Path) -> None:
+        """clone_repository defaults to capture-both, same as before."""
+        target = tmp_path / "clone"
+        with patch(
+            "gww.git.repository.subprocess.run",
+            return_value=TestRunGitPassThroughStdout._fake_completed(),
+        ) as mock_run:
+            clone_repository("file:///some/repo.git", target)
+
+        kwargs = mock_run.call_args.kwargs
+        assert kwargs["stdout"] == subprocess.PIPE
+        assert kwargs["stderr"] == subprocess.PIPE
+
+    def test_pass_through_stdout_streams_clone_progress(self, tmp_path: Path) -> None:
+        """clone_repository(..., pass_through_stdout=True) inherits parent stdout."""
+        target = tmp_path / "clone"
+        with patch(
+            "gww.git.repository.subprocess.run",
+            return_value=TestRunGitPassThroughStdout._fake_completed(),
+        ) as mock_run:
+            clone_repository(
+                "file:///some/repo.git", target, pass_through_stdout=True
+            )
+
+        kwargs = mock_run.call_args.kwargs
+        assert kwargs["stdout"] is None
+        assert kwargs["stderr"] is None
+
+
+class TestPullRepositoryPassThrough:
+    """``pull_repository`` must forward ``pass_through_stdout`` to ``_run_git``."""
+
+    def test_default_does_not_pass_through_stdout(self, tmp_path: Path) -> None:
+        with patch(
+            "gww.git.repository.subprocess.run",
+            return_value=TestRunGitPassThroughStdout._fake_completed(),
+        ) as mock_run:
+            pull_repository(tmp_path)
+
+        kwargs = mock_run.call_args.kwargs
+        assert kwargs["stdout"] == subprocess.PIPE
+        assert kwargs["stderr"] == subprocess.PIPE
+
+    def test_pass_through_stdout_streams_pull_progress(self, tmp_path: Path) -> None:
+        with patch(
+            "gww.git.repository.subprocess.run",
+            return_value=TestRunGitPassThroughStdout._fake_completed(),
+        ) as mock_run:
+            pull_repository(tmp_path, pass_through_stdout=True)
+
+        kwargs = mock_run.call_args.kwargs
+        assert kwargs["stdout"] is None
+        assert kwargs["stderr"] is None

@@ -71,7 +71,12 @@ def run_remove(ctx: CommandContext) -> int:
             ctx.verbose_msg(f"Removing worktree: {worktree_path}...")
 
     try:
-        remove_worktree(source_path, worktree_path, force=ctx.force)
+        remove_worktree(
+            source_path,
+            worktree_path,
+            force=ctx.force,
+            pass_through_stdout=not ctx.quiet,
+        )
     except (WorktreeNotFoundError, WorktreeDirtyError, GitCommandError) as e:
         raise CommandExit(1, f"Error: {e}") from e
 
