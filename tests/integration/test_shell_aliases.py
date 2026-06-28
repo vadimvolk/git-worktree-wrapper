@@ -61,15 +61,6 @@ def _make_source_repo(tmp_path: Path) -> Path:
     return src
 
 
-def _write_config(config_path: Path, worktree_dir: Path) -> None:
-    """Write a gww config that points worktrees into ``worktree_dir``."""
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(
-        f"default_sources: {config_path.parent}/src\n"
-        f"default_worktrees: {worktree_dir}/norm_branch()\n"
-    )
-
-
 def _isolated_xdg_config(tmp_path: Path, worktree_dir: Path) -> Path:
     """Create a config file at the macOS XDG path under a fake HOME.
 
@@ -81,7 +72,11 @@ def _isolated_xdg_config(tmp_path: Path, worktree_dir: Path) -> Path:
     """
     fake_home = tmp_path / "fakehome"
     config_path = fake_home / "Library" / "Application Support" / "gww" / "config.yml"
-    _write_config(config_path, worktree_dir)
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        f"default_sources: {config_path.parent}/src\n"
+        f"default_worktrees: {worktree_dir}/norm_branch()\n"
+    )
     return fake_home
 
 
@@ -173,13 +168,13 @@ class TestBashGwaAlias:
     """Behavioural tests for the generated ``gwa`` function (bash)."""
 
     def test_yes_answer_cds_into_new_worktree(
-        self, tmp_path: Path, config_dir: Path
+        self, tmp_path: Path
     ) -> None:
         """Answering ``y`` to the prompt must ``cd`` into the printed worktree."""
         assert SH_BASH is not None
         src = _make_source_repo(tmp_path)
         wt = tmp_path / "worktrees"
-        _write_config(config_dir / "gww" / "config.yml", wt)
+        
         fake_home = _isolated_xdg_config(tmp_path, wt)
         alias_file = tmp_path / "gwa.bash"
         # strip trailing `complete` lines — they need an interactive shell
@@ -212,12 +207,12 @@ class TestBashGwaAlias:
         )
         assert (Path(pwd_after) / ".git").exists()
 
-    def test_no_answer_stays_put(self, tmp_path: Path, config_dir: Path) -> None:
+    def test_no_answer_stays_put(self, tmp_path: Path) -> None:
         """Answering ``n`` to the prompt must not change the current directory."""
         assert SH_BASH is not None
         src = _make_source_repo(tmp_path)
         wt = tmp_path / "worktrees"
-        _write_config(config_dir / "gww" / "config.yml", wt)
+        
         fake_home = _isolated_xdg_config(tmp_path, wt)
         alias_file = tmp_path / "gwa.bash"
         alias_file.write_text(
@@ -248,7 +243,7 @@ class TestBashGwaAlias:
         )
 
     def test_prompt_text_is_emitted_on_stdout(
-        self, tmp_path: Path, config_dir: Path
+        self, tmp_path: Path
     ) -> None:
         """The ``Navigate to <path>? [Y/n]`` prompt must be visible to the user.
 
@@ -258,7 +253,7 @@ class TestBashGwaAlias:
         assert SH_BASH is not None
         src = _make_source_repo(tmp_path)
         wt = tmp_path / "worktrees"
-        _write_config(config_dir / "gww" / "config.yml", wt)
+        
         fake_home = _isolated_xdg_config(tmp_path, wt)
         alias_file = tmp_path / "gwa.bash"
         alias_file.write_text(
@@ -289,7 +284,7 @@ class TestBashGwaAlias:
         assert "[Y/n]" in result.stdout
 
     def test_subshell_capture_discards_cd(
-        self, tmp_path: Path, config_dir: Path
+        self, tmp_path: Path
     ) -> None:
         """Capturing ``gwa`` in ``$(...)`` runs it in a subshell.
 
@@ -299,7 +294,7 @@ class TestBashGwaAlias:
         assert SH_BASH is not None
         src = _make_source_repo(tmp_path)
         wt = tmp_path / "worktrees"
-        _write_config(config_dir / "gww" / "config.yml", wt)
+        
         fake_home = _isolated_xdg_config(tmp_path, wt)
         alias_file = tmp_path / "gwa.bash"
         alias_file.write_text(
@@ -355,13 +350,13 @@ class TestZshGwaAlias:
         )
 
     def test_yes_answer_cds_into_new_worktree(
-        self, tmp_path: Path, config_dir: Path
+        self, tmp_path: Path
     ) -> None:
         """Answering ``y`` to the prompt must ``cd`` into the printed worktree."""
         assert SH_ZSH is not None
         src = _make_source_repo(tmp_path)
         wt = tmp_path / "worktrees"
-        _write_config(config_dir / "gww" / "config.yml", wt)
+        
         fake_home = _isolated_xdg_config(tmp_path, wt)
         alias_file = tmp_path / "gwa.zsh"
         self._write_alias(alias_file)
@@ -386,12 +381,12 @@ class TestZshGwaAlias:
         )
         assert (Path(pwd_after) / ".git").exists()
 
-    def test_no_answer_stays_put(self, tmp_path: Path, config_dir: Path) -> None:
+    def test_no_answer_stays_put(self, tmp_path: Path) -> None:
         """Answering ``n`` to the prompt must not change the current directory."""
         assert SH_ZSH is not None
         src = _make_source_repo(tmp_path)
         wt = tmp_path / "worktrees"
-        _write_config(config_dir / "gww" / "config.yml", wt)
+        
         fake_home = _isolated_xdg_config(tmp_path, wt)
         alias_file = tmp_path / "gwa.zsh"
         self._write_alias(alias_file)
@@ -416,7 +411,7 @@ class TestZshGwaAlias:
         )
 
     def test_prompt_text_is_emitted_on_stdout(
-        self, tmp_path: Path, config_dir: Path
+        self, tmp_path: Path
     ) -> None:
         """The ``Navigate to <path>? [Y/n]`` prompt must be visible to the user.
 
@@ -426,7 +421,7 @@ class TestZshGwaAlias:
         assert SH_ZSH is not None
         src = _make_source_repo(tmp_path)
         wt = tmp_path / "worktrees"
-        _write_config(config_dir / "gww" / "config.yml", wt)
+        
         fake_home = _isolated_xdg_config(tmp_path, wt)
         alias_file = tmp_path / "gwa.zsh"
         self._write_alias(alias_file)
@@ -451,7 +446,7 @@ class TestZshGwaAlias:
         assert "[Y/n]" in result.stdout
 
     def test_subshell_capture_discards_cd(
-        self, tmp_path: Path, config_dir: Path
+        self, tmp_path: Path
     ) -> None:
         """Capturing ``gwa`` in ``$(...)`` runs it in a subshell.
 
@@ -461,7 +456,7 @@ class TestZshGwaAlias:
         assert SH_ZSH is not None
         src = _make_source_repo(tmp_path)
         wt = tmp_path / "worktrees"
-        _write_config(config_dir / "gww" / "config.yml", wt)
+        
         fake_home = _isolated_xdg_config(tmp_path, wt)
         alias_file = tmp_path / "gwa.zsh"
         self._write_alias(alias_file)
@@ -500,13 +495,13 @@ class TestFishGwaAlias:
     """Behavioural tests for the generated ``gwa`` function (fish)."""
 
     def test_yes_answer_cds_into_new_worktree(
-        self, tmp_path: Path, config_dir: Path
+        self, tmp_path: Path
     ) -> None:
         """Answering ``y`` to the prompt must ``cd`` into the printed worktree."""
         assert SH_FISH is not None
         src = _make_source_repo(tmp_path)
         wt = tmp_path / "worktrees"
-        _write_config(config_dir / "gww" / "config.yml", wt)
+        
         fake_home = _isolated_xdg_config(tmp_path, wt)
         alias_file = tmp_path / "gwa.fish"
         alias_file.write_text(generate_fish_aliases()["gwa"])
@@ -531,12 +526,12 @@ class TestFishGwaAlias:
         )
         assert (Path(pwd_after) / ".git").exists()
 
-    def test_no_answer_stays_put(self, tmp_path: Path, config_dir: Path) -> None:
+    def test_no_answer_stays_put(self, tmp_path: Path) -> None:
         """Answering ``n`` to the prompt must not change the current directory."""
         assert SH_FISH is not None
         src = _make_source_repo(tmp_path)
         wt = tmp_path / "worktrees"
-        _write_config(config_dir / "gww" / "config.yml", wt)
+        
         fake_home = _isolated_xdg_config(tmp_path, wt)
         alias_file = tmp_path / "gwa.fish"
         alias_file.write_text(generate_fish_aliases()["gwa"])
@@ -561,7 +556,7 @@ class TestFishGwaAlias:
         )
 
     def test_subshell_capture_propagates_cd(
-        self, tmp_path: Path, config_dir: Path
+        self, tmp_path: Path
     ) -> None:
         """In fish, ``set OUT (gwa ...)`` runs in a subshell but ``cd`` propagates.
 
@@ -573,7 +568,7 @@ class TestFishGwaAlias:
         assert SH_FISH is not None
         src = _make_source_repo(tmp_path)
         wt = tmp_path / "worktrees"
-        _write_config(config_dir / "gww" / "config.yml", wt)
+        
         fake_home = _isolated_xdg_config(tmp_path, wt)
         alias_file = tmp_path / "gwa.fish"
         alias_file.write_text(generate_fish_aliases()["gwa"])
