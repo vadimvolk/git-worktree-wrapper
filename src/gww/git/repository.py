@@ -185,21 +185,19 @@ def get_source_repository(worktree_path: Path) -> Path:
         NotGitRepositoryError: If path is not a valid worktree.
         GitCommandError: If git command fails.
     """
+    from gww.git.worktree import read_gitdir
+
     repo_root = get_repository_root(worktree_path)
 
     if not is_worktree(repo_root):
         # Already at source repository
         return repo_root
 
-    # Read .git file to find worktree config
     git_file = repo_root / ".git"
-    content = git_file.read_text().strip()
-
-    # Format: "gitdir: /path/to/repo/.git/worktrees/name"
-    if not content.startswith("gitdir:"):
+    gitdir = read_gitdir(git_file)
+    if gitdir is None:
         raise NotGitRepositoryError(f"Invalid .git file in worktree: {worktree_path}")
 
-    gitdir = content.split(":", 1)[1].strip()
     gitdir_path = Path(gitdir).resolve()
 
     # Navigate from .git/worktrees/<name> to the repository root

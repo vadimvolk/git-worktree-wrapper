@@ -10,6 +10,56 @@ from typing import Optional
 from gww.git.repository import GitCommandError, _run_git, get_repository_root, is_worktree
 
 
+def read_gitdir(gitfile: Path) -> Optional[str]:
+    """Read the ``gitdir: ...`` line from a worktree's ``.git`` file.
+
+    A worktree's ``.git`` is a regular file (not a directory) containing a
+    single line of the form ``gitdir: /path/to/source/.git/worktrees/<id>``.
+    Source repos and submodules use this file too.
+
+    Args:
+        gitfile: Path to the ``.git`` file to read.
+
+    Returns:
+        The trimmed ``gitdir`` path, or ``None`` if ``gitfile`` does not
+        exist, is not a regular file, cannot be read, or does not have a
+        ``gitdir:`` prefix.
+    """
+    if not gitfile.is_file():
+        return None
+    try:
+        content = gitfile.read_text().strip()
+    except OSError:
+        return None
+    if not content.startswith("gitdir:"):
+        return None
+    return content.split(":", 1)[1].strip()
+
+
+def worktree_id_from_gitdir(gitdir: str) -> Optional[str]:
+    """Extract the worktree id from a ``gitdir`` path.
+
+    Git encodes the worktree identity as ``.../worktrees/<id>``. The id is
+    used by operations that need to relocate a copied worktree's ``.git``
+    pointer to its new source repo.
+
+    Args:
+        gitdir: Value returned from :func:`read_gitdir`.
+
+    Returns:
+        The worktree id, or ``None`` if the path does not contain a
+        ``worktrees/<id>`` segment.
+    """
+    parts = Path(gitdir.replace("\\", "/")).parts
+    try:
+        idx = parts.index("worktrees")
+    except ValueError:
+        return None
+    if idx + 1 >= len(parts):
+        return None
+    return parts[idx + 1]
+
+
 class WorktreeError(Exception):
     """Base exception for worktree-related errors."""
 

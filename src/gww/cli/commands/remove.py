@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import argparse
-import sys
 from pathlib import Path
 
+from gww.cli.context import CommandContext, CommandExit, exit_on_error
 from gww.git.repository import (
     GitCommandError,
     NotGitRepositoryError,
@@ -16,99 +15,88 @@ from gww.git.worktree import (
     WorktreeDirtyError,
     WorktreeNotFoundError,
     find_worktree_by_branch,
-    find_worktree_by_path,
     remove_worktree,
 )
 
 
-def run_remove(args: argparse.Namespace) -> int:
+def _resolve_source_repo(cwd: Path) -> Path:
+    """Detect repo at cwd and walk back to its source if needed.
+
+    Args:
+        cwd: Directory to start the detection from.
+
+    Returns:
+        Path to the source repository.
+
+    Raises:
+        CommandExit: With code ``1`` if ``cwd`` is not in a git repo or the
+            source repo cannot be found.
+    """
+    try:
+        repo = detect_repository(cwd)
+    except NotGitRepositoryError as e:
+        raise CommandExit(1, "Error: Not in a git repository.") from e
+
+    if repo.is_worktree:
+        try:
+            return get_source_repository(repo.path)
+        except (NotGitRepositoryError, GitCommandError) as e:
+            raise CommandExit(1, f"Error finding source repository: {e}") from e
+    return repo.path
+
+
+@exit_on_error
+def run_remove(ctx: CommandContext) -> int:
     """Execute the remove worktree command.
 
     Args:
-        args: Parsed command line arguments.
+        ctx: Per-invocation command context.
 
     Returns:
         Exit code (0 for success, 1 for error).
     """
-    branch_or_path = args.branch_or_path
-    force = getattr(args, "force", False)
-    verbose = getattr(args, "verbose", 0)
-    quiet = getattr(args, "quiet", False)
+    if ctx.branch_or_path is None:
+        raise CommandExit(1, "Error: Missing branch or path.")
 
-    # Determine if argument is a path or branch name
+    branch_or_path = ctx.branch_or_path
     is_path = "/" in branch_or_path and Path(branch_or_path).is_absolute()
 
     if is_path:
         worktree_path = Path(branch_or_path).resolve()
 
-        # Verify it's a valid worktree
         try:
             repo = detect_repository(worktree_path)
-        except NotGitRepositoryError:
-            print(f"Error: Not a git repository: {worktree_path}", file=sys.stderr)
-            return 1
+        except NotGitRepositoryError as e:
+            raise CommandExit(1, f"Error: Not a git repository: {worktree_path}") from e
 
         if not repo.is_worktree:
-            print(f"Error: Not a worktree: {worktree_path}", file=sys.stderr)
-            return 1
+            raise CommandExit(1, f"Error: Not a worktree: {worktree_path}")
 
-        # Get source repository
         try:
             source_path = get_source_repository(worktree_path)
         except (NotGitRepositoryError, GitCommandError) as e:
-            print(f"Error finding source repository: {e}", file=sys.stderr)
-            return 1
+            raise CommandExit(1, f"Error finding source repository: {e}") from e
     else:
-        # branch_or_path is a branch name
         branch = branch_or_path
         cwd = Path.cwd()
+        source_path = _resolve_source_repo(cwd)
 
-        # Detect current repository
-        try:
-            repo = detect_repository(cwd)
-        except NotGitRepositoryError:
-            print("Error: Not in a git repository.", file=sys.stderr)
-            return 1
-
-        # Get source repository
-        if repo.is_worktree:
-            try:
-                source_path = get_source_repository(repo.path)
-            except (NotGitRepositoryError, GitCommandError) as e:
-                print(f"Error finding source repository: {e}", file=sys.stderr)
-                return 1
-        else:
-            source_path = repo.path
-
-        # Find worktree by branch
         wt = find_worktree_by_branch(source_path, branch)
         if not wt:
-            print(f"Error: No worktree found for branch '{branch}'", file=sys.stderr)
-            return 1
-
+            raise CommandExit(1, f"Error: No worktree found for branch '{branch}'")
         worktree_path = wt.path
 
-    if verbose > 0 and not quiet:
-        if force:
-            print(f"Force removing worktree: {worktree_path}...", file=sys.stderr)
+    if ctx.verbose > 0:
+        if ctx.force:
+            ctx.verbose_msg(f"Force removing worktree: {worktree_path}...")
         else:
-            print(f"Removing worktree: {worktree_path}...", file=sys.stderr)
+            ctx.verbose_msg(f"Removing worktree: {worktree_path}...")
 
-    # Remove worktree
     try:
-        remove_worktree(source_path, worktree_path, force=force)
-    except WorktreeNotFoundError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
-    except WorktreeDirtyError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
-    except GitCommandError as e:
-        print(f"Error removing worktree: {e}", file=sys.stderr)
-        return 1
+        remove_worktree(source_path, worktree_path, force=ctx.force)
+    except (WorktreeNotFoundError, WorktreeDirtyError, GitCommandError) as e:
+        raise CommandExit(1, f"Error: {e}") from e
 
-    # Output confirmation
-    if not quiet:
-        print(f"Removed worktree: {worktree_path}")
+    ctx.say(f"Removed worktree: {worktree_path}")
 
     return 0

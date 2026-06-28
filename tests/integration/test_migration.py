@@ -8,6 +8,7 @@ from pathlib import Path
 
 from gww.cli.commands.migrate import run_migrate
 from gww.git.worktree import list_worktrees
+from tests.conftest import make_ctx
 
 
 @pytest.fixture
@@ -88,19 +89,6 @@ def old_repos_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
     subprocess.run(["git", "commit", "-m", "Initial"], cwd=repo3, check=True, capture_output=True)
 
     return old_dir
-
-
-@pytest.fixture
-def config_dir(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Create a temporary config directory and patch get_config_path."""
-    config_path = tmp_path_factory.mktemp("config")
-    test_config_file = config_path / "gww" / "config.yml"
-    
-    # Patch get_config_path in all modules that import it
-    monkeypatch.setattr("gww.utils.xdg.get_config_path", lambda appname="gww": test_config_file)
-    monkeypatch.setattr("gww.config.loader.get_config_path", lambda: test_config_file)
-    
-    return config_path
 
 
 @pytest.fixture
@@ -259,14 +247,13 @@ sources:
     sources: {target_dir}/gitlab/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = str(old_repos_dir)
-            dry_run = True
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_repos_dir),
+            dry_run=True,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
 
         assert result == 0
         captured = capsys.readouterr()
@@ -297,14 +284,13 @@ sources:
     sources: {target_dir}/gitlab/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = str(old_repos_dir)
-            dry_run = False
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_repos_dir),
+            dry_run=False,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
 
         assert result == 0
         # Original repos should still exist (copy, not move)
@@ -360,14 +346,13 @@ sources:
     sources: {target_dir}/github/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = str(old_dir)
-            dry_run = False
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_dir),
+            dry_run=False,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
 
         assert result == 0
         migrated = target_dir / "github" / "user" / "symlink_repo"
@@ -398,14 +383,13 @@ sources:
     sources: {target_dir}/gitlab/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = str(old_repos_dir)
-            dry_run = False
-            inplace = True
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_repos_dir),
+            dry_run=False,
+            inplace=True,
+            verbose=0,
+            quiet=False,
+        ))
 
         assert result == 0
         # Original repos should be moved (no longer exist)
@@ -430,14 +414,13 @@ default_sources: {target_dir}/default/path(-1)
 default_worktrees: {target_dir}/worktrees
 """)
 
-        class Args:
-            old_repos = str(old_repos_dir)
-            dry_run = False
-            inplace = False
-            verbose = 1  # Verbose to see skip messages
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_repos_dir),
+            dry_run=False,
+            inplace=False,
+            verbose=1,  # Verbose to see skip messages
+            quiet=False,
+        ))
 
         assert result == 0
         captured = capsys.readouterr()
@@ -457,14 +440,13 @@ default_sources: {target_dir}/sources
 default_worktrees: {target_dir}/worktrees
 """)
 
-        class Args:
-            old_repos = "/nonexistent/path"
-            dry_run = False
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos="/nonexistent/path",
+            dry_run=False,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
 
         assert result == 1
 
@@ -476,14 +458,13 @@ default_worktrees: {target_dir}/worktrees
         """Test that migrate fails without config file."""
         # Don't create config
 
-        class Args:
-            old_repos = str(old_repos_dir)
-            dry_run = False
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_repos_dir),
+            dry_run=False,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
 
         assert result == 2
 
@@ -502,14 +483,13 @@ default_sources: {target_dir}/sources
 default_worktrees: {target_dir}/worktrees
 """)
 
-        class Args:
-            old_repos = str(tmp_path)
-            dry_run = False
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(tmp_path),
+            dry_run=False,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
 
         assert result == 0
         captured = capsys.readouterr()
@@ -557,14 +537,13 @@ default_sources: {target_dir}/github/path(-2)/path(-1)
 default_worktrees: {target_dir}/worktrees
 """)
 
-        class Args:
-            old_repos = str(target_dir)
-            dry_run = False
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(target_dir),
+            dry_run=False,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
 
         assert result == 0
         captured = capsys.readouterr()
@@ -592,14 +571,13 @@ sources:
     sources: {target_dir}/github/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = str(old_repos_dir)
-            dry_run = False
-            inplace = False
-            verbose = 1
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_repos_dir),
+            dry_run=False,
+            inplace=False,
+            verbose=1,
+            quiet=False,
+        ))
 
         assert result == 0
         captured = capsys.readouterr()
@@ -628,14 +606,13 @@ sources:
     worktrees: {target_dir}/github/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = str(worktrees_dir)
-            dry_run = False
-            inplace = True
-            verbose = 1
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(worktrees_dir),
+            dry_run=False,
+            inplace=True,
+            verbose=1,
+            quiet=False,
+        ))
 
         assert result == 0
         captured = capsys.readouterr()
@@ -676,14 +653,13 @@ sources:
     worktrees: {target_dir}/github/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = str(worktrees_dir)
-            dry_run = False
-            inplace = False  # Copy (default)
-            verbose = 1
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(worktrees_dir),
+            dry_run=False,
+            inplace=False,  # Copy (default)
+            verbose=1,
+            quiet=False,
+        ))
 
         assert result == 0
         captured = capsys.readouterr()
@@ -717,14 +693,13 @@ sources:
     sources: {target_dir}/github/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = str(old_repos_dir)
-            dry_run = False
-            inplace = True
-            verbose = 1
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_repos_dir),
+            dry_run=False,
+            inplace=True,
+            verbose=1,
+            quiet=False,
+        ))
 
         assert result == 0
         captured = capsys.readouterr()
@@ -753,14 +728,13 @@ default_sources: {target_dir}/github/path(-2)/path(-1)
 default_worktrees: {target_dir}/worktrees
 """)
 
-        class Args:
-            old_repos = str(old_dir)
-            dry_run = True
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_dir),
+            dry_run=True,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
 
         assert result == 0
         captured = capsys.readouterr()
@@ -785,14 +759,13 @@ default_sources: {target_dir}/github/path(-2)/path(-1)
 default_worktrees: {target_dir}/worktrees
 """)
 
-        class Args:
-            old_repos = str(old_dir)
-            dry_run = False
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_dir),
+            dry_run=False,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
 
         assert result == 0
         # URI path segment is "main-repo" (from main-repo.git)
@@ -854,14 +827,13 @@ sources:
     sources: {target_dir}/gitlab/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = [str(old_repos_dir), str(other_dir)]
-            dry_run = False
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=[str(old_repos_dir), str(other_dir)],
+            dry_run=False,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
 
         assert result == 0
         assert (target_dir / "github" / "user" / "project1").exists()
@@ -890,14 +862,13 @@ sources:
     sources: {target_dir}/gitlab/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = str(old_repos_dir)
-            dry_run = False
-            inplace = True
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_repos_dir),
+            dry_run=False,
+            inplace=True,
+            verbose=0,
+            quiet=False,
+        ))
 
         assert result == 0
         assert not (old_repos_dir / "project1").exists()
@@ -931,14 +902,13 @@ sources:
     sources: {target_dir}/gitlab/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = str(old_repos_dir)
-            dry_run = False
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_repos_dir),
+            dry_run=False,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
         captured = capsys.readouterr()
 
         # Copy mode should fail with exit code 1 when destination exists
@@ -982,14 +952,13 @@ sources:
     sources: {target_dir}/gitlab/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = str(old_repos_dir)
-            dry_run = False
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_repos_dir),
+            dry_run=False,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
         captured = capsys.readouterr()
 
         # Should fail with exit code 1
@@ -1030,14 +999,13 @@ sources:
     sources: {target_dir}/gitlab/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = str(old_repos_dir)
-            dry_run = True  # Dry run mode
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_repos_dir),
+            dry_run=True,  # Dry run mode,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
         captured = capsys.readouterr()
 
         # Dry-run should also fail with exit code 1
@@ -1079,14 +1047,13 @@ sources:
     sources: {target_dir}/gitlab/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = str(old_repos_dir)
-            dry_run = False
-            inplace = True  # Inplace mode
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(old_repos_dir),
+            dry_run=False,
+            inplace=True,  # Inplace mode,
+            verbose=0,
+            quiet=False,
+        ))
         captured = capsys.readouterr()
 
         # Inplace mode should succeed with exit code 0
@@ -1181,14 +1148,13 @@ default_sources: {target_dir}/github/path(-2)/path(-1)
 default_worktrees: {target_dir}/github/path(-2)/path(-1)
 """)
 
-        class Args:
-            old_repos = str(mixed_dir)
-            dry_run = False
-            inplace = False
-            verbose = 1
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(mixed_dir),
+            dry_run=False,
+            inplace=False,
+            verbose=1,
+            quiet=False,
+        ))
         captured = capsys.readouterr()
 
         assert result == 0
@@ -1277,14 +1243,13 @@ default_sources: {target_dir}/repos/path(-2)/path(-1)
 default_worktrees: {target_dir}/worktrees
 """)
 
-        class Args:
-            old_repos = str(collision_dir)
-            dry_run = False
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=str(collision_dir),
+            dry_run=False,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
         captured = capsys.readouterr()
 
         # Should fail in copy mode when destination already exists
@@ -1310,14 +1275,13 @@ default_worktrees: {target_dir}/worktrees
 
         # Pass empty list - this simulates programmatic usage
         # Note: CLI would require at least one path, but run_migrate accepts a list
-        class Args:
-            old_repos = []
-            dry_run = False
-            inplace = False
-            verbose = 0
-            quiet = False
-
-        result = run_migrate(Args())
+        result = run_migrate(make_ctx(
+            old_repos=[],
+            dry_run=False,
+            inplace=False,
+            verbose=0,
+            quiet=False,
+        ))
         captured = capsys.readouterr()
 
         # Should succeed with no repositories found

@@ -1,27 +1,11 @@
 """Integration tests for init commands (config and shell) (T063, T070)."""
 
 import pytest
-import subprocess
 from pathlib import Path
-from unittest.mock import patch
 
 from gww.cli.commands.init import run_init_config, run_init_shell
 from gww.config.loader import load_config
-from gww.utils.xdg import get_config_path
-
-
-@pytest.fixture
-def config_dir(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Create a temporary config directory and patch get_config_path."""
-    config_path = tmp_path_factory.mktemp("config")
-    test_config_file = config_path / "gww" / "config.yml"
-    
-    # Patch get_config_path to return our test path
-    monkeypatch.setattr("gww.utils.xdg.get_config_path", lambda appname="gww": test_config_file)
-    monkeypatch.setattr("gww.config.loader.get_config_path", lambda: test_config_file)
-    monkeypatch.setattr("gww.cli.commands.init.get_config_path", lambda: test_config_file)
-    
-    return config_path
+from tests.conftest import make_ctx
 
 
 class TestInitConfigCommand:
@@ -33,18 +17,12 @@ class TestInitConfigCommand:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test that init config creates default configuration file."""
-        class Args:
-            verbose = 0
-            quiet = False
-
-        result = run_init_config(Args())
+        result = run_init_config(make_ctx())
 
         assert result == 0
-        # Verify config was created
         config_path = config_dir / "gww" / "config.yml"
         assert config_path.exists()
 
-        # Verify output
         captured = capsys.readouterr()
         assert "Created config file" in captured.out
 
@@ -53,14 +31,9 @@ class TestInitConfigCommand:
         config_dir: Path,
     ) -> None:
         """Test that created config is valid YAML."""
-        class Args:
-            verbose = 0
-            quiet = False
-
-        run_init_config(Args())
+        run_init_config(make_ctx())
 
         config_path = config_dir / "gww" / "config.yml"
-        # Should be loadable
         config = load_config(config_path)
         assert "default_sources" in config
         assert "default_worktrees" in config
@@ -70,19 +43,14 @@ class TestInitConfigCommand:
         config_dir: Path,
     ) -> None:
         """Test that config contains helpful documentation."""
-        class Args:
-            verbose = 0
-            quiet = False
-
-        run_init_config(Args())
+        run_init_config(make_ctx())
 
         config_path = config_dir / "gww" / "config.yml"
         content = config_path.read_text()
 
-        # Should contain documentation
-        assert "#" in content  # Has comments
-        assert "path(" in content  # Documents path function
-        assert "branch" in content.lower()  # Documents branch functions
+        assert "#" in content
+        assert "path(" in content
+        assert "branch" in content.lower()
 
     def test_fails_when_config_exists(
         self,
@@ -90,16 +58,11 @@ class TestInitConfigCommand:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test that init config fails when config already exists."""
-        # Create config first
         config_path = config_dir / "gww" / "config.yml"
         config_path.parent.mkdir(parents=True)
         config_path.write_text("existing: config")
 
-        class Args:
-            verbose = 0
-            quiet = False
-
-        result = run_init_config(Args())
+        result = run_init_config(make_ctx())
 
         assert result == 1
         captured = capsys.readouterr()
@@ -111,11 +74,7 @@ class TestInitConfigCommand:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test that quiet mode suppresses output."""
-        class Args:
-            verbose = 0
-            quiet = True
-
-        result = run_init_config(Args())
+        result = run_init_config(make_ctx(quiet=True))
 
         assert result == 0
         captured = capsys.readouterr()
@@ -126,12 +85,7 @@ class TestInitConfigCommand:
         config_dir: Path,
     ) -> None:
         """Test that init config creates parent directories."""
-        # Config dir exists but gww subdirectory doesn't
-        class Args:
-            verbose = 0
-            quiet = False
-
-        result = run_init_config(Args())
+        result = run_init_config(make_ctx())
 
         assert result == 0
         config_path = config_dir / "gww" / "config.yml"
@@ -148,15 +102,9 @@ class TestInitShellCommand:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test installing bash completion script."""
-        # Override home directory to use tmp_path
         monkeypatch.setenv("HOME", str(tmp_path))
 
-        class Args:
-            shell = "bash"
-            verbose = 0
-            quiet = False
-
-        result = run_init_shell(Args())
+        result = run_init_shell(make_ctx(shell="bash"))
 
         assert result == 0
         captured = capsys.readouterr()
@@ -171,12 +119,7 @@ class TestInitShellCommand:
         """Test installing zsh completion script."""
         monkeypatch.setenv("HOME", str(tmp_path))
 
-        class Args:
-            shell = "zsh"
-            verbose = 0
-            quiet = False
-
-        result = run_init_shell(Args())
+        result = run_init_shell(make_ctx(shell="zsh"))
 
         assert result == 0
         captured = capsys.readouterr()
@@ -191,12 +134,7 @@ class TestInitShellCommand:
         """Test installing fish completion script."""
         monkeypatch.setenv("HOME", str(tmp_path))
 
-        class Args:
-            shell = "fish"
-            verbose = 0
-            quiet = False
-
-        result = run_init_shell(Args())
+        result = run_init_shell(make_ctx(shell="fish"))
 
         assert result == 0
         captured = capsys.readouterr()
@@ -211,12 +149,7 @@ class TestInitShellCommand:
         """Test that init shell fails for invalid shell name."""
         monkeypatch.setenv("HOME", str(tmp_path))
 
-        class Args:
-            shell = "powershell"
-            verbose = 0
-            quiet = False
-
-        result = run_init_shell(Args())
+        result = run_init_shell(make_ctx(shell="powershell"))
 
         assert result == 1
         captured = capsys.readouterr()
@@ -231,12 +164,7 @@ class TestInitShellCommand:
         """Test that quiet mode suppresses output."""
         monkeypatch.setenv("HOME", str(tmp_path))
 
-        class Args:
-            shell = "bash"
-            verbose = 0
-            quiet = True
-
-        result = run_init_shell(Args())
+        result = run_init_shell(make_ctx(shell="bash", quiet=True))
 
         assert result == 0
         captured = capsys.readouterr()
@@ -250,14 +178,8 @@ class TestInitShellCommand:
         """Test that bash completion content has required elements."""
         monkeypatch.setenv("HOME", str(tmp_path))
 
-        class Args:
-            shell = "bash"
-            verbose = 0
-            quiet = True
+        run_init_shell(make_ctx(shell="bash", quiet=True))
 
-        run_init_shell(Args())
-
-        # Find and read the completion file
         completion_file = tmp_path / ".bash_completion.d" / "gww"
         assert completion_file.exists()
 
@@ -273,14 +195,8 @@ class TestInitShellCommand:
         """Test that zsh completion content has required elements."""
         monkeypatch.setenv("HOME", str(tmp_path))
 
-        class Args:
-            shell = "zsh"
-            verbose = 0
-            quiet = True
+        run_init_shell(make_ctx(shell="zsh", quiet=True))
 
-        run_init_shell(Args())
-
-        # Find and read the completion file
         completion_file = tmp_path / ".zsh" / "completions" / "_gww"
         assert completion_file.exists()
 
@@ -296,14 +212,8 @@ class TestInitShellCommand:
         """Test that fish completion content has required elements."""
         monkeypatch.setenv("HOME", str(tmp_path))
 
-        class Args:
-            shell = "fish"
-            verbose = 0
-            quiet = True
+        run_init_shell(make_ctx(shell="fish", quiet=True))
 
-        run_init_shell(Args())
-
-        # Find and read the completion file
         completion_file = tmp_path / ".config" / "fish" / "completions" / "gww.fish"
         assert completion_file.exists()
 
@@ -319,13 +229,7 @@ class TestInitShellCommand:
         """Test that init shell shows installation instructions."""
         monkeypatch.setenv("HOME", str(tmp_path))
 
-        class Args:
-            shell = "bash"
-            verbose = 0
-            quiet = False
-
-        run_init_shell(Args())
+        run_init_shell(make_ctx(shell="bash"))
 
         captured = capsys.readouterr()
-        # Should include instructions for activating
         assert "source" in captured.out.lower() or "bashrc" in captured.out.lower()

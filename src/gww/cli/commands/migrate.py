@@ -1,576 +1,81 @@
-"""Migrate command implementation."""
+"""Migrate command implementation.
+
+Thin wrapper over :mod:`gww.migration`: the command validates inputs,
+calls the planner, prints the result, and delegates execution to the
+executor. All planning and movement logic lives in the migration package
+where it can be unit-tested directly.
+"""
 
 from __future__ import annotations
 
-import argparse
-import os
-import shutil
 import sys
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
-from gww.config.loader import ConfigLoadError, ConfigNotFoundError, load_config
-from gww.config.resolver import ResolverError, resolve_source_path, resolve_worktree_path
-from gww.config.validator import Config, ConfigValidationError, validate_config
-from gww.git.repository import (
-    GitCommandError,
-    get_current_branch,
-    get_remote_uri,
-    get_source_repository,
-    is_submodule,
-    is_worktree,
+from gww.cli.context import CommandContext, CommandExit, exit_on_error, load_config_or_exit
+from gww.migration import (
+    Blocked,
+    Migration,
+    Mode,
+    collect_repositories,
+    execute,
+    plan_migration,
 )
-from gww.git.worktree import repair_worktrees
-from gww.utils.uri import parse_uri
 
 
-@dataclass
-class MigrationPlan:
-    """Plan for migrating a single repository (source or worktree)."""
-
-    old_path: Path
-    new_path: Path
-    uri: str
-    is_worktree: bool = False
-    source_path: Optional[Path] = None  # main repo path (for worktrees only)
-
-
-def _find_git_repositories(directory: Path) -> list[Path]:
-    """Find all git repositories and worktrees in a directory tree.
-
-    Repository and worktree interiors are not traversed; each repo or worktree
-    is treated as a single unit (no descent into subdirectories).
-
-    Args:
-        directory: Directory to scan.
-
-    Returns:
-        List of paths to git repository roots.
-    """
-    repos: list[Path] = []
-
-    for root, dirs, files in os.walk(directory):
-        root_path = Path(root)
-
-        # Check if this is a git repository or worktree (skip submodules - they move with parent)
-        if (root_path / ".git").exists() and not is_submodule(root_path):
-            repos.append(root_path)
-            # Do not descend into the repository or worktree (treat as single unit)
-            dirs.clear()
-
-    return repos
-
-
-def _collect_all_repos(input_paths: list[Path]) -> tuple[list[Path], list[Path]]:
-    """Collect and merge repo roots from multiple input directories.
-
-    Args:
-        input_paths: List of directories to scan.
-
-    Returns:
-        Tuple of (deduplicated repo paths, input roots for cleanup).
-    """
-    seen: set[Path] = set()
-    repos: list[Path] = []
-    for directory in input_paths:
-        for repo_path in _find_git_repositories(directory):
-            resolved = repo_path.resolve()
-            if resolved not in seen:
-                seen.add(resolved)
-                repos.append(repo_path)
-    return repos, [p.resolve() for p in input_paths]
-
-
-def _format_skipped_items(skipped_items: list[tuple[str, Path, bool]]) -> str:
-    """Format skipped items breakdown by type and reason.
-
-    Args:
-        skipped_items: List of (reason, path, is_worktree) tuples
-
-    Returns:
-        Formatted multi-line string with breakdown, or empty string if no skips
-    """
-    if not skipped_items:
-        return ""
-
-    # Group by reason, tracking sources vs worktrees
-    reason_counts: dict[str, tuple[int, int]] = {}  # reason -> (sources, worktrees)
-
-    for reason, path, is_worktree in skipped_items:
-        if reason not in reason_counts:
-            reason_counts[reason] = (0, 0)
-        sources, worktrees = reason_counts[reason]
-        if is_worktree:
-            reason_counts[reason] = (sources, worktrees + 1)
-        else:
-            reason_counts[reason] = (sources + 1, worktrees)
-
-    total_sources = sum(s for s, w in reason_counts.values())
-    total_worktrees = sum(w for s, w in reason_counts.values())
-
-    lines = []
-    if total_sources > 0 and total_worktrees > 0:
-        src_word = "source" if total_sources == 1 else "sources"
-        wt_word = "worktree" if total_worktrees == 1 else "worktrees"
-        lines.append(f"Ignored {total_sources} {src_word}, {total_worktrees} {wt_word}:")
-    elif total_sources > 0:
-        src_word = "source" if total_sources == 1 else "sources"
-        lines.append(f"Ignored {total_sources} {src_word}:")
-    elif total_worktrees > 0:
-        wt_word = "worktree" if total_worktrees == 1 else "worktrees"
-        lines.append(f"Ignored {total_worktrees} {wt_word}:")
-
-    # Format each reason with its breakdown
-    for reason, (sources, worktrees) in sorted(reason_counts.items()):
-        parts = []
-        if sources > 0:
-            parts.append(f"{sources} source{'s' if sources != 1 else ''}")
-        if worktrees > 0:
-            parts.append(f"{worktrees} worktree{'s' if worktrees != 1 else ''}")
-        lines.append(f"  - {reason}: {', '.join(parts)}")
-
-    return "\n".join(lines)
-
-
-def _plan_migration(
-    repos: list[Path],
-    config: Config,
-    inplace: bool,
-    verbose: int = 0,
-    tags: Optional[dict[str, str]] = None,
-) -> tuple[list[MigrationPlan], list[tuple[str, Path, bool, bool]]]:
-    """Plan migrations for all repositories.
-
-    Classifies each repo as source or worktree; uses resolve_source_path for
-    sources and resolve_worktree_path for worktrees (branch from get_current_branch).
-
-    Args:
-        repos: List of repository root paths.
-        config: Validated configuration.
-        inplace: Migration mode flag (True=inplace move, False=copy mode).
-        verbose: Verbosity level.
-        tags: Optional tags for template evaluation.
-
-    Returns:
-        Tuple of (valid migration plans, list of skips as (reason, path, is_fatal, is_worktree) tuples).
-        - is_fatal depends on mode: destination exists is fatal in copy mode, not fatal in inplace
-        - Other skips (already at target, no remote, etc.) are always non-fatal
-    """
-    if tags is None:
-        tags = {}
-    plans: list[MigrationPlan] = []
-    skips: list[tuple[str, Path, bool, bool]] = []  # (reason, path, is_fatal, is_worktree)
-
-    for repo_path in repos:
-        remote_uri = get_remote_uri(repo_path)
-        if not remote_uri:
-            skips.append(("no remote origin configured", repo_path, False, False))
-            if verbose > 0:
-                print(
-                    f"Skipping {repo_path}: No remote origin configured",
-                    file=sys.stderr,
-                )
-            continue
-
-        try:
-            uri_parsed = parse_uri(remote_uri)
-        except ValueError as e:
-            skips.append((f"invalid remote URI: {e}", repo_path, False, False))
-            if verbose > 0:
-                print(f"Skipping {repo_path}: Invalid remote URI: {e}", file=sys.stderr)
-            continue
-
-        is_wt = is_worktree(repo_path)
-        source_path: Optional[Path] = None
-        if is_wt:
-            try:
-                source_path = get_source_repository(repo_path)
-            except Exception:
-                skips.append(("could not resolve source repository", repo_path, False, is_wt))
-                if verbose > 0:
-                    print(f"Skipping {repo_path}: Could not resolve source repository", file=sys.stderr)
-                continue
-            try:
-                branch = get_current_branch(repo_path)
-            except GitCommandError:
-                skips.append(("detached HEAD", repo_path, False, is_wt))
-                if verbose > 0:
-                    print(f"Skipping {repo_path}: Detached HEAD (branch required for worktree path)", file=sys.stderr)
-                continue
-            try:
-                expected_path = resolve_worktree_path(config, uri_parsed, branch, tags)
-            except ResolverError as e:
-                skips.append((str(e), repo_path, False, is_wt))
-                if verbose > 0:
-                    print(f"Skipping {repo_path}: {e}", file=sys.stderr)
-                continue
-        else:
-            try:
-                expected_path = resolve_source_path(config, uri_parsed, tags)
-            except ResolverError as e:
-                skips.append((str(e), repo_path, False, is_wt))
-                if verbose > 0:
-                    print(f"Skipping {repo_path}: {e}", file=sys.stderr)
-                continue
-
-        # Check if already at target
-        if repo_path.resolve() == expected_path.resolve():
-            skips.append(("already at target", repo_path, False, is_wt))
-            continue
-
-        # Check if destination exists
-        # In copy mode: fatal error (will cause migration to fail)
-        # In inplace mode: non-fatal skip (will skip this repo, continue with others)
-        if expected_path.exists():
-            is_fatal = not inplace  # Fatal only in copy mode
-            skips.append(("destination exists", expected_path, is_fatal, is_wt))
-            continue
-
-        # Valid migration plan
-        plans.append(
-            MigrationPlan(
-                old_path=repo_path,
-                new_path=expected_path,
-                uri=remote_uri,
-                is_worktree=is_wt,
-                source_path=source_path,
-            )
-        )
-
-    return plans, skips
-
-
-def _run_inplace(
-    valid_plans: list[MigrationPlan],
-    already_at_target: list[Path],
-    input_roots: list[Path],
-    dry_run: bool,
-    quiet: bool,
-    verbose: int,
-) -> int:
-    """Execute inplace migration (move worktrees then sources, then clean empty dirs)."""
-    # Output "already at target" when not quiet
-    if already_at_target and not quiet:
-        for path in already_at_target:
-            print(f"Already at target: {path}")
-
-    worktree_plans = [p for p in valid_plans if p.is_worktree]
-    source_plans = [p for p in valid_plans if not p.is_worktree]
-
-    # First pass: worktrees
-    for plan in worktree_plans:
-        if dry_run:
-            if not quiet:
-                print(plan.new_path)
-            continue
-        if not quiet:
-            print(plan.new_path)
-        plan.new_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(plan.old_path), str(plan.new_path))
-        if plan.source_path is not None:
-            try:
-                if verbose > 0 and not quiet:
-                    print(f"Repairing worktree paths in {plan.source_path}", file=sys.stderr)
-                repair_worktrees(plan.source_path)
-            except GitCommandError as e:
-                print(
-                    f"Warning: Failed to repair worktree paths for {plan.new_path}: {e}",
-                    file=sys.stderr,
-                )
-
-    # Second pass: sources (only repair if this source had worktrees we moved)
-    source_paths_with_worktrees = {p.source_path.resolve() for p in worktree_plans if p.source_path is not None}
-    for plan in source_plans:
-        if dry_run:
-            if not quiet:
-                print(plan.new_path)
-            continue
-        if not quiet:
-            print(plan.new_path)
-        plan.new_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(plan.old_path), str(plan.new_path))
-        if plan.old_path.resolve() in source_paths_with_worktrees:
-            try:
-                if verbose > 0 and not quiet:
-                    print(f"Repairing worktree paths in {plan.new_path}", file=sys.stderr)
-                repair_worktrees(plan.new_path)
-            except GitCommandError as e:
-                print(
-                    f"Warning: Failed to repair worktree paths for {plan.new_path}: {e}",
-                    file=sys.stderr,
-                )
-
-    # Clean empty source folders (inplace only, recursive)
-    if not dry_run and valid_plans:
-        vacated = [p.old_path.resolve() for p in valid_plans]
-        roots_set = set(input_roots)
-        # Process deepest paths first so parents can be removed after children
-        vacated_sorted = sorted(vacated, key=lambda p: len(p.parts), reverse=True)
-        for start_path in vacated_sorted:
-            current = start_path
-            while True:
-                if current in roots_set or not current.exists():
-                    break
-                if not current.is_dir():
-                    break
-                try:
-                    if any(current.iterdir()):
-                        break
-                    current.rmdir()
-                    current = current.parent
-                except OSError:
-                    break
-
-    if not quiet:
-        if valid_plans:
-            num_sources = len(source_plans)
-            num_worktrees = len(worktree_plans)
-            if num_sources > 0 and num_worktrees > 0:
-                print(f"Moved {num_sources} sources, {num_worktrees} worktrees")
-            elif num_sources > 0:
-                print(f"Moved {num_sources} sources")
-            elif num_worktrees > 0:
-                print(f"Moved {num_worktrees} worktrees")
-        if already_at_target:
-            print(f"Already at target: {len(already_at_target)} repositories")
-    return 0
-
-
-def _run_copy(
-    valid_plans: list[MigrationPlan],
-    skipped_items: list[tuple[str, Path, bool]],
-    already_at_target: list[Path],
-    dry_run: bool,
-    quiet: bool,
-    verbose: int,
-    tags: dict[str, str],
-) -> int:
-    """Execute copy migration (list, validate, copy sources then worktrees, repair, summary)."""
-    # Output "already at target" when not quiet
-    if already_at_target and not quiet:
-        for path in already_at_target:
-            print(f"Already at target: {path}")
-
-    if not valid_plans:
-        if skipped_items and not quiet:
-            for reason, path, _ in skipped_items:
-                print(f"{path}: {reason}")
-        if not quiet:
-            print("No repositories to migrate.")
-            skip_msg = _format_skipped_items(skipped_items)
-            if skip_msg:
-                print(skip_msg)
-            if already_at_target:
-                print(f"Already at target: {len(already_at_target)} repositories")
-        return 0
-
-    # List and output each found source and worktree
-    if not quiet:
-        for plan in valid_plans:
-            kind = "Worktree" if plan.is_worktree else "Source"
-            print(f"{kind}: {plan.old_path} -> {plan.new_path}")
-        for reason, path, _ in skipped_items:
-            print(f"{path}: {reason}")
-
-    if dry_run:
-        if not quiet:
-            print(f"Would migrate {len(valid_plans)} repositories")
-            if skipped_items:
-                print(f"Would skip {len(skipped_items)} repositories")
-        return 0
-
-    # Migrate sources first, then worktrees
-    source_plans = [p for p in valid_plans if not p.is_worktree]
-    worktree_plans = [p for p in valid_plans if p.is_worktree]
-    migrated_sources = 0
-    migrated_worktrees = 0
-    failed = 0
-
-    for plan in source_plans:
-        try:
-            if not quiet:
-                print(f"Copying repository {plan.old_path} -> {plan.new_path}")
-            plan.new_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(str(plan.old_path), str(plan.new_path), symlinks=True)
-            migrated_sources += 1
-        except OSError as e:
-            print(f"Error migrating {plan.old_path}: {e}", file=sys.stderr)
-            failed += 1
-
-    for plan in worktree_plans:
-        try:
-            if not quiet:
-                print(f"Copying worktree {plan.old_path} -> {plan.new_path}")
-            plan.new_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(str(plan.old_path), str(plan.new_path), symlinks=True)
-            migrated_worktrees += 1
-            # Recover relation: point copied worktree's .git to new source (if any) and repair
-            if plan.source_path is not None:
-                # Resolve new source path (source may have been copied in this run)
-                new_source = None
-                for sp in source_plans:
-                    if sp.old_path.resolve() == plan.source_path.resolve():
-                        new_source = sp.new_path
-                        break
-                if new_source is not None:
-                    _fix_copied_worktree_gitfile(plan.new_path, plan.old_path, new_source)
-                    try:
-                        if verbose > 0 and not quiet:
-                            print(f"Repairing worktree paths in {new_source}", file=sys.stderr)
-                        repair_worktrees(new_source)
-                    except GitCommandError as e:
-                        print(
-                            f"Warning: Failed to repair worktree paths for {plan.new_path}: {e}",
-                            file=sys.stderr,
-                        )
-                else:
-                    # Source was not in migration; repair old source with new worktree path
-                    try:
-                        if verbose > 0 and not quiet:
-                            print(f"Repairing worktree paths in {plan.source_path}", file=sys.stderr)
-                        repair_worktrees(plan.source_path, [plan.new_path])
-                    except GitCommandError as e:
-                        print(
-                            f"Warning: Failed to repair worktree paths for {plan.new_path}: {e}",
-                            file=sys.stderr,
-                        )
-        except OSError as e:
-            print(f"Error migrating {plan.old_path}: {e}", file=sys.stderr)
-            failed += 1
-
-    if not quiet:
-        if migrated_sources > 0 and migrated_worktrees > 0:
-            print(f"Migrated {migrated_sources} sources, {migrated_worktrees} worktrees")
-        elif migrated_sources > 0:
-            print(f"Migrated {migrated_sources} sources")
-        elif migrated_worktrees > 0:
-            print(f"Migrated {migrated_worktrees} worktrees")
-
-        skip_msg = _format_skipped_items(skipped_items)
-        if skip_msg:
-            print(skip_msg)
-
-        if already_at_target:
-            print(f"Already at target: {len(already_at_target)} repositories")
-        if failed:
-            print(f"Failed {failed} repositories")
-    return 1 if failed > 0 else 0
-
-
-def _fix_copied_worktree_gitfile(
-    new_worktree_path: Path,
-    old_worktree_path: Path,
-    new_source_path: Path,
-) -> None:
-    """Update copied worktree's .git file to point to new source's worktrees dir."""
-    git_file = new_worktree_path / ".git"
-    if not git_file.is_file():
-        return
-    content = git_file.read_text().strip()
-    if not content.startswith("gitdir:"):
-        return
-    old_gitdir = content.split(":", 1)[1].strip()
-    # Old content points to old_source/.git/worktrees/<id>; extract worktree id
-    parts = Path(old_gitdir.replace("\\", "/")).parts
-    try:
-        idx = parts.index("worktrees")
-        if idx + 1 < len(parts):
-            wt_id = parts[idx + 1]
-            new_gitdir = str(new_source_path / ".git" / "worktrees" / wt_id)
-            git_file.write_text(f"gitdir: {new_gitdir}\n")
-    except (ValueError, IndexError):
-        pass
-
-
-def run_migrate(args: argparse.Namespace) -> int:
+@exit_on_error
+def run_migrate(ctx: CommandContext) -> int:
     """Execute the migrate command.
 
     Args:
-        args: Parsed command line arguments.
+        ctx: Per-invocation command context.
 
     Returns:
         Exit code (0 for success, 1 for error, 2 for config error).
     """
-    old_repos_raw = args.old_repos
-    old_repos_list: list[str] = (
-        old_repos_raw if isinstance(old_repos_raw, list) else [old_repos_raw]
-    )
-    dry_run = getattr(args, "dry_run", False)
-    inplace = getattr(args, "inplace", False)
-    verbose = getattr(args, "verbose", 0)
-    quiet = getattr(args, "quiet", False)
-    tags = getattr(args, "tags", {}) or {}
-
-    input_paths = [Path(p).expanduser().resolve() for p in old_repos_list]
+    input_paths = [Path(p).expanduser().resolve() for p in ctx.old_repos]
 
     for p in input_paths:
         if not p.exists():
-            print(f"Error: Path does not exist: {p}", file=sys.stderr)
-            return 1
+            raise CommandExit(1, f"Error: Path does not exist: {p}")
         if not p.is_dir():
-            print(f"Error: Not a directory: {p}", file=sys.stderr)
-            return 1
+            raise CommandExit(1, f"Error: Not a directory: {p}")
 
-    # Load and validate config
-    try:
-        raw_config = load_config()
-        config = validate_config(raw_config)
-    except ConfigNotFoundError:
-        print(
-            "Error: Config file not found. Run 'gww init config' to create one.",
-            file=sys.stderr,
-        )
-        return 2
-    except ConfigLoadError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 2
-    except ConfigValidationError as e:
-        print(f"Config validation error: {e}", file=sys.stderr)
-        return 2
+    config = load_config_or_exit()
 
-    repos, input_roots = _collect_all_repos(input_paths)
-    if verbose > 0 and not quiet:
-        print(f"Scanning {len(input_paths)} path(s) for repositories...", file=sys.stderr)
+    repos, input_roots = collect_repositories(input_paths)
+    ctx.verbose_msg(f"Scanning {len(input_paths)} path(s) for repositories...")
 
-    plans, skips = _plan_migration(repos, config, inplace, verbose, tags)
+    result = plan_migration(
+        repos,
+        config,
+        inplace=ctx.inplace,
+        verbose=ctx.verbose,
+        tags=ctx.tags,
+    )
 
-    # Separate fatal skips from informational skips
-    # (destination exists is fatal only in copy mode, determined in _plan_migration)
-    fatal_skips = [(reason, path) for reason, path, is_fatal, _ in skips if is_fatal]
-    info_skips = [(reason, path, is_worktree) for reason, path, is_fatal, is_worktree in skips if not is_fatal]
-
-    # Fail if any fatal skips exist
-    # Note: fatal_skips will only be non-empty in copy mode (destination exists is non-fatal in inplace)
-    if fatal_skips:
-        # Print all fatal errors to stderr
-        for reason, path in fatal_skips:
-            print(
-                f"Error: Destination already exists: {path}",
-                file=sys.stderr
-            )
-        # Print summary
-        count = len(fatal_skips)
+    if isinstance(result, Blocked):
+        for path in result.destinations:
+            print(f"Error: Destination already exists: {path}", file=sys.stderr)
+        count = len(result.destinations)
         print(
             f"Cannot proceed: {count} destination(s) already exist in copy mode",
-            file=sys.stderr
+            file=sys.stderr,
         )
         return 1
 
-    if not plans and not skips:
-        if not quiet:
+    migration: Migration = result
+
+    if not migration.plans and not migration.info_skips and not migration.already_at_target:
+        if not ctx.quiet:
             print("No repositories to migrate.")
         return 0
 
-    # Separate "already at target" from other skips for display
-    already_at_target = [path for reason, path, _, _ in skips if reason == "already at target"]
-    # For copy mode, we already validated no fatal skips exist
-    skipped_for_display = [(reason, path, is_worktree) for reason, path, is_fatal, is_worktree in skips if reason != "already at target"]
-
-    if inplace:
-        return _run_inplace(
-            plans, already_at_target, input_roots, dry_run, quiet, verbose
-        )
-    return _run_copy(
-        plans, skipped_for_display, already_at_target, dry_run, quiet, verbose, tags
+    mode: Mode = "inplace" if ctx.inplace else "copy"
+    return execute(
+        migration,
+        input_roots=input_roots,
+        mode=mode,
+        dry_run=ctx.dry_run,
+        quiet=ctx.quiet,
+        verbose=ctx.verbose,
     )

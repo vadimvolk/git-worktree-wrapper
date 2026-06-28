@@ -7,6 +7,7 @@ import sys
 from typing import Optional, Sequence
 
 from gww import __version__
+from gww.cli.context import CommandContext, CommandExit
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -182,25 +183,6 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _parse_tags(tag_args: list[str]) -> dict[str, str]:
-    """Parse tag arguments into a dictionary.
-
-    Args:
-        tag_args: List of tag strings in format "key=value" or "key".
-
-    Returns:
-        Dictionary mapping tag keys to values (empty string if no value).
-    """
-    tags: dict[str, str] = {}
-    for tag_arg in tag_args:
-        if "=" in tag_arg:
-            key, value = tag_arg.split("=", 1)
-            tags[key] = value
-        else:
-            tags[tag_arg] = ""
-    return tags
-
-
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Main entry point for gww CLI.
 
@@ -213,34 +195,33 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = create_parser()
     args = parser.parse_args(argv)
 
-    # Parse tags into dictionary
-    args.tags = _parse_tags(args.tag)
-
     if args.command is None:
         parser.print_help()
         return 0
+
+    ctx = CommandContext.from_args(args)
 
     # Import and run command handlers
     try:
         if args.command == "clone":
             from gww.cli.commands.clone import run_clone
-            return run_clone(args)
+            return run_clone(ctx)
 
         elif args.command == "add":
             from gww.cli.commands.add import run_add
-            return run_add(args)
+            return run_add(ctx)
 
         elif args.command == "remove":
             from gww.cli.commands.remove import run_remove
-            return run_remove(args)
+            return run_remove(ctx)
 
         elif args.command == "pull":
             from gww.cli.commands.pull import run_pull
-            return run_pull(args)
+            return run_pull(ctx)
 
         elif args.command == "migrate":
             from gww.cli.commands.migrate import run_migrate
-            return run_migrate(args)
+            return run_migrate(ctx)
 
         elif args.command == "init":
             if args.init_command is None:
@@ -250,15 +231,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
             if args.init_command == "config":
                 from gww.cli.commands.init import run_init_config
-                return run_init_config(args)
+                return run_init_config(ctx)
 
             elif args.init_command == "shell":
                 from gww.cli.commands.init import run_init_shell
-                return run_init_shell(args)
+                return run_init_shell(ctx)
 
         else:
             parser.print_help()
             return 1
+
+    except CommandExit as e:
+        if e.message:
+            print(e.message, file=sys.stderr)
+        return e.code
 
     except KeyboardInterrupt:
         print("\nOperation cancelled.", file=sys.stderr)
@@ -266,7 +252,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
-        if args.verbose > 0:
+        if ctx.verbose > 0:
             import traceback
             traceback.print_exc()
         return 1
