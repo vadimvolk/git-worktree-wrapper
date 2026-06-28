@@ -279,7 +279,7 @@ class TestBashGwaAlias:
         assert SH_BASH is not None
         src = _make_source_repo(tmp_path)
         wt = tmp_path / "worktrees"
-        
+
         fake_home = _isolated_xdg_config(tmp_path, wt)
         alias_file = tmp_path / "gwa.bash"
         alias_file.write_text(
@@ -308,6 +308,49 @@ class TestBashGwaAlias:
             f"expected 'Navigate to ' prompt on stdout, got {result.stdout!r}"
         )
         assert "[Y/n]" in result.stdout
+
+    def test_streams_git_progress_to_stderr(
+        self, tmp_path: Path
+    ) -> None:
+        """``gwa`` must let git's ``Preparing worktree …`` line through to the user.
+
+        The old template captured both stdout and stderr into a variable that
+        was discarded on success, swallowing every progress message. The new
+        template pipes only stdout through ``tail -n 1`` and lets stderr
+        stream straight to the terminal — which in this test framework ends
+        up in ``result.stderr``.
+        """
+        assert SH_BASH is not None
+        src = _make_source_repo(tmp_path)
+        wt = tmp_path / "worktrees"
+
+        fake_home = _isolated_xdg_config(tmp_path, wt)
+        alias_file = tmp_path / "gwa.bash"
+        alias_file.write_text(
+            "\n".join(
+                line
+                for line in generate_bash_aliases().splitlines()
+                if not line.startswith("complete -F")
+            )
+        )
+
+        result = _run_shell(
+            SH_BASH,
+            _bash_script("stream-branch", "n"),
+            cwd=src,
+            env_extra={
+                "ALIAS_FILE": str(alias_file),
+                "SRC_DIR": str(src),
+                "HOME": str(fake_home),
+            },
+        )
+
+        assert result.returncode == 0, (
+            f"stderr={result.stderr!r} stdout={result.stdout!r}"
+        )
+        assert "Preparing worktree" in result.stderr, (
+            f"expected git progress in stderr, got {result.stderr!r}"
+        )
 
     def test_subshell_capture_discards_cd(
         self, tmp_path: Path
@@ -447,7 +490,7 @@ class TestZshGwaAlias:
         assert SH_ZSH is not None
         src = _make_source_repo(tmp_path)
         wt = tmp_path / "worktrees"
-        
+
         fake_home = _isolated_xdg_config(tmp_path, wt)
         alias_file = tmp_path / "gwa.zsh"
         self._write_alias(alias_file)
@@ -470,6 +513,36 @@ class TestZshGwaAlias:
             f"expected 'Navigate to ' prompt on stdout, got {result.stdout!r}"
         )
         assert "[Y/n]" in result.stdout
+
+    def test_streams_git_progress_to_stderr(
+        self, tmp_path: Path
+    ) -> None:
+        """``gwa`` must let git's ``Preparing worktree …`` line through to the user."""
+        assert SH_ZSH is not None
+        src = _make_source_repo(tmp_path)
+        wt = tmp_path / "worktrees"
+
+        fake_home = _isolated_xdg_config(tmp_path, wt)
+        alias_file = tmp_path / "gwa.zsh"
+        self._write_alias(alias_file)
+
+        result = _run_shell(
+            SH_ZSH,
+            _zsh_script("zsh-stream", "n"),
+            cwd=src,
+            env_extra={
+                "ALIAS_FILE": str(alias_file),
+                "SRC_DIR": str(src),
+                "HOME": str(fake_home),
+            },
+        )
+
+        assert result.returncode == 0, (
+            f"stderr={result.stderr!r} stdout={result.stdout!r}"
+        )
+        assert "Preparing worktree" in result.stderr, (
+            f"expected git progress in stderr, got {result.stderr!r}"
+        )
 
     def test_subshell_capture_discards_cd(
         self, tmp_path: Path
@@ -625,4 +698,34 @@ class TestFishGwaAlias:
         pwd_after = _parse_pwd_marker(result.stdout, "PWD_AFTER=")
         assert pwd_after.endswith("fish-gotcha"), (
             "fish subshell should propagate cd to parent (fish semantics)"
+        )
+
+    def test_streams_git_progress_to_stderr(
+        self, tmp_path: Path
+    ) -> None:
+        """``gwa`` must let git's ``Preparing worktree …`` line through to the user."""
+        assert SH_FISH is not None
+        src = _make_source_repo(tmp_path)
+        wt = tmp_path / "worktrees"
+
+        fake_home = _isolated_xdg_config(tmp_path, wt)
+        alias_file = tmp_path / "gwa.fish"
+        alias_file.write_text(generate_fish_aliases()["gwa"])
+
+        result = _run_shell(
+            SH_FISH,
+            _fish_script("fish-stream", "n"),
+            cwd=src,
+            env_extra={
+                "ALIAS_FILE": str(alias_file),
+                "SRC_DIR": str(src),
+                "HOME": str(fake_home),
+            },
+        )
+
+        assert result.returncode == 0, (
+            f"stderr={result.stderr!r} stdout={result.stdout!r}"
+        )
+        assert "Preparing worktree" in result.stderr, (
+            f"expected git progress in stderr, got {result.stderr!r}"
         )
