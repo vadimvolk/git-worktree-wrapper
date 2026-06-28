@@ -20,6 +20,9 @@ This module collects the boilerplate that every command used to inline:
   worktree back to its source, and return ``(source_path, remote_uri)``. Raises
   :class:`CommandExit(1, ...)` on any failure so callers do not have to repeat
   the detect-or-walk pattern.
+* :func:`resolve_source_repo` — same detect-or-walk pattern, but without the
+  remote-origin requirement. Used by commands that only need the source path
+  (e.g. ``pull``).
 
 Commands still own their own control flow. They raise :class:`CommandExit`
 when they want to bail out with a specific exit code; the ``@exit_on_error``
@@ -280,3 +283,33 @@ def resolve_source_repo_or_exit(cwd: Path) -> tuple[Path, str]:
         )
 
     return source_path, repo.remote_uri
+
+
+def resolve_source_repo(cwd: Path) -> Path:
+    """Detect repo at ``cwd`` and walk back to its source.
+
+    Unlike :func:`resolve_source_repo_or_exit` this helper does not require
+    a remote origin — it returns the source path regardless of remote state.
+    Used by commands that operate on the local source (e.g. ``pull``).
+
+    Args:
+        cwd: Directory to start the detection from.
+
+    Returns:
+        Path to the source repository.
+
+    Raises:
+        CommandExit: With code ``1`` if ``cwd`` is not in a git repository or
+            the source repo cannot be found.
+    """
+    try:
+        repo = detect_repository(cwd)
+    except NotGitRepositoryError as e:
+        raise CommandExit(1, "Error: Not in a git repository.") from e
+
+    if repo.is_worktree:
+        try:
+            return get_source_repository(repo.path)
+        except (NotGitRepositoryError, GitCommandError) as e:
+            raise CommandExit(1, f"Error finding source repository: {e}") from e
+    return repo.path

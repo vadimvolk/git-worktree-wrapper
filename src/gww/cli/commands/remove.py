@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gww.cli.context import CommandContext, CommandExit, exit_on_error
+from gww.cli.context import (
+    CommandContext,
+    CommandExit,
+    exit_on_error,
+    resolve_source_repo,
+)
 from gww.git.repository import (
     GitCommandError,
     NotGitRepositoryError,
@@ -17,32 +22,6 @@ from gww.git.worktree import (
     find_worktree_by_branch,
     remove_worktree,
 )
-
-
-def _resolve_source_repo(cwd: Path) -> Path:
-    """Detect repo at cwd and walk back to its source if needed.
-
-    Args:
-        cwd: Directory to start the detection from.
-
-    Returns:
-        Path to the source repository.
-
-    Raises:
-        CommandExit: With code ``1`` if ``cwd`` is not in a git repo or the
-            source repo cannot be found.
-    """
-    try:
-        repo = detect_repository(cwd)
-    except NotGitRepositoryError as e:
-        raise CommandExit(1, "Error: Not in a git repository.") from e
-
-    if repo.is_worktree:
-        try:
-            return get_source_repository(repo.path)
-        except (NotGitRepositoryError, GitCommandError) as e:
-            raise CommandExit(1, f"Error finding source repository: {e}") from e
-    return repo.path
 
 
 @exit_on_error
@@ -78,8 +57,7 @@ def run_remove(ctx: CommandContext) -> int:
             raise CommandExit(1, f"Error finding source repository: {e}") from e
     else:
         branch = branch_or_path
-        cwd = Path.cwd()
-        source_path = _resolve_source_repo(cwd)
+        source_path = resolve_source_repo(Path.cwd())
 
         wt = find_worktree_by_branch(source_path, branch)
         if not wt:

@@ -102,20 +102,50 @@ def _repair_after_move(
     verbose: int,
     quiet: bool,
 ) -> None:
-    """Run ``git worktree repair`` for the source that owns this plan."""
-    if plan.source_path is None:
+    """Run ``git worktree repair`` for the source that owns this plan.
+
+    Used in the worktree-move loop, where the source already exists at its
+    original location (``new_source is None``) and only the worktree moved.
+    When the source is being migrated too, repair is deferred to
+    :func:`_repair_source_after_move` after the source has actually moved.
+    """
+    if plan.source_path is None or new_source is not None:
         return
-    target_source = new_source or plan.source_path
+    target_source = plan.source_path
     try:
         if verbose > 0 and not quiet:
             print(f"Repairing worktree paths in {target_source}", file=sys.stderr)
-        if new_source is not None:
-            repair_worktrees(target_source)
-        else:
-            repair_worktrees(target_source, [plan.new_path])
+        repair_worktrees(target_source, [plan.new_path])
     except GitCommandError as e:
         print(
             f"Warning: Failed to repair worktree paths for {plan.new_path}: {e}",
+            file=sys.stderr,
+        )
+
+
+def _repair_source_after_move(
+    new_source: Path,
+    moved_worktree_paths: list[Path],
+    verbose: int,
+    quiet: bool,
+) -> None:
+    """Repair worktree admin files in a newly-moved source.
+
+    Called after a source has been moved to ``new_source`` and one or more
+    of its worktrees were also moved in this run. ``git worktree repair``
+    updates each moved worktree's ``gitdir`` entry inside the source (and,
+    for inplace mode, rewrites the worktree's own ``.git`` file). Copy mode
+    already rewrote the worktree's ``.git`` file up-front via
+    :func:`fix_copied_worktree_gitfile`; repair completes the round trip
+    by updating the source's side.
+    """
+    try:
+        if verbose > 0 and not quiet:
+            print(f"Repairing worktree paths in {new_source}", file=sys.stderr)
+        repair_worktrees(new_source, moved_worktree_paths)
+    except GitCommandError as e:
+        print(
+            f"Warning: Failed to repair worktree paths in {new_source}: {e}",
             file=sys.stderr,
         )
 
@@ -256,7 +286,9 @@ def execute(
 
     # Worktrees first so the source's .git/worktrees/<id> directory exists
     # in time for the later source moves to be safe (inplace only — copy
-    # just rewrites the .git pointer).
+    # just rewrites the .git pointer). When the source is also being
+    # migrated, the worktree's per-source repair is deferred to the source
+    # loop, which runs _after_ the source has been moved to new_source.
     for plan in worktree_plans:
         try:
             if not quiet:
@@ -279,15 +311,13 @@ def execute(
             plan.new_path.parent.mkdir(parents=True, exist_ok=True)
             move(str(plan.old_path), str(plan.new_path))
             migrated_sources += 1
-            # Repair the source only if a worktree that referenced it was
-            # moved in this run.
-            repaired = False
-            for wt_plan in worktree_plans:
-                if wt_plan.source_path is not None and wt_plan.source_path.resolve() == plan.old_path.resolve():
-                    _repair_after_move(plan, None, verbose, quiet)
-                    repaired = True
-                    break
-            del repaired
+            moved_wt_paths = [
+                wt.new_path for wt in worktree_plans
+                if wt.source_path is not None
+                and wt.source_path.resolve() == plan.old_path.resolve()
+            ]
+            if moved_wt_paths:
+                _repair_source_after_move(plan.new_path, moved_wt_paths, verbose, quiet)
         except OSError as e:
             print(f"Error migrating {plan.old_path}: {e}", file=sys.stderr)
             failed += 1

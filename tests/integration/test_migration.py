@@ -221,6 +221,64 @@ def repo_with_submodule(
     return old_dir, main_repo, submodule_path
 
 
+@pytest.fixture
+def source_with_worktree_inside(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> tuple[Path, Path, Path]:
+    """Create a source repo and its worktree both inside one migration root.
+
+    Returns:
+        Tuple of (old_repos_dir, source_repo_path, worktree_path).
+    """
+    old_dir = tmp_path_factory.mktemp("old_repos_with_worktree_inside")
+
+    source_repo = old_dir / "source-project"
+    source_repo.mkdir()
+    subprocess.run(["git", "init"], cwd=source_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@test.com"],
+        cwd=source_repo,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test"],
+        cwd=source_repo,
+        check=True,
+        capture_output=True,
+    )
+    (source_repo / "README.md").write_text("# Source")
+    subprocess.run(["git", "add", "."], cwd=source_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Initial"],
+        cwd=source_repo,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://github.com/user/source-project.git"],
+        cwd=source_repo,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "branch", "feature"],
+        cwd=source_repo,
+        check=True,
+        capture_output=True,
+    )
+
+    worktree_path = old_dir / "feature-worktree"
+    subprocess.run(
+        ["git", "worktree", "add", str(worktree_path), "feature"],
+        cwd=source_repo,
+        check=True,
+        capture_output=True,
+    )
+
+    return old_dir, source_repo, worktree_path
+
+
 class TestMigrateCommand:
     """Integration tests for migrate command (T056)."""
 
@@ -711,6 +769,102 @@ sources:
         assert "Repairing worktree paths" not in captured.err
         # Output should NOT mention "Repaired" since no worktrees were involved
         assert "Repaired" not in captured.out
+
+    def test_migrate_source_and_its_worktree_together_copy(
+        self,
+        source_with_worktree_inside: tuple[Path, Path, Path],
+        config_dir: Path,
+        target_dir: Path,
+    ) -> None:
+        """Migrating a source together with one of its worktrees in copy mode
+        leaves a consistent set of pointers: the new source knows about the
+        new worktree location, and the new worktree's ``.git`` file points at
+        the new source. Regression test for the case where the source-side
+        repair was being called before the source existed at its new path.
+        """
+        old_dir, source_repo, _worktree_path = source_with_worktree_inside
+
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/github/path(-2)/path(-1)
+default_worktrees: {target_dir}/github-wt/path(-2)/path(-1)
+""")
+
+        result = run_migrate(make_ctx(
+            old_repos=str(old_dir),
+            dry_run=False,
+            inplace=False,
+            verbose=0,
+            quiet=True,
+        ))
+
+        assert result == 0
+        new_source = target_dir / "github" / "user" / "source-project"
+        new_worktree = target_dir / "github-wt" / "user" / "source-project"
+        assert new_source.exists()
+        assert new_worktree.exists()
+        assert source_repo.exists(), "copy mode leaves originals in place"
+
+        worktrees = list_worktrees(new_source)
+        wt_paths = {wt.path.resolve() for wt in worktrees}
+        assert new_worktree.resolve() in wt_paths, (
+            "New source must know about the new worktree path, not the old one"
+        )
+
+        git_file = new_worktree / ".git"
+        assert git_file.is_file()
+        gitdir = git_file.read_text().strip()
+        assert gitdir.startswith("gitdir:")
+        assert str(new_source / ".git" / "worktrees") in gitdir, (
+            f"New worktree .git must reference new source; got {gitdir!r}"
+        )
+
+    def test_migrate_source_and_its_worktree_together_inplace(
+        self,
+        source_with_worktree_inside: tuple[Path, Path, Path],
+        config_dir: Path,
+        target_dir: Path,
+    ) -> None:
+        """Inplace counterpart of :meth:`test_migrate_source_and_its_worktree_together_copy`.
+
+        After both moves, ``git worktree list`` from the new source must report
+        the worktree at its new path, and the worktree's ``.git`` file must
+        reference the new source.
+        """
+        old_dir, source_repo, worktree_path = source_with_worktree_inside
+
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/github/path(-2)/path(-1)
+default_worktrees: {target_dir}/github-wt/path(-2)/path(-1)
+""")
+
+        result = run_migrate(make_ctx(
+            old_repos=str(old_dir),
+            dry_run=False,
+            inplace=True,
+            verbose=0,
+            quiet=True,
+        ))
+
+        assert result == 0
+        new_source = target_dir / "github" / "user" / "source-project"
+        new_worktree = target_dir / "github-wt" / "user" / "source-project"
+        assert new_source.exists()
+        assert new_worktree.exists()
+        assert not source_repo.exists(), "inplace mode moves the original"
+        assert not worktree_path.exists()
+
+        worktrees = list_worktrees(new_source)
+        wt_paths = {wt.path.resolve() for wt in worktrees}
+        assert new_worktree.resolve() in wt_paths
+
+        git_file = new_worktree / ".git"
+        assert git_file.is_file()
+        gitdir = git_file.read_text().strip()
+        assert str(new_source / ".git" / "worktrees") in gitdir
 
     def test_migrate_dry_run_skips_submodules(
         self,

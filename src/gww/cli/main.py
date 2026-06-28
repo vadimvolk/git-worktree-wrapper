@@ -13,6 +13,10 @@ from gww.cli.context import CommandContext, CommandExit
 def create_parser() -> argparse.ArgumentParser:
     """Create the main argument parser with all subcommands.
 
+    The returned parser has ``init_parser`` attached as an attribute so
+    callers (notably :func:`main`) can print help for the ``init`` command
+    without re-creating the parser.
+
     Returns:
         Configured ArgumentParser.
     """
@@ -180,6 +184,7 @@ def create_parser() -> argparse.ArgumentParser:
         help="Shell to install completion for",
     )
 
+    parser.init_parser = init_parser  # type: ignore[attr-defined]
     return parser
 
 
@@ -225,8 +230,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
         elif args.command == "init":
             if args.init_command is None:
-                # Show init help
-                parser.parse_args(["init", "--help"])
+                parser.init_parser.print_help()  # type: ignore[attr-defined]
                 return 0
 
             if args.init_command == "config":
