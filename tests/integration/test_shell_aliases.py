@@ -67,17 +67,35 @@ def _isolated_xdg_config(tmp_path: Path, worktree_dir: Path) -> Path:
     Returns the directory that should be set as ``HOME`` for the subprocess
     so that ``gww`` reads our test config instead of the user's real one.
     The gww XDG code in :mod:`gww.utils.xdg` has no env-var override, so
-    HOME redirection is the cleanest way to isolate. The path layout mirrors
-    :func:`gww.utils.xdg.user_config_dir` so it works on Linux, macOS, and
-    Windows runners.
+    HOME redirection is the cleanest way to isolate. The config path is
+    computed by calling :func:`gww.utils.xdg.user_config_dir` with a
+    patched HOME so it matches what the subprocess will look up exactly.
     """
     fake_home = tmp_path / "fakehome"
-    if sys.platform == "darwin":
-        config_path = fake_home / "Library" / "Application Support" / "gww" / "config.yml"
-    elif sys.platform.startswith("win"):
-        config_path = fake_home / "AppData" / "Roaming" / "gww" / "config.yml"
-    else:
-        config_path = fake_home / ".config" / "gww" / "config.yml"
+    fake_home.mkdir(parents=True, exist_ok=True)
+
+    # Compute the config path the same way gww will, so we don't drift
+    # from the production XDG logic across platforms / Python versions.
+    saved_home = os.environ.get("HOME")
+    saved_appdata = os.environ.get("APPDATA")
+    saved_xdg = os.environ.get("XDG_CONFIG_HOME")
+    os.environ["HOME"] = str(fake_home)
+    os.environ.pop("XDG_CONFIG_HOME", None)
+    os.environ.pop("APPDATA", None)
+    try:
+        from gww.utils.xdg import get_config_path  # local import: needs patched env
+
+        config_path = get_config_path()
+    finally:
+        if saved_home is None:
+            os.environ.pop("HOME", None)
+        else:
+            os.environ["HOME"] = saved_home
+        if saved_xdg is not None:
+            os.environ["XDG_CONFIG_HOME"] = saved_xdg
+        if saved_appdata is not None:
+            os.environ["APPDATA"] = saved_appdata
+
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
         f"default_sources: {config_path.parent}/src\n"
