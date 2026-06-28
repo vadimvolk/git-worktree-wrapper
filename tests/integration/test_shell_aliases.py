@@ -62,16 +62,22 @@ def _make_source_repo(tmp_path: Path) -> Path:
 
 
 def _isolated_xdg_config(tmp_path: Path, worktree_dir: Path) -> Path:
-    """Create a config file at the macOS XDG path under a fake HOME.
+    """Create a config file at the platform-appropriate XDG path under a fake HOME.
 
     Returns the directory that should be set as ``HOME`` for the subprocess
     so that ``gww`` reads our test config instead of the user's real one.
-    The config path is ``$HOME/Library/Application Support/gww/config.yml``;
-    the gww XDG code in :mod:`gww.utils.xdg` has no env-var override, so
-    HOME redirection is the cleanest way to isolate.
+    The gww XDG code in :mod:`gww.utils.xdg` has no env-var override, so
+    HOME redirection is the cleanest way to isolate. The path layout mirrors
+    :func:`gww.utils.xdg.user_config_dir` so it works on Linux, macOS, and
+    Windows runners.
     """
     fake_home = tmp_path / "fakehome"
-    config_path = fake_home / "Library" / "Application Support" / "gww" / "config.yml"
+    if sys.platform == "darwin":
+        config_path = fake_home / "Library" / "Application Support" / "gww" / "config.yml"
+    elif sys.platform.startswith("win"):
+        config_path = fake_home / "AppData" / "Roaming" / "gww" / "config.yml"
+    else:
+        config_path = fake_home / ".config" / "gww" / "config.yml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
         f"default_sources: {config_path.parent}/src\n"
