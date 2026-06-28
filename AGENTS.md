@@ -215,10 +215,9 @@ GWW is a CLI tool (`gww`) that wraps git worktree functionality with:
 - Keep functions focused and testable
 
 ### Git Workflow
-- Use the speckit workflow commands (`.cursor/commands/speckit.*`)
 - Create feature branches: `NN-feature-name`
-- Write specs before implementation
-- Update tasks.md as work progresses
+- Follow `CONSTITUTION.md` principles; verify new code complies before review
+- Record hard-to-reverse decisions as ADRs in `docs/adr/` — see the `domain-modeling` skill
 
 ### Testing
 - Write tests for new features
@@ -245,5 +244,4 @@ GWW is a CLI tool (`gww`) that wraps git worktree functionality with:
 **Type check**: `uv run mypy src/gww`
 **Install deps**: `uv sync`
 **Run CLI**: `uv run gww --help`
-**Create spec**: Use `/speckit.specify` command
-**Create plan**: Use `/speckit.plan` command
+**Record decision**: Use the `grill-with-docs` skill (produces `CONTEXT.md` / `docs/adr/NNNN-…`)
