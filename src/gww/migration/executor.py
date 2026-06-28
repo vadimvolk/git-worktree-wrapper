@@ -115,7 +115,9 @@ def _repair_after_move(
     try:
         if verbose > 0 and not quiet:
             print(f"Repairing worktree paths in {target_source}", file=sys.stderr)
-        repair_worktrees(target_source, [plan.new_path])
+        repair_worktrees(
+            target_source, [plan.new_path], pass_through_stdout=not quiet
+        )
     except GitCommandError as e:
         print(
             f"Warning: Failed to repair worktree paths for {plan.new_path}: {e}",
@@ -142,7 +144,9 @@ def _repair_source_after_move(
     try:
         if verbose > 0 and not quiet:
             print(f"Repairing worktree paths in {new_source}", file=sys.stderr)
-        repair_worktrees(new_source, moved_worktree_paths)
+        repair_worktrees(
+            new_source, moved_worktree_paths, pass_through_stdout=not quiet
+        )
     except GitCommandError as e:
         print(
             f"Warning: Failed to repair worktree paths in {new_source}: {e}",

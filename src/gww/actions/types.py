@@ -28,7 +28,12 @@ class Action(Protocol):
     whether to surface the failure or continue with the remaining actions.
     """
 
-    def run(self, source_dir: Optional[Path], target_dir: Path) -> None:
+    def run(
+        self,
+        source_dir: Optional[Path],
+        target_dir: Path,
+        pass_through_stdout: bool = False,
+    ) -> None:
         """Execute the action against ``target_dir``.
 
         Args:
@@ -37,6 +42,10 @@ class Action(Protocol):
                 ``rel_copy`` and worktree commands.
             target_dir: Path to operate on (source repo for ``after_clone``,
                 worktree for ``after_add``).
+            pass_through_stdout: Only meaningful for :class:`CommandAction`.
+                When ``True``, the external command's stdout is inherited from
+                the parent (so the user sees its progress in real time) while
+                stderr stays captured for the :class:`ActionError` message.
 
         Raises:
             ActionError: If the action fails for any reason.
@@ -56,14 +65,19 @@ class AbsCopyAction:
         self.source = source
         self.destination = destination
 
-    def run(self, source_dir: Optional[Path], target_dir: Path) -> None:
+    def run(
+        self,
+        source_dir: Optional[Path],
+        target_dir: Path,
+        pass_through_stdout: bool = False,
+    ) -> None:
         """Copy ``source`` into ``target_dir / destination``.
 
         Raises:
             ActionError: If the source is missing, not a file, or cannot be
                 copied.
         """
-        del source_dir  # unused for absolute copy
+        del source_dir, pass_through_stdout  # unused for absolute copy
         source_path = Path(self.source).expanduser().resolve()
         dest_path = target_dir / self.destination
 
@@ -94,13 +108,19 @@ class RelCopyAction:
         self.source = source
         self.destination = destination
 
-    def run(self, source_dir: Optional[Path], target_dir: Path) -> None:
+    def run(
+        self,
+        source_dir: Optional[Path],
+        target_dir: Path,
+        pass_through_stdout: bool = False,
+    ) -> None:
         """Copy ``source_dir / source`` into ``target_dir / destination``.
 
         Raises:
             ActionError: If ``source_dir`` is missing, the source file does
                 not exist, or the copy fails.
         """
+        del pass_through_stdout  # unused for relative copy
         if source_dir is None:
             raise ActionError("rel_copy requires source_dir")
 
@@ -134,7 +154,12 @@ class CommandAction:
         self.command = command
         self.args = args
 
-    def run(self, source_dir: Optional[Path], target_dir: Path) -> None:
+    def run(
+        self,
+        source_dir: Optional[Path],
+        target_dir: Path,
+        pass_through_stdout: bool = False,
+    ) -> None:
         """Invoke the command in ``target_dir``.
 
         Raises:
@@ -148,7 +173,8 @@ class CommandAction:
             result = subprocess.run(
                 cmd,
                 cwd=target_dir,
-                capture_output=True,
+                stdout=None if pass_through_stdout else subprocess.PIPE,
+                stderr=None if pass_through_stdout else subprocess.PIPE,
                 text=True,
                 check=False,
             )

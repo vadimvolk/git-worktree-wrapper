@@ -228,3 +228,75 @@ class TestCommandAction:
         with patch("gww.actions.types.subprocess.run", side_effect=fake_run):
             with pytest.raises(ActionError, match="Failed to execute"):
                 action.run(source_dir=None, target_dir=target)
+
+
+class TestCommandActionPassThroughStdout:
+    """``CommandAction.run`` must let callers opt into streaming subprocess stdout.
+
+    Same contract as ``_run_git``: default keeps both streams captured; with
+    ``pass_through_stdout=True`` stdout inherits from the parent and stderr
+    stays captured so ``ActionError`` can still surface it.
+    """
+
+    @staticmethod
+    def _fake_completed(returncode: int = 0, stderr: str = "") -> MagicMock:
+        result = MagicMock()
+        result.returncode = returncode
+        result.stdout = ""
+        result.stderr = stderr
+        return result
+
+    def test_default_captures_both_streams(self, tmp_path: Path) -> None:
+        """Without pass_through_stdout, subprocess.run captures both streams."""
+        target = tmp_path / "work"
+        target.mkdir()
+
+        with patch(
+            "gww.actions.types.subprocess.run",
+            return_value=self._fake_completed(),
+        ) as mock_run:
+            CommandAction(command="echo", args=["hi"]).run(
+                source_dir=None, target_dir=target
+            )
+
+        kwargs = mock_run.call_args.kwargs
+        assert kwargs["stdout"] == subprocess.PIPE
+        assert kwargs["stderr"] == subprocess.PIPE
+
+    def test_pass_through_stdout_inherits_parent_stdout(self, tmp_path: Path) -> None:
+        """pass_through_stdout=True streams stdout to the parent process."""
+        target = tmp_path / "work"
+        target.mkdir()
+
+        with patch(
+            "gww.actions.types.subprocess.run",
+            return_value=self._fake_completed(),
+        ) as mock_run:
+            CommandAction(command="echo", args=["hi"]).run(
+                source_dir=None,
+                target_dir=target,
+                pass_through_stdout=True,
+            )
+
+        kwargs = mock_run.call_args.kwargs
+        assert kwargs["stdout"] is None
+        assert kwargs["stderr"] is None
+
+    def test_pass_through_stdout_streams_stderr_too(
+        self, tmp_path: Path
+    ) -> None:
+        """When streaming, stderr also inherits from the parent — the user
+        sees the external command's stderr output in real time."""
+        target = tmp_path / "work"
+        target.mkdir()
+
+        with patch(
+            "gww.actions.types.subprocess.run",
+            return_value=self._fake_completed(returncode=1, stderr=""),
+        ):
+            with pytest.raises(ActionError):
+                CommandAction(command="false", args=[]).run(
+                    source_dir=None,
+                    target_dir=target,
+                    pass_through_stdout=True,
+                )

@@ -45,7 +45,7 @@ def _run_git(
     args: list[str],
     cwd: Path,
     check: bool = True,
-    capture_output: bool = True,
+    pass_through_stdout: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     """Run a git command.
 
@@ -53,7 +53,14 @@ def _run_git(
         args: Git command arguments (without 'git').
         cwd: Working directory for the command.
         check: Whether to raise on non-zero exit.
-        capture_output: Whether to capture stdout/stderr.
+        pass_through_stdout: If ``True``, the subprocess inherits both stdout
+            and stderr from the parent so the user sees git's progress in real
+            time (this includes messages git writes to stderr such as
+            ``Cloning into '…'`` and ``Preparing worktree (new branch 'X')``).
+            If ``False`` (default), both streams are captured — the historic
+            silent behavior used by quick internal checks. When streaming, the
+            embedded stderr in :class:`GitCommandError` will be empty on
+            failure because the user already saw it scroll past.
 
     Returns:
         CompletedProcess with command results.
@@ -66,7 +73,8 @@ def _run_git(
         result = subprocess.run(
             cmd,
             cwd=cwd,
-            capture_output=capture_output,
+            stdout=None if pass_through_stdout else subprocess.PIPE,
+            stderr=None if pass_through_stdout else subprocess.PIPE,
             text=True,
             check=False,
         )
@@ -319,12 +327,19 @@ def detect_repository(path: Path) -> Repository:
     )
 
 
-def clone_repository(uri: str, target_path: Path) -> Path:
+def clone_repository(
+    uri: str,
+    target_path: Path,
+    pass_through_stdout: bool = False,
+) -> Path:
     """Clone a repository to the specified path.
 
     Args:
         uri: Repository URI to clone.
         target_path: Path where repository should be cloned.
+        pass_through_stdout: Forwarded to :func:`_run_git`. When ``True``,
+            git's progress messages (``Cloning into '…'``, ``Receiving
+            objects: 100%``, …) stream to the parent process's stdout.
 
     Returns:
         Path to cloned repository.
@@ -339,16 +354,22 @@ def clone_repository(uri: str, target_path: Path) -> Path:
         ["clone", uri, str(target_path)],
         cwd=target_path.parent,
         check=True,
+        pass_through_stdout=pass_through_stdout,
     )
 
     return target_path
 
 
-def pull_repository(repo_path: Path) -> None:
+def pull_repository(
+    repo_path: Path,
+    pass_through_stdout: bool = False,
+) -> None:
     """Pull changes from remote.
 
     Args:
         repo_path: Path to repository.
+        pass_through_stdout: Forwarded to :func:`_run_git`. When ``True``,
+            git's pull progress streams to the parent process's stdout.
 
     Raises:
         GitCommandError: If pull fails.
@@ -357,4 +378,5 @@ def pull_repository(repo_path: Path) -> None:
         ["pull"],
         cwd=repo_path,
         check=True,
+        pass_through_stdout=pass_through_stdout,
     )

@@ -46,7 +46,7 @@ def run_clone(ctx: CommandContext) -> int:
     ctx.verbose_msg(f"Cloning {ctx.uri} to {source_path}...")
 
     try:
-        clone_repository(ctx.uri, source_path)
+        clone_repository(ctx.uri, source_path, pass_through_stdout=not ctx.quiet)
     except GitCommandError as e:
         raise CommandExit(1, f"Error cloning repository: {e}") from e
 
@@ -67,7 +67,11 @@ def run_clone(ctx: CommandContext) -> int:
             ctx.verbose_msg(f"Executing {len(actions)} source action(s)...")
             for action in actions:
                 try:
-                    action.run(source_dir=None, target_dir=source_path)
+                    action.run(
+                        source_dir=None,
+                        target_dir=source_path,
+                        pass_through_stdout=not ctx.quiet,
+                    )
                 except ActionError as e:
                     print(f"Error executing source action: {e}", file=sys.stderr)
 

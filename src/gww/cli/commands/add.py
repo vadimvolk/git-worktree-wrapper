@@ -70,7 +70,12 @@ def run_add(ctx: CommandContext) -> int:
     ctx.verbose_msg(f"Adding worktree for '{ctx.branch}' at {worktree_path}...")
 
     try:
-        add_worktree(source_path, worktree_path, ctx.branch)
+        add_worktree(
+            source_path,
+            worktree_path,
+            ctx.branch,
+            pass_through_stdout=not ctx.quiet,
+        )
     except (WorktreeExistsError, GitCommandError) as e:
         raise CommandExit(1, f"Error adding worktree: {e}") from e
 
@@ -91,7 +96,11 @@ def run_add(ctx: CommandContext) -> int:
             ctx.verbose_msg(f"Executing {len(actions)} worktree action(s)...")
             for action in actions:
                 try:
-                    action.run(source_dir=source_path, target_dir=worktree_path)
+                    action.run(
+                        source_dir=source_path,
+                        target_dir=worktree_path,
+                        pass_through_stdout=not ctx.quiet,
+                    )
                 except ActionError as e:
                     print(f"Error executing worktree action: {e}", file=sys.stderr)
 

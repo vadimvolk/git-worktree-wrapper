@@ -53,7 +53,7 @@ def run_pull(ctx: CommandContext) -> int:
     ctx.verbose_msg(f"Pulling updates for {source_path}...")
 
     try:
-        pull_repository(source_path)
+        pull_repository(source_path, pass_through_stdout=not ctx.quiet)
     except GitCommandError as e:
         raise CommandExit(1, f"Error pulling updates: {e}") from e
 
