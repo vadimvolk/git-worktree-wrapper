@@ -95,6 +95,8 @@ def _run_shell(
     """Run ``script`` with ``shell`` in ``cwd``, returning the result."""
     env = os.environ.copy()
     env["PATH"] = f"{_venv_bin()}:{env.get('PATH', '')}"
+    env.pop("XDG_CONFIG_HOME", None)
+    env.pop("APPDATA", None)
     if env_extra:
         env.update(env_extra)
     return subprocess.run(
