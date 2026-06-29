@@ -19,16 +19,33 @@ from gww.utils.uri import ParsedURI
 class TemplateContext:
     """Context for template evaluation.
 
+    The same context object feeds every evaluation site that uses the unified
+    function registry: source-rule ``when`` predicates, ``default_sources``
+    and ``default_worktrees`` path templates, and project-rule ``when``
+    predicates plus their command templates.
+
     Attributes:
-        uri: Parsed URI object (for clone operations).
-        branch: Git branch name (for worktree operations).
-        source_path: Source repository path (for project predicates).
-        tags: Dictionary of tag key-value pairs.
+        uri: Parsed URI object. Populated for ``clone`` (from CLI) and for
+            ``add`` (from the source repo's ``origin`` remote — *not* the
+            original clone URL if the user later changed remotes).
+        branch: Git branch name. For ``add``, the user-supplied branch. For
+            ``clone``, the branch git checked out by default (the remote's
+            HEAD) after the clone operation completes; ``""`` if HEAD is
+            detached.
+        source_path: Source repository path. Always set for project-rule
+            predicates; used by ``source_path``, ``file_exists``,
+            ``dir_exists``, ``path_exists``.
+        dest_path: Destination path for project-rule actions — the worktree
+            path for ``after_add``, the source path for ``after_clone``. Used
+            by the ``dest_path()`` function. ``None`` in non-project
+            evaluation sites (URI predicates, path templates).
+        tags: Dictionary of tag key-value pairs from the CLI.
     """
 
     uri: Optional[ParsedURI] = None
     branch: Optional[str] = None
     source_path: Optional[Path] = None
+    dest_path: Optional[Path] = None
     tags: dict[str, str] = field(default_factory=dict)
 
 
@@ -245,23 +262,33 @@ def create_function_registry(context: TemplateContext) -> dict[str, Callable[...
 
 
 def create_project_functions(
-    source_path: Path,
-    dest_path: Optional[Path] = None,
+    context: TemplateContext,
 ) -> dict[str, Callable[..., Any]]:
     """Create project-specific functions for project predicate evaluation.
 
     These functions are only available in project predicates, not in templates
-    or URI predicates.
+    or URI predicates. Reads ``source_path`` and ``dest_path`` off the
+    supplied :class:`TemplateContext` rather than taking them as separate
+    arguments — keeps the project-rule evaluation pipeline a single-context
+    pipeline.
 
     Args:
-        source_path: Path to source repository (used by file_exists, dir_exists, path_exists).
-        dest_path: Optional destination path. For clone operations, this is the same as
-            source_path. For add operations, this is the worktree path. If None,
-            dest_path() will return the same as source_path().
+        context: Template context whose ``source_path`` and ``dest_path`` are
+            used by the returned functions. ``source_path`` must be set;
+            ``dest_path`` falls back to ``source_path`` when ``None``.
 
     Returns:
         Dictionary of project-specific functions.
+
+    Raises:
+        ValueError: If ``context.source_path`` is ``None``.
     """
+    if context.source_path is None:
+        raise ValueError(
+            "create_project_functions requires context.source_path"
+        )
+    source_path = context.source_path
+    dest_path = context.dest_path
 
     def _source_path() -> str:
         """Get absolute path to source repository or worktree root.
@@ -289,10 +316,8 @@ def create_project_functions(
         - During add: returns worktree path
         - If dest_path was not provided: returns source_path()
         """
-        if dest_path is not None:
-            return str(dest_path.resolve())
-        # Fallback to source_path behavior
-        return str(source_path.resolve())
+        target = dest_path if dest_path is not None else source_path
+        return str(target.resolve())
 
     def _file_exists(path: str) -> bool:
         """Check if a file exists relative to source repository.

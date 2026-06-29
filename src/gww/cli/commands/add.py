@@ -25,6 +25,7 @@ from gww.git.repository import (
     get_current_commit,
 )
 from gww.git.worktree import WorktreeExistsError, add_worktree
+from gww.template.functions import TemplateContext
 
 
 @exit_on_error
@@ -80,14 +81,15 @@ def run_add(ctx: CommandContext) -> int:
         raise CommandExit(1, f"Error adding worktree: {e}") from e
 
     if config.actions:
+        context = TemplateContext(
+            uri=uri,
+            branch=ctx.branch,
+            source_path=source_path,
+            dest_path=worktree_path,
+            tags=ctx.tags,
+        )
         try:
-            actions = apply_actions(
-                config.actions,
-                source_path,
-                ctx.tags,
-                dest_path=worktree_path,
-                kind="after_add",
-            )
+            actions = apply_actions(config.actions, context, kind="after_add")
         except Exception as e:
             print(f"Error matching project rules: {e}", file=sys.stderr)
             actions = []
