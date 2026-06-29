@@ -235,6 +235,25 @@ Other functions available in the actions section:
 | `rel_copy` | Copy file from source repository to worktree (relative paths) | `rel_copy: ["local.properties"]` or `rel_copy: ["config.template", "config"]` |
 | `command` | Execute external command (runs in destination directory, template functions available) | `command: "npm install"` or `command: "claude init"` |
 
+Each action rule also accepts an optional `critical:` flag (default `true`). When `true`, a failing action in that rule aborts the remaining actions in the rule and makes the command exit `1`. Set `critical: false` for non-critical rules — failures are reported in the action execution summary but the command still exits `0`. See [Failure handling](#-failure-handling) below for the full exit-code table.
+```yml
+actions:
+  - when: file_exists("package.json")
+    critical: false  # non-critical: a missing node_modules is annoying, not fatal
+    after_clone:
+      - command: "npm install"
+```
+
+#### ❗ Failure handling
+Action failures are reported per-rule, grouped at the end of the action loop on stderr as the **action execution summary**. The summary lists every failing rule by its index in `actions:`, its criticality flag, and the failing action's error. Its non-emptiness also gates the success line: `say()` (the line scripts `cd $(gwc …)`) is suppressed whenever the summary has any entry, so `cd` only ever lands on a fully-configured worktree.
+
+| Outcome | Exit code |
+|---|---|
+| Clean run (no failures) | `0` |
+| Non-critical rule failure only | `0` |
+| Critical rule failure | `1` |
+| `when:` predicate or `command:` template failed to evaluate | `2` |
+
 #### 📁 Actions Functions (available in `command` actions and `when` conditions)
 
 | Function | Description | Example |

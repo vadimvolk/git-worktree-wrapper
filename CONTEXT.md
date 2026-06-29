@@ -46,6 +46,22 @@ In `clone`, the URI in the project rule context is whatever the user typed on th
 **Branch as seen by `clone` vs `add`**:
 In `add`, the branch in the project rule context is the user-supplied branch being checked out in the new worktree. In `clone`, it is whatever branch git checked out by default (the remote's HEAD) after the clone operation completes; if HEAD ends up detached, the value is `""` so predicates evaluate to a defined but non-matching state rather than raising.
 
+**Critical rule**:
+A project rule with `critical: true` (the default) in the `actions:` config. When any action in a critical rule fails, the command exits 1, the `say()` success line is suppressed, and the failure is reported in the action execution summary. Other rules still run after a critical rule fails.
+_Avoid_: required rule, mandatory rule, fatal rule.
+
+**Non-critical rule**:
+A project rule with `critical: false`. When an action in a non-critical rule fails, the failure is reported in the action execution summary but the command exits 0. The `say()` success line is still suppressed when the summary is non-empty — criticality affects the exit code, not the success-line policy.
+_Avoid_: optional rule, best-effort rule, lenient rule.
+
+**Matcher failure**:
+A failure to evaluate a `when:` predicate or `command:` template, raised as `MatcherError` from `gww.actions.apply_actions`. Treated as a configuration error — the command exits 2 with no actions executed, even if the git operation already succeeded.
+_Avoid_: template error, evaluation error, predicate failure.
+
+**Action execution summary**:
+The grouped failure block printed to stderr at the end of the action loop in `clone`/`add`. Lists one entry per failing action, identified by the rule's config index, the rule's criticality flag, and the failing action's error. Critical rules' loops break after the first failure (so each critical rule appears at most once); non-critical rules appear once per failing action. The non-emptiness of this summary is what gates the `say()` success line: the line is suppressed whenever this summary has any entry, whether critical or non-critical.
+_Avoid_: failure report, error log, action error output.
+
 **Checked-out branch**:
 A git branch (refs/heads/&lt;name&gt;) that is currently checked out in some worktree of a given source repository. Discovered via `git worktree list --porcelain` (the `branch ` line). Detached-HEAD worktrees are excluded from this set. Informally called a "worktree branch" in some docs, but that conflates the branch with its worktree — keep the canonical term strict.
 _Avoid_: worktree branch (informal only), bound branch.
