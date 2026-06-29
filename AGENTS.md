@@ -16,7 +16,7 @@ GWW is a CLI tool (`gww`) that wraps git worktree functionality with:
 - `src/gww/` - Main source code
 - `tests/` - Test suite (unit and integration)
 - `specs/001-git-worktree-wrapper/` - Feature specifications
-- `.cursor/commands/` - Cursor command definitions
+- `.opencode/skills/` - OpenCode skill definitions
 
 ## Agents
 
@@ -242,6 +242,42 @@ GWW is a CLI tool (`gww`) that wraps git worktree functionality with:
 
 **Run tests**: `uv run pytest`
 **Type check**: `uv run mypy src/gww`
+**Lint**: `ruff check .`
 **Install deps**: `uv sync`
 **Run CLI**: `uv run gww --help`
 **Record decision**: Use the `grill-with-docs` skill (produces `CONTEXT.md` / `docs/adr/NNNN-…`)
+
+---
+
+## Auto-generated Project Context
+
+Migrated from `.cursor/rules/specify-rules.mdc`. Auto-generated from feature plans.
+
+### Active Technologies
+- Python 3.11+ (001-git-worktree-wrapper)
+- File system (YAML config in `XDG_CONFIG_HOME` / `~/Library/Application Support`, git repositories) (001-git-worktree-wrapper)
+
+### Project Structure
+
+```text
+src/
+tests/
+```
+
+### Commands
+
+```bash
+cd src
+pytest
+ruff check .
+```
+
+### Code Style
+
+Python 3.11+: Follow standard conventions.
+
+### Recent Changes
+- 001-git-worktree-wrapper: Added Python 3.11+
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->
