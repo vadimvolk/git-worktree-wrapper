@@ -36,6 +36,16 @@ _Avoid_: SystemExit, raise.
 A single entry from the `actions:` list in the config, evaluated against a `when:` predicate. A rule that matches produces zero or more `after_clone` and `after_add` actions.
 _Avoid_: hook, callback.
 
+**Project rule evaluation context**:
+The :class:`TemplateContext` instance a project rule's `when` predicate and command templates evaluate against. Carries every piece of state that the calling command (`clone` or `add`) actually knows — URI, branch, tags, source path, destination path — so authors can mix `host()`, `branch()`, `tag()`, `file_exists()`, `dest_path()` and friends in the same predicate. Each command populates it from its own operation; see URI-as-seen-by-`clone`-vs-`add` for the asymmetry.
+_Avoid_: URI context, action context (too narrow — the context also feeds command templates and tags, not just URI predicates).
+
+**URI as seen by `clone` vs `add`**:
+In `clone`, the URI in the project rule context is whatever the user typed on the command line. In `add`, it is whatever `git remote get-url origin` of the source repository returns *now*. If the user later rewrote the remote (`git remote set-url …` from HTTPS to SSH, host rename, etc.), the `clone` rule still sees the original URL while the `add` rule sees the rewritten one. For host-based predicates this rarely matters; for protocol-sensitive predicates it can.
+
+**Branch as seen by `clone` vs `add`**:
+In `add`, the branch in the project rule context is the user-supplied branch being checked out in the new worktree. In `clone`, it is whatever branch git checked out by default (the remote's HEAD) after the clone operation completes; if HEAD ends up detached, the value is `""` so predicates evaluate to a defined but non-matching state rather than raising.
+
 **Checked-out branch**:
 A git branch (refs/heads/&lt;name&gt;) that is currently checked out in some worktree of a given source repository. Discovered via `git worktree list --porcelain` (the `branch ` line). Detached-HEAD worktrees are excluded from this set. Informally called a "worktree branch" in some docs, but that conflates the branch with its worktree — keep the canonical term strict.
 _Avoid_: worktree branch (informal only), bound branch.

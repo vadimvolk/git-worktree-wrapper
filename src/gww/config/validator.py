@@ -47,7 +47,9 @@ class ProjectRule:
     """Validated project detection rule.
 
     Attributes:
-        when: Expression evaluated against repository filesystem.
+        when: Expression evaluated against the :class:`TemplateContext`
+            populated by the calling command (``clone`` or ``add``). Sees
+            URI, branch, tags, source path, and destination path.
         after_clone: Actions executed after source checkout.
         after_add: Actions executed when worktree is added.
     """

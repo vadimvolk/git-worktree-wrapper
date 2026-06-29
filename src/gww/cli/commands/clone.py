@@ -13,7 +13,12 @@ from gww.cli.context import (
     parse_uri_or_exit,
 )
 from gww.config.resolver import ResolverError, resolve_source_path
-from gww.git.repository import GitCommandError, clone_repository
+from gww.git.repository import (
+    GitCommandError,
+    clone_repository,
+    try_get_current_branch,
+)
+from gww.template.functions import TemplateContext
 
 
 @exit_on_error
@@ -51,14 +56,16 @@ def run_clone(ctx: CommandContext) -> int:
         raise CommandExit(1, f"Error cloning repository: {e}") from e
 
     if config.actions:
+        branch = try_get_current_branch(source_path)
+        context = TemplateContext(
+            uri=uri,
+            branch=branch,
+            source_path=source_path,
+            dest_path=source_path,
+            tags=ctx.tags,
+        )
         try:
-            actions = apply_actions(
-                config.actions,
-                source_path,
-                ctx.tags,
-                dest_path=source_path,
-                kind="after_clone",
-            )
+            actions = apply_actions(config.actions, context, kind="after_clone")
         except Exception as e:  # MatcherError or its base
             print(f"Error matching project rules: {e}", file=sys.stderr)
             actions = []

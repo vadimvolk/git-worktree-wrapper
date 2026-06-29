@@ -19,8 +19,7 @@ Public surface:
 from __future__ import annotations
 
 import shlex
-from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 from gww.actions.types import (
     AbsCopyAction,
@@ -62,19 +61,16 @@ __all__ = [
 ]
 
 
-def _create_predicate_context(
-    source_path: Path,
-    tags: dict[str, str],
-    dest_path: Optional[Path],
-) -> dict[str, object]:
+def _create_predicate_context(context: TemplateContext) -> dict[str, object]:
     """Build the evaluation context shared by ``when`` predicates and command
-    templates. Adds project-specific functions (``source_path``,
-    ``dest_path``, ``file_exists``, ``dir_exists``, ``path_exists``) on top
-    of the unified URI/branch/tag registry.
+    templates.
+
+    Adds project-specific functions (``source_path``, ``dest_path``,
+    ``file_exists``, ``dir_exists``, ``path_exists``) on top of the unified
+    URI/branch/tag registry seeded by ``context``.
     """
-    context = TemplateContext(source_path=source_path, tags=tags)
     functions: dict[str, object] = dict(create_function_registry(context))
-    functions.update(create_project_functions(source_path, dest_path))
+    functions.update(create_project_functions(context))
     return functions
 
 
@@ -120,19 +116,19 @@ def _build_action(
 
 def apply_actions(
     rules: list[ProjectRule],
-    source_path: Path,
-    tags: dict[str, str],
-    dest_path: Path,
+    context: TemplateContext,
     kind: ActionKind,
 ) -> list[Action]:
     """Match rules and return executable actions for the given ``kind``.
 
+    The ``context`` carries the URI, branch, tags, source path, and
+    destination path that ``when`` predicates and command templates evaluate
+    against. Callers (``clone``, ``add``) populate it from the operation in
+    progress; see :class:`TemplateContext` for the field-level contract.
+
     Args:
         rules: Project rules from the validated config.
-        source_path: Path to the source repository.
-        tags: Tag key-value pairs from the CLI.
-        dest_path: Destination path (equals ``source_path`` for ``after_clone``,
-            equals the worktree path for ``after_add``).
+        context: Evaluation context — see :class:`TemplateContext`.
         kind: Which action list to read — ``"after_clone"`` or ``"after_add"``.
 
     Returns:
@@ -143,12 +139,12 @@ def apply_actions(
         MatcherError: If a ``when`` predicate or a ``command`` template fails
             to evaluate.
     """
-    context = _create_predicate_context(source_path, tags, dest_path)
+    eval_context = _create_predicate_context(context)
 
     matched: list[ProjectRule] = []
     for i, rule in enumerate(rules):
         try:
-            if evaluate_predicate(rule.when, context):
+            if evaluate_predicate(rule.when, eval_context):
                 matched.append(rule)
         except TemplateError as e:
             raise MatcherError(
@@ -161,6 +157,6 @@ def apply_actions(
             rule.after_clone if kind == "after_clone" else rule.after_add
         )
         for raw in source_actions:
-            actions.append(_build_action(raw, context))
+            actions.append(_build_action(raw, eval_context))
 
     return actions

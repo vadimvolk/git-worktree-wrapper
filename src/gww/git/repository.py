@@ -265,6 +265,27 @@ def get_current_branch(repo_path: Path) -> str:
     return branch
 
 
+def try_get_current_branch(repo_path: Path) -> str:
+    """Get the current branch name, returning ``""`` on failure.
+
+    Soft-fail variant of :func:`get_current_branch` for callers (notably
+    ``clone``) that need a branch value to populate a template context but
+    must not abort when HEAD is detached or the repo is in an unexpected
+    state. Used so that predicates referencing ``branch()`` evaluate to a
+    defined but non-matching value rather than raising.
+
+    Args:
+        repo_path: Path to repository.
+
+    Returns:
+        Branch name, or ``""`` if HEAD is detached or the git command fails.
+    """
+    try:
+        return get_current_branch(repo_path)
+    except GitCommandError:
+        return ""
+
+
 def is_clean(repo_path: Path) -> bool:
     """Check if repository has no uncommitted changes.
 

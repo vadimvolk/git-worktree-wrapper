@@ -652,7 +652,7 @@ class TestProjectFunctions:
 
     def test_create_project_functions_returns_all_functions(self, tmp_path: Path) -> None:
         """Test create_project_functions returns all project functions."""
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         assert "source_path" in functions
         assert "dest_path" in functions
@@ -667,7 +667,7 @@ class TestProjectFunctions:
         _init_git_repo(repo_path)
         _create_initial_commit(repo_path)
 
-        functions = create_project_functions(tmp_path)  # param not used by source_path()
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))  # param not used by source_path()
 
         original_cwd = os.getcwd()
         try:
@@ -687,7 +687,7 @@ class TestProjectFunctions:
         subdir = repo_path / "src" / "nested"
         subdir.mkdir(parents=True)
 
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         original_cwd = os.getcwd()
         try:
@@ -707,7 +707,7 @@ class TestProjectFunctions:
         worktree_path = tmp_path / "worktree"
         _add_worktree(repo_path, worktree_path, "feature-branch")
 
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         original_cwd = os.getcwd()
         try:
@@ -730,7 +730,7 @@ class TestProjectFunctions:
         subdir = worktree_path / "src" / "nested"
         subdir.mkdir(parents=True)
 
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         original_cwd = os.getcwd()
         try:
@@ -745,7 +745,7 @@ class TestProjectFunctions:
         non_git_dir = tmp_path / "not_a_repo"
         non_git_dir.mkdir()
 
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         original_cwd = os.getcwd()
         try:
@@ -762,7 +762,7 @@ class TestProjectFunctions:
         _init_git_repo(repo_path)
         _create_initial_commit(repo_path)
 
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         original_cwd = os.getcwd()
         try:
@@ -779,7 +779,7 @@ class TestProjectFunctions:
         source_path = tmp_path / "source"
         source_path.mkdir()
 
-        functions = create_project_functions(source_path)
+        functions = create_project_functions(TemplateContext(source_path=source_path))
 
         result = functions["dest_path"]()
 
@@ -792,7 +792,9 @@ class TestProjectFunctions:
         worktree_path = tmp_path / "worktree"
         worktree_path.mkdir()
 
-        functions = create_project_functions(source_path, dest_path=worktree_path)
+        functions = create_project_functions(
+            TemplateContext(source_path=source_path, dest_path=worktree_path),
+        )
 
         result = functions["dest_path"]()
 
@@ -805,7 +807,9 @@ class TestProjectFunctions:
         worktree_path = tmp_path / "worktree"
         worktree_path.mkdir()
 
-        functions = create_project_functions(source_path, dest_path=worktree_path)
+        functions = create_project_functions(
+            TemplateContext(source_path=source_path, dest_path=worktree_path),
+        )
 
         result = functions["dest_path"]()
 
@@ -818,7 +822,9 @@ class TestProjectFunctions:
         source_path.mkdir()
 
         # In clone context, dest_path is set to the same as source_path
-        functions = create_project_functions(source_path, dest_path=source_path)
+        functions = create_project_functions(
+            TemplateContext(source_path=source_path, dest_path=source_path),
+        )
 
         result = functions["dest_path"]()
 
@@ -832,7 +838,9 @@ class TestProjectFunctions:
         worktree_path.mkdir(parents=True)
 
         # In add context, dest_path is the worktree path
-        functions = create_project_functions(source_path, dest_path=worktree_path)
+        functions = create_project_functions(
+            TemplateContext(source_path=source_path, dest_path=worktree_path),
+        )
 
         result = functions["dest_path"]()
 
@@ -845,13 +853,13 @@ class TestProjectFunctions:
         test_file = tmp_path / "package.json"
         test_file.touch()
 
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         assert functions["file_exists"]("package.json") is True
 
     def test_file_exists_returns_false_for_missing_file(self, tmp_path: Path) -> None:
         """Test file_exists() returns False for missing file."""
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         assert functions["file_exists"]("nonexistent.txt") is False
 
@@ -860,7 +868,7 @@ class TestProjectFunctions:
         test_dir = tmp_path / "src"
         test_dir.mkdir()
 
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         assert functions["file_exists"]("src") is False
 
@@ -869,13 +877,13 @@ class TestProjectFunctions:
         test_dir = tmp_path / "src"
         test_dir.mkdir()
 
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         assert functions["dir_exists"]("src") is True
 
     def test_dir_exists_returns_false_for_missing_directory(self, tmp_path: Path) -> None:
         """Test dir_exists() returns False for missing directory."""
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         assert functions["dir_exists"]("nonexistent") is False
 
@@ -884,7 +892,7 @@ class TestProjectFunctions:
         test_file = tmp_path / "package.json"
         test_file.touch()
 
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         assert functions["dir_exists"]("package.json") is False
 
@@ -893,7 +901,7 @@ class TestProjectFunctions:
         test_file = tmp_path / "package.json"
         test_file.touch()
 
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         assert functions["path_exists"]("package.json") is True
 
@@ -902,13 +910,13 @@ class TestProjectFunctions:
         test_dir = tmp_path / "src"
         test_dir.mkdir()
 
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         assert functions["path_exists"]("src") is True
 
     def test_path_exists_returns_false_for_missing_path(self, tmp_path: Path) -> None:
         """Test path_exists() returns False for missing path."""
-        functions = create_project_functions(tmp_path)
+        functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         assert functions["path_exists"]("nonexistent") is False
 
