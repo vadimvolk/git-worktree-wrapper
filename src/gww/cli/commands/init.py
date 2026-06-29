@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import os
 import sys
+from pathlib import Path
 
 from gww.cli.context import CommandContext, CommandExit, exit_on_error
 from gww.config.loader import config_exists, get_default_config
 from gww.utils.shell import (
+    generate_bash_aliases,
+    generate_fish_aliases,
+    generate_zsh_aliases,
+    get_aliases_path,
     get_installation_instructions,
     install_aliases,
     install_completion,
@@ -83,3 +89,59 @@ def run_init_shell(ctx: CommandContext) -> int:
         print(instructions)
 
     return 0
+
+
+def detect_user_shell() -> str | None:
+    """Return the user's current shell name, or ``None`` if undetectable.
+
+    Reads ``$SHELL`` and extracts the basename (``/bin/bash`` → ``bash``).
+    Returns ``None`` for unknown shells so callers can silently skip
+    staleness checks rather than guess.
+    """
+    shell_path = os.environ.get("SHELL", "")
+    basename = os.path.basename(shell_path)
+    if basename in {"bash", "zsh", "fish"}:
+        return basename
+    return None
+
+
+def warn_if_alias_is_stale(shell: str) -> None:
+    """Warn on stderr if the installed alias file predates the current source.
+
+    Compares the on-disk alias file to what :func:`gww.utils.shell` would
+    generate today. If they differ, prints a one-line reminder to re-run
+    ``gww init shell <shell>``. Silently does nothing when:
+
+    * no alias file exists yet — we don't pester first-time installers;
+    * the file already matches the current generator output.
+
+    Args:
+        shell: Shell name (``"bash"``, ``"zsh"``, or ``"fish"``).
+    """
+    aliases_path = get_aliases_path(shell)
+
+    if shell == "fish":
+        assert isinstance(aliases_path, dict)
+        target = aliases_path["gwa"]
+        if not target.exists():
+            return
+        installed = target.read_text()
+        expected = generate_fish_aliases()["gwa"]
+        location = str(target)
+    else:
+        assert isinstance(aliases_path, Path)
+        if not aliases_path.exists():
+            return
+        installed = aliases_path.read_text()
+        expected = (
+            generate_bash_aliases() if shell == "bash" else generate_zsh_aliases()
+        )
+        location = str(aliases_path)
+
+    if installed != expected:
+        print(
+            f"gww: shell aliases at {location} are out of date — "
+            f"re-run 'gww init shell {shell}' to pick up the latest "
+            f"gwc/gwa/gwr.",
+            file=sys.stderr,
+        )

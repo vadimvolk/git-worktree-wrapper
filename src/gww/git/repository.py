@@ -339,7 +339,7 @@ def clone_repository(
         target_path: Path where repository should be cloned.
         pass_through_stdout: Forwarded to :func:`_run_git`. When ``True``,
             git's progress messages (``Cloning into '…'``, ``Receiving
-            objects: 100%``, …) stream to the parent process's stdout.
+            objects: 100%``, …) stream to the parent process's stderr.
 
     Returns:
         Path to cloned repository.

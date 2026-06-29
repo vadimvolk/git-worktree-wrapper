@@ -261,7 +261,7 @@ def add_worktree(
         base_commit: Commit to base new branch on (if create_branch=True).
         pass_through_stdout: Forwarded to :func:`_run_git`. When ``True``,
             git's ``worktree add`` progress (``Preparing worktree…``) streams
-            to the parent process's stdout.
+            to the parent process's stderr.
 
     Returns:
         Path to created worktree.
