@@ -204,6 +204,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         parser.print_help()
         return 0
 
+    # Remind the user if their installed shell alias predates the current
+    # source. Skipped for `gww init shell` since that's the command that
+    # rewrites the alias file (no point nagging mid-regeneration).
+    if not (args.command == "init" and getattr(args, "init_command", None) == "shell"):
+        from gww.cli.commands.init import detect_user_shell, warn_if_alias_is_stale
+
+        shell = detect_user_shell()
+        if shell is not None:
+            warn_if_alias_is_stale(shell)
+
     ctx = CommandContext.from_args(args)
 
     # Import and run command handlers
