@@ -35,3 +35,7 @@ _Avoid_: SystemExit, raise.
 **Project rule**:
 A single entry from the `actions:` list in the config, evaluated against a `when:` predicate. A rule that matches produces zero or more `after_clone` and `after_add` actions.
 _Avoid_: hook, callback.
+
+**Checked-out branch**:
+A git branch (refs/heads/&lt;name&gt;) that is currently checked out in some worktree of a given source repository. Discovered via `git worktree list --porcelain` (the `branch ` line). Detached-HEAD worktrees are excluded from this set. Informally called a "worktree branch" in some docs, but that conflates the branch with its worktree — keep the canonical term strict.
+_Avoid_: worktree branch (informal only), bound branch.

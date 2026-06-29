@@ -1,9 +1,19 @@
 """Unit tests for shell completion generation in src/gww/utils/shell.py."""
 
-import pytest
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import textwrap
 from pathlib import Path
 
+import pytest
+
 from gww.utils.shell import (
+    _BASH_REMOVE_AWK,
+    _FISH_REMOVE_AWK,
+    _ZSH_REMOVE_AWK,
     get_completion_path,
     generate_bash_completion,
     generate_zsh_completion,
@@ -12,6 +22,10 @@ from gww.utils.shell import (
     install_completion,
     get_installation_instructions,
 )
+
+SH_BASH = shutil.which("bash")
+SH_FISH = shutil.which("fish")
+SH_ZSH = shutil.which("zsh")
 
 
 class TestGetCompletionPath:
@@ -86,10 +100,22 @@ class TestGenerateBashCompletion:
         assert "fish" in script
 
     def test_includes_dynamic_branch_completion(self) -> None:
-        """Test that script includes dynamic branch completion."""
+        """Test that script includes dynamic branch completion for `add`."""
         script = generate_bash_completion()
-        # Should reference git branch for completion
-        assert "git" in script and "branch" in script
+        # `add` should still reference `git branch` so the user can pick any branch.
+        assert "git branch" in script
+
+    def test_remove_completion_filters_to_worktrees(self) -> None:
+        """`remove` completer must use `git worktree list --porcelain`, not `git branch`.
+
+        Bug regression: previously the `remove` completer used `git branch`
+        which returned every local + remote branch — including ones not checked
+        out in any worktree — so `gwr <TAB>` offered lots of bogus candidates.
+        """
+        script = generate_bash_completion()
+        remove_block = _extract_case_block(script, "remove)")
+        assert "git worktree list --porcelain" in remove_block
+        assert "compgen" in remove_block
 
     def test_is_valid_bash_syntax(self) -> None:
         """Test that generated script has valid bash syntax elements."""
@@ -285,3 +311,289 @@ class TestGetInstallationInstructions:
         instructions = get_installation_instructions("other", path)
 
         assert str(path) in instructions
+
+
+def _extract_case_block(script: str, marker: str, end_marker: str = ";;") -> str:
+    """Return the bash `case` arm that starts with ``marker`` and ends at ``end_marker``.
+
+    Used to assert structural properties of a single arm of the completion
+    function's `case "${prev}"` block without depending on line numbers.
+    """
+    start = script.find(marker)
+    assert start != -1, f"marker {marker!r} not found in script"
+    end = script.find(end_marker, start)
+    assert end != -1, f"end marker {end_marker!r} not found after {marker!r}"
+    return script[start:end]
+
+
+def _install_fake_git(tmp_path: Path) -> Path:
+    """Write a fake ``git`` binary that returns canned worktree porcelain.
+
+    Returns the directory that should be prepended to ``PATH`` for subprocess
+    tests. The fake ``git`` answers two queries only: ``git rev-parse --git-dir``
+    (returns a fake path so the completion code thinks we're in a repo) and
+    ``git worktree list --porcelain`` (returns the canned fixture).
+    """
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    git = bin_dir / "git"
+    git.write_text(
+        textwrap.dedent(
+            """\
+            #!/bin/sh
+            case "$*" in
+              "rev-parse --git-dir")
+                echo "/tmp/fake-git-dir"
+                exit 0
+                ;;
+              "worktree list --porcelain")
+                cat <<'PORCELAIN_EOF'
+            worktree /home/u/myrepo
+            HEAD 1111111111111111111111111111111111111111
+            branch refs/heads/main
+
+            worktree /home/u/myrepo-feature-x
+            HEAD 2222222222222222222222222222222222222222
+            branch refs/heads/feature-x
+
+            worktree /home/u/myrepo-detached
+            HEAD 3333333333333333333333333333333333333333
+            detached
+
+            PORCELAIN_EOF
+                ;;
+            esac
+            """
+        )
+    )
+    git.chmod(0o755)
+    return bin_dir
+
+
+class TestRemoveCompletionListsWorktrees:
+    """`gww remove` completion must offer paths + checked-out branches only.
+
+    Bug regression: the completer used to call ``git branch`` (all branches)
+    or the shell-native branch helpers, which returned every local + remote
+    branch. The fix is to parse ``git worktree list --porcelain``, drop the
+    source entry, and emit each worktree's path (always) and its branch (only
+    if not detached).
+    """
+
+    def test_bash_awk_script_skips_source(self, tmp_path: Path) -> None:
+        """The awk pipe shipped with bash completion drops the source entry."""
+        bin_dir = _install_fake_git(tmp_path)
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        result = subprocess.run(
+            ["bash", "-c", "git worktree list --porcelain 2>/dev/null | awk -v skip=1 '" + _BASH_REMOVE_AWK + "'"],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        candidates = result.stdout.splitlines()
+        assert "/home/u/myrepo" not in candidates
+        assert "main" not in candidates
+        assert "/home/u/myrepo-feature-x" in candidates
+        assert "feature-x" in candidates
+        assert "/home/u/myrepo-detached" in candidates
+        # Detached worktree has no branch line in porcelain, so no branch entry.
+        assert candidates.count("/home/u/myrepo-feature-x") == 1
+        assert candidates.count("feature-x") == 1
+
+    def test_zsh_awk_script_emits_descriptions(self, tmp_path: Path) -> None:
+        """The zsh/fish awk script emits `value<TAB>description` lines."""
+        bin_dir = _install_fake_git(tmp_path)
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        for label, script in (("zsh", _ZSH_REMOVE_AWK), ("fish", _FISH_REMOVE_AWK)):
+            result = subprocess.run(
+                ["bash", "-c", "git worktree list --porcelain 2>/dev/null | awk -v skip=1 '" + script + "'"],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            lines = [ln for ln in result.stdout.splitlines() if ln]
+            # Each line is `value<TAB>description`. Split once.
+            values = [ln.split("\t", 1)[0] for ln in lines]
+            # Source excluded (note: '/home/u/myrepo' is a prefix of the linked
+            # worktree paths, so we must check exact membership, not substring).
+            assert "/home/u/myrepo" not in values, f"{label}: source path leaked"
+            assert "main" not in values, f"{label}: source branch leaked"
+            # Cross-descriptions present
+            joined = "\n".join(lines)
+            assert "/home/u/myrepo-feature-x\tpath (branch: feature-x)" in joined, label
+            assert "feature-x\tbranch (worktree at /home/u/myrepo-feature-x)" in joined, label
+            # Detached path present, with "detached" description
+            assert "/home/u/myrepo-detached" in values, label
+            assert "detached at 3333333" in joined, label
+
+    @pytest.mark.skipif(SH_BASH is None, reason="bash not installed")
+    def test_bash_completion_live(self, tmp_path: Path) -> None:
+        """Spawn a real bash, source the completion, and check COMPREPLY."""
+        bin_dir = _install_fake_git(tmp_path)
+        completion_file = tmp_path / "gww.bash"
+        completion_file.write_text(generate_bash_completion())
+
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        # No need for `compgen` to actually display — just need the values.
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                (
+                    f"source {completion_file}\n"
+                    'COMP_WORDS=(gww remove "")\n'
+                    "COMP_CWORD=2\n"
+                    "_gww_completions\n"
+                    'printf "%s\\n" "${COMPREPLY[@]}"\n'
+                ),
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        assert result.returncode == 0, f"bash failed: {result.stderr}"
+        candidates = sorted(result.stdout.splitlines())
+        # Source excluded
+        assert "/home/u/myrepo" not in candidates
+        assert "main" not in candidates
+        # Worktree paths and checked-out branch present
+        assert "/home/u/myrepo-feature-x" in candidates
+        assert "feature-x" in candidates
+        assert "/home/u/myrepo-detached" in candidates
+        # No extras
+        assert len(candidates) == 3
+
+    @pytest.mark.skipif(SH_FISH is None, reason="fish not installed")
+    def test_fish_remove_function_emits_candidates(self, tmp_path: Path) -> None:
+        """Source the fish completion, call the helper, and parse the output."""
+        bin_dir = _install_fake_git(tmp_path)
+        completion_file = tmp_path / "gww.fish"
+        completion_file.write_text(generate_fish_completion())
+
+        # Fish re-resolves PATH from its own config, so push the fake dir
+        # to the front of $PATH *inside* the fish process.
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        script = (
+            f"set -gx PATH {bin_dir} $PATH\n"
+            f"source {completion_file}\n"
+            "__gww_remove_worktrees\n"
+        )
+        result = subprocess.run(
+            ["fish", "-c", script],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        assert result.returncode == 0, f"fish failed: {result.stderr}"
+        lines = [ln for ln in result.stdout.splitlines() if ln]
+        # Source excluded
+        assert not any("/home/u/myrepo" == ln.split("\t", 1)[0] for ln in lines)
+        assert not any("main" == ln.split("\t", 1)[0] for ln in lines)
+        # Checked-out branch and paths present
+        assert any(
+            ln.startswith("/home/u/myrepo-feature-x\t") and "branch: feature-x" in ln
+            for ln in lines
+        )
+        assert any(
+            ln.startswith("feature-x\t") and "worktree at /home/u/myrepo-feature-x" in ln
+            for ln in lines
+        )
+        assert any(
+            ln.startswith("/home/u/myrepo-detached\t") and "detached at 3333333" in ln
+            for ln in lines
+        )
+
+    @pytest.mark.skipif(SH_ZSH is None, reason="zsh not installed")
+    def test_zsh_awk_pipeline_runs(self, tmp_path: Path) -> None:
+        """Run the awk pipeline used by the zsh completer under zsh.
+
+        zsh's completion system can only be exercised from a real terminal, so
+        we don't call the completion function directly. We do verify that the
+        exact pipeline embedded in the generated script works in a zsh subshell.
+        """
+        bin_dir = _install_fake_git(tmp_path)
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
+        result = subprocess.run(
+            [
+                "zsh",
+                "-c",
+                (
+                    "git worktree list --porcelain 2>/dev/null | awk -v skip=1 '"
+                    + _ZSH_REMOVE_AWK
+                    + "'"
+                ),
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        assert result.returncode == 0, f"zsh failed: {result.stderr}"
+        lines = [ln for ln in result.stdout.splitlines() if ln]
+        values = [ln.split("\t", 1)[0] for ln in lines]
+        joined = "\n".join(lines)
+        assert "/home/u/myrepo" not in values
+        assert "main" not in values
+        assert "/home/u/myrepo-feature-x\tpath (branch: feature-x)" in joined
+        assert "feature-x\tbranch (worktree at /home/u/myrepo-feature-x)" in joined
+        assert "/home/u/myrepo-detached" in values
+        assert "detached at 3333333" in joined
+
+    def test_zsh_remove_uses_worktrees_completer_not_branch_names(self) -> None:
+        """Structural check: zsh `remove` case must call our function, not branch helper."""
+        script = generate_zsh_completion()
+        # Locate the `remove)` arm inside `_gww()`
+        start = script.find("remove)")
+        assert start != -1
+        end = script.find(";;", start)
+        assert end != -1
+        arm = script[start:end]
+        assert "_gww_worktrees" in arm
+        assert "_git_branch_names" not in arm
+        # The function itself must use `git worktree list --porcelain` and `_describe`.
+        # The function spans multiple lines — find the opening brace, then the
+        # matching closing brace by tracking brace depth.
+        func_start = script.find("_gww_worktrees()")
+        assert func_start != -1
+        brace = script.find("{", func_start)
+        depth = 1
+        i = brace + 1
+        while i < len(script) and depth > 0:
+            if script[i] == "{":
+                depth += 1
+            elif script[i] == "}":
+                depth -= 1
+            i += 1
+        func_body = script[func_start:i]
+        assert "git worktree list --porcelain" in func_body
+        assert "_describe" in func_body
+
+    def test_fish_remove_completion_does_not_use_git_branches(self) -> None:
+        """Structural check: fish `remove` completion must not call __fish_git_branches."""
+        script = generate_fish_completion()
+        # The `add` arm still uses __fish_git_branches (correct).
+        # The `remove` section must not. The fish completion defines a
+        # `__gww_remove_worktrees` helper inside the `# remove completions`
+        # section, so we look at that whole section.
+        remove_arm_start = script.find("# remove completions")
+        assert remove_arm_start != -1
+        next_section = script.find("# migrate", remove_arm_start)
+        assert next_section != -1
+        remove_section = script[remove_arm_start:next_section]
+        # The candidates line should not reference __fish_git_branches.
+        assert "__fish_git_branches" not in remove_section
+        # The helper function (defined inline in this section) should use
+        # `git worktree list --porcelain`.
+        assert "git worktree list --porcelain" in remove_section
+        # The `__gww_remove_worktrees` helper should be wired into the
+        # `complete -a` line for remove.
+        assert "(__gww_remove_worktrees)" in remove_section

@@ -62,6 +62,37 @@ def get_aliases_path(shell: str) -> Path | dict[str, Path]:
         raise ValueError(f"Unsupported shell: {shell}. Must be one of: bash, zsh, fish")
 
 
+_BASH_REMOVE_AWK = r'''
+/^worktree / { path = substr($0, 10) }
+/^HEAD / { head = substr($0, 6) }
+/^branch refs\/heads\// { branch = substr($0, 19) }
+/^$/ {
+    if (skip) {
+        skip = 0
+        path = ""; branch = ""; head = ""
+    } else if (path != "") {
+        if (branch != "") {
+            print path
+            print branch
+        } else {
+            print path
+        }
+        path = ""; branch = ""; head = ""
+    }
+}
+END {
+    if (path != "" && !skip) {
+        if (branch != "") {
+            print path
+            print branch
+        } else {
+            print path
+        }
+    }
+}
+'''.strip("\n")
+
+
 def generate_bash_completion() -> str:
     """Generate bash completion script.
 
@@ -105,10 +136,12 @@ _{APP_NAME}_completions() {{
             return 0
             ;;
         remove)
-            # Complete with worktree branches or paths
+            # Complete with worktree paths and checked-out branches only (not all branches).
+            # `gwr` mirrors `gww remove` which accepts a branch or a path.
             if git rev-parse --git-dir > /dev/null 2>&1; then
-                local worktrees=$(git worktree list --porcelain 2>/dev/null | grep '^branch ' | sed 's/branch refs\\/heads\\///')
-                COMPREPLY=( $(compgen -W "${{worktrees}}" -- "${{cur}}") )
+                # First entry of `git worktree list --porcelain` is the source repo — git's invariant. Skip it.
+                local candidates=$(git worktree list --porcelain 2>/dev/null | awk -v skip=1 '{_BASH_REMOVE_AWK}')
+                COMPREPLY=( $(compgen -W "${{candidates}}" -- "${{cur}}") )
             fi
             return 0
             ;;
@@ -143,6 +176,37 @@ _{APP_NAME}_completions() {{
 
 complete -F _{APP_NAME}_completions {APP_NAME}
 '''
+
+
+_ZSH_REMOVE_AWK = r'''
+/^worktree / { path = substr($0, 10) }
+/^HEAD / { head = substr($0, 6) }
+/^branch refs\/heads\// { branch = substr($0, 19) }
+/^$/ {
+    if (skip) {
+        skip = 0
+        path = ""; branch = ""; head = ""
+    } else if (path != "") {
+        if (branch != "") {
+            print path "\tpath (branch: " branch ")"
+            print branch "\tbranch (worktree at " path ")"
+        } else {
+            print path "\tpath (detached at " substr(head, 1, 7) ")"
+        }
+        path = ""; branch = ""; head = ""
+    }
+}
+END {
+    if (path != "" && !skip) {
+        if (branch != "") {
+            print path "\tpath (branch: " branch ")"
+            print branch "\tbranch (worktree at " path ")"
+        } else {
+            print path "\tpath (detached at " substr(head, 1, 7) ")"
+        }
+    }
+}
+'''.strip("\n")
 
 
 def generate_zsh_completion() -> str:
@@ -199,7 +263,7 @@ _{APP_NAME}() {{
                     _arguments \\
                         '-f[Force removal]' \\
                         '--force[Force removal]' \\
-                        '1:branch or path:_git_branch_names'
+                        '1:branch or path:_{APP_NAME}_worktrees'
                     ;;
                 pull)
                     ;;
@@ -225,6 +289,19 @@ _{APP_NAME}() {{
     esac
 }}
 
+_{APP_NAME}_worktrees() {{
+    local -a candidates
+    if git rev-parse --git-dir > /dev/null 2>&1; then
+        # First entry of `git worktree list --porcelain` is the source repo — git's invariant. Skip it.
+        local raw=$(git worktree list --porcelain 2>/dev/null | awk -v skip=1 '{_ZSH_REMOVE_AWK}')
+        local IFS=$'\\n'
+        for entry in $raw; do
+            candidates+=("$entry")
+        done
+    fi
+    _describe -t worktrees 'worktree' candidates
+}}
+
 _git_branch_names() {{
     local -a branches
     if git rev-parse --git-dir > /dev/null 2>&1; then
@@ -235,6 +312,37 @@ _git_branch_names() {{
 
 _{APP_NAME} "$@"
 '''
+
+
+_FISH_REMOVE_AWK = r'''
+/^worktree / { path = substr($0, 10) }
+/^HEAD / { head = substr($0, 6) }
+/^branch refs\/heads\// { branch = substr($0, 19) }
+/^$/ {
+    if (skip) {
+        skip = 0
+        path = ""; branch = ""; head = ""
+    } else if (path != "") {
+        if (branch != "") {
+            print path "\tpath (branch: " branch ")"
+            print branch "\tbranch (worktree at " path ")"
+        } else {
+            print path "\tpath (detached at " substr(head, 1, 7) ")"
+        }
+        path = ""; branch = ""; head = ""
+    }
+}
+END {
+    if (path != "" && !skip) {
+        if (branch != "") {
+            print path "\tpath (branch: " branch ")"
+            print branch "\tbranch (worktree at " path ")"
+        } else {
+            print path "\tpath (detached at " substr(head, 1, 7) ")"
+        }
+    }
+}
+'''.strip("\n")
 
 
 def generate_fish_completion() -> str:
@@ -270,9 +378,13 @@ complete -c {APP_NAME} -n __fish_use_subcommand -a init -d 'Initialize config or
 complete -c {APP_NAME} -n '__fish_seen_subcommand_from add' -s c -l create-branch -d 'Create branch if not exists'
 complete -c {APP_NAME} -n '__fish_seen_subcommand_from add' -a '(__fish_git_branches)'
 
-# remove completions
+# remove completions — only worktree paths and checked-out branches, not all branches.
+# First entry of `git worktree list --porcelain` is the source repo — git's invariant. Skip it.
+function __{APP_NAME}_remove_worktrees
+    git worktree list --porcelain 2>/dev/null | awk -v skip=1 '{_FISH_REMOVE_AWK}'
+end
 complete -c {APP_NAME} -n '__fish_seen_subcommand_from remove' -s f -l force -d 'Force removal'
-complete -c {APP_NAME} -n '__fish_seen_subcommand_from remove' -a '(__fish_git_branches)'
+complete -c {APP_NAME} -n '__fish_seen_subcommand_from remove' -a '(__{APP_NAME}_remove_worktrees)'
 
 # migrate completions
 complete -c {APP_NAME} -n '__fish_seen_subcommand_from migrate' -s n -l dry-run -d 'Show what would be migrated'
