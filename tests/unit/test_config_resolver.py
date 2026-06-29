@@ -11,7 +11,7 @@ from gww.config.resolver import (
     resolve_worktree_path,
     get_source_path_for_worktree,
 )
-from gww.config.validator import Config, SourceRule
+from gww.config.validator import Config, ConfigValidationError, SourceRule, validate_config
 from gww.utils.uri import parse_uri
 
 
@@ -836,3 +836,61 @@ class TestMigrationPathCalculation:
         assert "2.0" in str(result)
         assert "repo" in str(result)
         assert "main" in str(result)
+
+
+class TestProjectRuleCritical:
+    """Schema tests for the per-rule ``critical:`` field (ADR-0009).
+
+    These exercise :func:`gww.config.validator.validate_config` rather than
+    the resolver — they live in this file because the resolver test module
+    is the closest sibling for any ``gww.config`` schema coverage.
+    """
+
+    @staticmethod
+    def _base_config(actions: object) -> dict[str, object]:
+        return {
+            "default_sources": "~/sources/default/path(-1)",
+            "default_worktrees": "~/worktrees/default",
+            "actions": actions,
+        }
+
+    def test_critical_defaults_to_true_when_omitted(self) -> None:
+        config = validate_config(self._base_config([
+            {"when": "True", "after_clone": [{"command": "echo"}]},
+        ]))
+
+        assert config.actions[0].critical is True
+
+    def test_critical_true_is_accepted(self) -> None:
+        config = validate_config(self._base_config([
+            {"when": "True", "critical": True, "after_clone": [{"command": "echo"}]},
+        ]))
+
+        assert config.actions[0].critical is True
+
+    def test_critical_false_is_accepted(self) -> None:
+        config = validate_config(self._base_config([
+            {"when": "True", "critical": False, "after_clone": [{"command": "echo"}]},
+        ]))
+
+        assert config.actions[0].critical is False
+
+    @pytest.mark.parametrize("bad_value", ["yes", 1, 0, "false", "true", None])
+    def test_non_boolean_critical_is_rejected(self, bad_value: object) -> None:
+        with pytest.raises(ConfigValidationError, match=r"\.critical must be a boolean"):
+            validate_config(self._base_config([
+                {"when": "True", "critical": bad_value,
+                 "after_clone": [{"command": "echo"}]},
+            ]))
+
+    def test_critical_on_action_is_rejected(self) -> None:
+        """``critical`` is per-rule only; placing it on an action is a config bug."""
+        with pytest.raises(
+            ConfigValidationError,
+            match=r"'critical' is only valid at the rule level",
+        ):
+            validate_config(self._base_config([
+                {"when": "True", "after_clone": [
+                    {"command": "echo", "critical": True},
+                ]},
+            ]))

@@ -14,6 +14,7 @@ from gww.actions import (
     CommandAction,
     MatcherError,
     RelCopyAction,
+    RuleActions,
     apply_actions,
 )
 from gww.actions.types import Action
@@ -27,30 +28,34 @@ def make_project(tmp_path: Path, *rules: ProjectRule) -> list[ProjectRule]:
 
 
 class TestApplyActionsMatching:
-    """apply_actions must return only the actions from rules whose ``when``
-    predicate evaluated True, and from the requested kind (``after_clone``
-    vs ``after_add``)."""
+    """apply_actions must return one :class:`RuleActions` bundle per rule whose
+    ``when`` predicate evaluated True, with the requested ``kind``'s actions."""
 
-    def test_returns_no_actions_when_no_rules_match(self, tmp_path: Path) -> None:
+    def test_returns_no_bundles_when_no_rules_match(self, tmp_path: Path) -> None:
         rule = ProjectRule(
             when="False",
             after_clone=[RawAction(action_type="command", args=["echo"])],
         )
 
-        result = apply_actions([rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone")
+        bundles = apply_actions(
+            [rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+        )
 
-        assert result == []
+        assert bundles == []
 
-    def test_returns_actions_from_matching_rule(self, tmp_path: Path) -> None:
+    def test_returns_bundle_from_matching_rule(self, tmp_path: Path) -> None:
         rule = ProjectRule(
             when="True",
             after_clone=[RawAction(action_type="command", args=["echo hi"])],
         )
 
-        result = apply_actions([rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone")
+        bundles = apply_actions(
+            [rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+        )
 
-        assert len(result) == 1
-        assert isinstance(result[0], CommandAction)
+        assert len(bundles) == 1
+        assert isinstance(bundles[0], RuleActions)
+        assert isinstance(bundles[0].actions[0], CommandAction)
 
     def test_after_clone_kind_returns_only_clone_actions(self, tmp_path: Path) -> None:
         rule = ProjectRule(
@@ -59,11 +64,13 @@ class TestApplyActionsMatching:
             after_add=[RawAction(action_type="command", args=["add-cmd"])],
         )
 
-        result = apply_actions([rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone")
+        bundles = apply_actions(
+            [rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+        )
 
-        assert len(result) == 1
-        assert isinstance(result[0], CommandAction)
-        assert result[0].command == "clone-cmd"
+        assert len(bundles) == 1
+        assert isinstance(bundles[0].actions[0], CommandAction)
+        assert bundles[0].actions[0].command == "clone-cmd"
 
     def test_after_add_kind_returns_only_add_actions(self, tmp_path: Path) -> None:
         rule = ProjectRule(
@@ -72,11 +79,13 @@ class TestApplyActionsMatching:
             after_add=[RawAction(action_type="command", args=["add-cmd"])],
         )
 
-        result = apply_actions([rule], tmp_path, {}, dest_path=tmp_path, kind="after_add")
+        bundles = apply_actions(
+            [rule], tmp_path, {}, dest_path=tmp_path, kind="after_add"
+        )
 
-        assert len(result) == 1
-        assert isinstance(result[0], CommandAction)
-        assert result[0].command == "add-cmd"
+        assert len(bundles) == 1
+        assert isinstance(bundles[0].actions[0], CommandAction)
+        assert bundles[0].actions[0].command == "add-cmd"
 
     def test_preserves_action_order(self, tmp_path: Path) -> None:
         rule = ProjectRule(
@@ -88,15 +97,17 @@ class TestApplyActionsMatching:
             ],
         )
 
-        result = apply_actions([rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone")
+        bundles = apply_actions(
+            [rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+        )
 
-        assert [type(a).__name__ for a in result] == [
+        assert [type(a).__name__ for a in bundles[0].actions] == [
             "CommandAction",
             "AbsCopyAction",
             "CommandAction",
         ]
 
-    def test_collects_actions_from_multiple_matching_rules(self, tmp_path: Path) -> None:
+    def test_collects_bundles_from_multiple_matching_rules(self, tmp_path: Path) -> None:
         rules = [
             ProjectRule(
                 when="True",
@@ -108,9 +119,16 @@ class TestApplyActionsMatching:
             ),
         ]
 
-        result = apply_actions(rules, tmp_path, {}, dest_path=tmp_path, kind="after_clone")
+        bundles = apply_actions(
+            rules, tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+        )
 
-        assert [a.command for a in result if isinstance(a, CommandAction)] == ["a", "b"]
+        assert [
+            a.command
+            for bundle in bundles
+            for a in bundle.actions
+            if isinstance(a, CommandAction)
+        ] == ["a", "b"]
 
     def test_invalid_predicate_raises_matcher_error(self, tmp_path: Path) -> None:
         rule = ProjectRule(
@@ -119,7 +137,88 @@ class TestApplyActionsMatching:
         )
 
         with pytest.raises(MatcherError, match="Error evaluating 'when'"):
-            apply_actions([rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone")
+            apply_actions(
+                [rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+            )
+
+    def test_matched_rule_without_kind_emits_empty_bundle(self, tmp_path: Path) -> None:
+        """A rule that matches but only has the *other* kind must still emit a
+        bundle — its ``actions`` list is just empty. Keeps the CLI loop's
+        bundle-counting predictable."""
+        rule = ProjectRule(
+            when="True",
+            after_add=[RawAction(action_type="command", args=["add-only"])],
+        )
+
+        bundles = apply_actions(
+            [rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+        )
+
+        assert len(bundles) == 1
+        assert bundles[0].actions == []
+
+
+class TestRuleActionsMetadata:
+    """The bundle returned by apply_actions must carry the rule's index,
+    predicate text, and criticality flag so the CLI loop can attribute
+    failures and choose exit codes."""
+
+    def test_bundle_carries_rule_index(self, tmp_path: Path) -> None:
+        rules = [
+            ProjectRule(
+                when="False",
+                after_clone=[RawAction(action_type="command", args=["x"])],
+            ),
+            ProjectRule(
+                when="True",
+                after_clone=[RawAction(action_type="command", args=["y"])],
+            ),
+        ]
+
+        bundles = apply_actions(
+            rules, tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+        )
+
+        assert [b.index for b in bundles] == [1]
+
+    def test_bundle_carries_predicate_text(self, tmp_path: Path) -> None:
+        (tmp_path / "CLAUDE.md").write_text("# hi")
+
+        rule = ProjectRule(
+            when='file_exists("CLAUDE.md")',
+            after_clone=[RawAction(action_type="command", args=["echo"])],
+        )
+
+        bundles = apply_actions(
+            [rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+        )
+
+        assert bundles[0].predicate == 'file_exists("CLAUDE.md")'
+
+    def test_default_criticality_is_true(self, tmp_path: Path) -> None:
+        rule = ProjectRule(
+            when="True",
+            after_clone=[RawAction(action_type="command", args=["echo"])],
+        )
+
+        bundles = apply_actions(
+            [rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+        )
+
+        assert bundles[0].critical is True
+
+    def test_explicit_critical_false_is_propagated(self, tmp_path: Path) -> None:
+        rule = ProjectRule(
+            when="True",
+            critical=False,
+            after_clone=[RawAction(action_type="command", args=["echo"])],
+        )
+
+        bundles = apply_actions(
+            [rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+        )
+
+        assert bundles[0].critical is False
 
 
 class TestApplyActionsBuildsTypedObjects:
@@ -135,12 +234,14 @@ class TestApplyActionsBuildsTypedObjects:
             ],
         )
 
-        result = apply_actions([rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone")
+        bundles = apply_actions(
+            [rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+        )
 
-        assert len(result) == 1
-        assert isinstance(result[0], CommandAction)
-        assert result[0].command == "./setup.sh"
-        assert result[0].args == [str(tmp_path)]
+        action = bundles[0].actions[0]
+        assert isinstance(action, CommandAction)
+        assert action.command == "./setup.sh"
+        assert action.args == [str(tmp_path)]
 
     def test_command_action_with_tag_value(self, tmp_path: Path) -> None:
         rule = ProjectRule(
@@ -150,14 +251,15 @@ class TestApplyActionsBuildsTypedObjects:
             ],
         )
 
-        result = apply_actions(
+        bundles = apply_actions(
             [rule], tmp_path, {"prompt": "/review"},
             dest_path=tmp_path, kind="after_clone",
         )
 
-        assert isinstance(result[0], CommandAction)
-        assert result[0].command == "claude"
-        assert result[0].args == ["-p", "/review"]
+        action = bundles[0].actions[0]
+        assert isinstance(action, CommandAction)
+        assert action.command == "claude"
+        assert action.args == ["-p", "/review"]
 
     def test_command_action_with_quoted_args_splits_correctly(self, tmp_path: Path) -> None:
         rule = ProjectRule(
@@ -165,11 +267,14 @@ class TestApplyActionsBuildsTypedObjects:
             after_clone=[RawAction(action_type="command", args=["echo 'hello world'"])],
         )
 
-        result = apply_actions([rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone")
+        bundles = apply_actions(
+            [rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+        )
 
-        assert isinstance(result[0], CommandAction)
-        assert result[0].command == "echo"
-        assert result[0].args == ["hello world"]
+        action = bundles[0].actions[0]
+        assert isinstance(action, CommandAction)
+        assert action.command == "echo"
+        assert action.args == ["hello world"]
 
     def test_abs_copy_action_built_from_args(self, tmp_path: Path) -> None:
         rule = ProjectRule(
@@ -179,12 +284,14 @@ class TestApplyActionsBuildsTypedObjects:
             ],
         )
 
-        result = apply_actions([rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone")
+        bundles = apply_actions(
+            [rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+        )
 
-        assert len(result) == 1
-        assert isinstance(result[0], AbsCopyAction)
-        assert result[0].source == "/tmp/source.txt"
-        assert result[0].destination == "dst.txt"
+        action = bundles[0].actions[0]
+        assert isinstance(action, AbsCopyAction)
+        assert action.source == "/tmp/source.txt"
+        assert action.destination == "dst.txt"
 
     def test_rel_copy_action_built_with_default_destination(self, tmp_path: Path) -> None:
         rule = ProjectRule(
@@ -192,12 +299,14 @@ class TestApplyActionsBuildsTypedObjects:
             after_add=[RawAction(action_type="rel_copy", args=["local.properties"])],
         )
 
-        result = apply_actions([rule], tmp_path, {}, dest_path=tmp_path, kind="after_add")
+        bundles = apply_actions(
+            [rule], tmp_path, {}, dest_path=tmp_path, kind="after_add"
+        )
 
-        assert len(result) == 1
-        assert isinstance(result[0], RelCopyAction)
-        assert result[0].source == "local.properties"
-        assert result[0].destination is None
+        action = bundles[0].actions[0]
+        assert isinstance(action, RelCopyAction)
+        assert action.source == "local.properties"
+        assert action.destination is None
 
     def test_rel_copy_action_built_with_explicit_destination(self, tmp_path: Path) -> None:
         rule = ProjectRule(
@@ -207,11 +316,14 @@ class TestApplyActionsBuildsTypedObjects:
             ],
         )
 
-        result = apply_actions([rule], tmp_path, {}, dest_path=tmp_path, kind="after_add")
+        bundles = apply_actions(
+            [rule], tmp_path, {}, dest_path=tmp_path, kind="after_add"
+        )
 
-        assert isinstance(result[0], RelCopyAction)
-        assert result[0].source == "a.txt"
-        assert result[0].destination == "b.txt"
+        action = bundles[0].actions[0]
+        assert isinstance(action, RelCopyAction)
+        assert action.source == "a.txt"
+        assert action.destination == "b.txt"
 
     def test_predicate_using_tag_function(self, tmp_path: Path) -> None:
         rule = ProjectRule(
@@ -238,4 +350,21 @@ class TestApplyActionsBuildsTypedObjects:
         )
 
         with pytest.raises(MatcherError, match="Unknown action type"):
-            apply_actions([rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone")
+            apply_actions(
+                [rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+            )
+
+    def test_command_template_failure_raises_matcher_error(
+        self, tmp_path: Path,
+    ) -> None:
+        rule = ProjectRule(
+            when="True",
+            after_clone=[
+                RawAction(action_type="command", args=["echo undefined_var()"]),
+            ],
+        )
+
+        with pytest.raises(MatcherError, match="Error evaluating command template"):
+            apply_actions(
+                [rule], tmp_path, {}, dest_path=tmp_path, kind="after_clone"
+            )

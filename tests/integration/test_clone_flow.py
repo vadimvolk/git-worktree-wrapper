@@ -219,3 +219,148 @@ actions:
         copied_file = expected_path / "copied_marker.txt"
         assert copied_file.exists()
         assert copied_file.read_text() == "marker content"
+
+
+class TestCloneActionFailureHandling:
+    """Integration tests for ADR-0009: per-rule criticality in clone's action loop.
+
+    Verifies exit codes, success-line suppression, and grouped summary on stderr
+    for the four documented outcomes: clean run, non-critical failure,
+    critical failure, and matcher failure.
+    """
+
+    def _write_config(
+        self, config_dir: Path, target_dir: Path, actions_block: str,
+    ) -> None:
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: {target_dir}/sources/path(-1)
+default_worktrees: {target_dir}/worktrees
+
+actions:
+{actions_block}
+""")
+
+    def test_clean_run_prints_success_line_and_no_summary(
+        self,
+        bare_repo: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self._write_config(
+            config_dir, target_dir,
+            "  - when: 'True'\n"
+            "    after_clone:\n"
+            "      - command: 'true'\n",
+        )
+
+        result = run_clone(make_ctx(uri=f"file://{bare_repo}"))
+
+        assert result == 0
+        captured = capsys.readouterr()
+        expected_path = target_dir / "sources" / "test"
+        assert str(expected_path) in captured.out
+        assert "Action execution summary" not in captured.err
+
+    def test_critical_rule_failure_exits_one_and_prints_summary(
+        self,
+        bare_repo: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self._write_config(
+            config_dir, target_dir,
+            "  - when: 'True'\n"
+            "    after_clone:\n"
+            "      - command: 'false'\n",
+        )
+
+        result = run_clone(make_ctx(uri=f"file://{bare_repo}"))
+
+        assert result == 1
+        captured = capsys.readouterr()
+        expected_path = target_dir / "sources" / "test"
+        assert str(expected_path) not in captured.out
+        assert "Action execution summary" in captured.err
+        assert "Rule 0 (critical" in captured.err
+        assert "Command failed" in captured.err
+
+    def test_non_critical_rule_failure_exits_zero_but_prints_summary(
+        self,
+        bare_repo: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self._write_config(
+            config_dir, target_dir,
+            "  - when: 'True'\n"
+            "    critical: false\n"
+            "    after_clone:\n"
+            "      - command: 'false'\n",
+        )
+
+        result = run_clone(make_ctx(uri=f"file://{bare_repo}"))
+
+        assert result == 0
+        captured = capsys.readouterr()
+        expected_path = target_dir / "sources" / "test"
+        assert str(expected_path) not in captured.out
+        assert "Action execution summary" in captured.err
+        assert "Rule 0 (non-critical" in captured.err
+
+    def test_critical_rule_aborts_remaining_actions(
+        self,
+        bare_repo: Path,
+        config_dir: Path,
+        target_dir: Path,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        marker = tmp_path / "marker.txt"
+        marker.write_text("should not be copied")
+
+        self._write_config(
+            config_dir, target_dir,
+            f"  - when: 'True'\n"
+            f"    after_clone:\n"
+            f"      - command: 'false'\n"
+            f"      - abs_copy: ['{marker}', 'should-not-copy.txt']\n",
+        )
+
+        result = run_clone(make_ctx(uri=f"file://{bare_repo}"))
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Action execution summary" in captured.err
+        # The abs_copy after the failing command must NOT have run.
+        expected_path = target_dir / "sources" / "test"
+        assert not (expected_path / "should-not-copy.txt").exists()
+
+    def test_matcher_failure_exits_two_with_no_actions_run(
+        self,
+        bare_repo: Path,
+        config_dir: Path,
+        target_dir: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        self._write_config(
+            config_dir, target_dir,
+            "  - when: 'undefined_variable'\n"
+            "    after_clone:\n"
+            "      - command: 'true'\n",
+        )
+
+        result = run_clone(make_ctx(uri=f"file://{bare_repo}"))
+
+        assert result == 2
+        captured = capsys.readouterr()
+        assert "Config error" in captured.err
+        expected_path = target_dir / "sources" / "test"
+        # Clone itself still succeeded; only the action loop bailed.
+        assert expected_path.exists()
+        # No success line either — we exited before reaching it.
+        assert str(expected_path) not in captured.out

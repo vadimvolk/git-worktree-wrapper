@@ -208,6 +208,23 @@ class TestCommandAction:
         with pytest.raises(ActionError, match="Command failed"):
             action.run(source_dir=None, target_dir=target)
 
+    def test_raises_when_command_fails_with_pass_through_stdout(
+        self, tmp_path: Path,
+    ) -> None:
+        """When ``pass_through_stdout=True`` both stdout and stderr are
+        inherited from the parent (``None`` in :mod:`subprocess`). The
+        failure message must not crash on a missing stderr capture."""
+        target = tmp_path / "work"
+        target.mkdir()
+
+        action = CommandAction(command="false", args=[])
+        with pytest.raises(ActionError, match="Command failed"):
+            action.run(
+                source_dir=None,
+                target_dir=target,
+                pass_through_stdout=True,
+            )
+
     def test_raises_when_command_missing(self, tmp_path: Path) -> None:
         target = tmp_path / "work"
         target.mkdir()

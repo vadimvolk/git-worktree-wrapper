@@ -50,11 +50,16 @@ class ProjectRule:
         when: Expression evaluated against repository filesystem.
         after_clone: Actions executed after source checkout.
         after_add: Actions executed when worktree is added.
+        critical: Whether failures in this rule abort the command with exit 1.
+            Defaults to ``True`` so that a fresh rule behaves like a setup
+            step that must succeed. Set to ``False`` for best-effort rules
+            whose failures should be reported but not block the command.
     """
 
     when: str
     after_clone: list[Action] = field(default_factory=list)
     after_add: list[Action] = field(default_factory=list)
+    critical: bool = True
 
 
 @dataclass
@@ -112,6 +117,12 @@ def _validate_action(action_data: Any, context: str) -> Action:
     if not isinstance(action_data, dict):
         raise ConfigValidationError(
             f"{context}: action must be a mapping, got {type(action_data).__name__}"
+        )
+
+    if "critical" in action_data:
+        raise ConfigValidationError(
+            f"{context}: 'critical' is only valid at the rule level, "
+            f"not on individual actions"
         )
 
     if len(action_data) != 1:
@@ -223,6 +234,16 @@ def _validate_project_rule(data: Any, index: int) -> ProjectRule:
 
     when = _validate_string(data["when"], f"{context}.when")
 
+    critical: bool = True
+    if "critical" in data:
+        critical_value = data["critical"]
+        if not isinstance(critical_value, bool):
+            raise ConfigValidationError(
+                f"{context}.critical must be a boolean, "
+                f"got {type(critical_value).__name__}"
+            )
+        critical = critical_value
+
     after_clone: list[Action] = []
     if "after_clone" in data:
         actions_data = data["after_clone"]
@@ -250,6 +271,7 @@ def _validate_project_rule(data: Any, index: int) -> ProjectRule:
         when=when,
         after_clone=after_clone,
         after_add=after_add,
+        critical=critical,
     )
 
 

@@ -184,8 +184,9 @@ class CommandAction:
             raise ActionError(f"Failed to execute command: {e}") from e
 
         if result.returncode != 0:
+            stderr_text = (result.stderr or "").strip()
             raise ActionError(
                 f"Command failed: {' '.join(cmd)}\n"
                 f"Exit code: {result.returncode}\n"
-                f"Stderr: {result.stderr.strip()}"
+                f"Stderr: {stderr_text}"
             )

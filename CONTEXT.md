@@ -36,6 +36,22 @@ _Avoid_: SystemExit, raise.
 A single entry from the `actions:` list in the config, evaluated against a `when:` predicate. A rule that matches produces zero or more `after_clone` and `after_add` actions.
 _Avoid_: hook, callback.
 
+**Critical rule**:
+A project rule with `critical: true` (the default) in the `actions:` config. When any action in a critical rule fails, the command exits 1, the `say()` success line is suppressed, and the failure is reported in the action execution summary. Other rules still run after a critical rule fails.
+_Avoid_: required rule, mandatory rule, fatal rule.
+
+**Non-critical rule**:
+A project rule with `critical: false`. When an action in a non-critical rule fails, the failure is reported in the action execution summary but the command exits 0. The `say()` success line is still suppressed when the summary is non-empty — criticality affects the exit code, not the success-line policy.
+_Avoid_: optional rule, best-effort rule, lenient rule.
+
+**Matcher failure**:
+A failure to evaluate a `when:` predicate or `command:` template, raised as `MatcherError` from `gww.actions.apply_actions`. Treated as a configuration error — the command exits 2 with no actions executed, even if the git operation already succeeded.
+_Avoid_: template error, evaluation error, predicate failure.
+
+**Action execution summary**:
+The grouped failure block printed to stderr at the end of the action loop in `clone`/`add`. Lists each failing rule by index, its criticality flag, and the failing action's error. Its non-emptiness is what gates the `say()` success line: the line is suppressed whenever this summary has any entry, whether critical or non-critical.
+_Avoid_: failure report, error log, action error output.
+
 **Checked-out branch**:
 A git branch (refs/heads/&lt;name&gt;) that is currently checked out in some worktree of a given source repository. Discovered via `git worktree list --porcelain` (the `branch ` line). Detached-HEAD worktrees are excluded from this set. Informally called a "worktree branch" in some docs, but that conflates the branch with its worktree — keep the canonical term strict.
 _Avoid_: worktree branch (informal only), bound branch.

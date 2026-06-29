@@ -2,8 +2,8 @@
 
 This package replaces the old ``actions/matcher.py`` and ``actions/executor.py``
 split with a single entry point (:func:`apply_actions`) that returns typed
-:class:`Action` objects. Commands iterate over the returned actions and call
-:meth:`Action.run` for each.
+:class:`Action` objects grouped per matched rule. Commands iterate over the
+returned bundles and call :meth:`Action.run` for each action.
 
 Public surface:
 
@@ -12,13 +12,16 @@ Public surface:
 * :class:`ActionError` raised by ``run()`` on failure
 * :class:`MatcherError` raised by :func:`apply_actions` when a rule predicate
   or command template cannot be evaluated
-* :func:`apply_actions` — match rules and return executable actions
+* :class:`RuleActions` — a rule that matched, its index/predicate/criticality,
+  and the executable actions for the requested kind
+* :func:`apply_actions` — match rules and return executable bundles
 * :data:`ActionKind` — literal distinguishing ``after_clone`` vs ``after_add``
 """
 
 from __future__ import annotations
 
 import shlex
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -50,6 +53,32 @@ class MatcherError(Exception):
 ActionKind = Literal["after_clone", "after_add"]
 
 
+@dataclass
+class RuleActions:
+    """A matched project rule plus the actions to execute for one kind.
+
+    Carries enough context (index, predicate text, criticality flag) for the
+    CLI loop to attribute per-action failures back to the rule that produced
+    them, and to decide whether the command should exit 1.
+
+    Attributes:
+        index: Position of the rule in ``config.actions`` — used as the rule's
+            identifier in error messages.
+        predicate: The ``when:`` expression as it appears in the config; kept
+            verbatim for diagnostics.
+        critical: Per-rule criticality flag from :class:`ProjectRule`. When
+            ``True``, a failing action aborts the rule's remaining actions
+            and causes the command to exit 1.
+        actions: Executable actions for the requested ``kind``, in the order
+            they appear in the rule's ``after_clone`` or ``after_add`` list.
+    """
+
+    index: int
+    predicate: str
+    critical: bool
+    actions: list[Action] = field(default_factory=list)
+
+
 __all__ = [
     "AbsCopyAction",
     "Action",
@@ -58,6 +87,7 @@ __all__ = [
     "CommandAction",
     "MatcherError",
     "RelCopyAction",
+    "RuleActions",
     "apply_actions",
 ]
 
@@ -124,8 +154,14 @@ def apply_actions(
     tags: dict[str, str],
     dest_path: Path,
     kind: ActionKind,
-) -> list[Action]:
-    """Match rules and return executable actions for the given ``kind``.
+) -> list[RuleActions]:
+    """Match rules and return executable bundles for the given ``kind``.
+
+    A :class:`RuleActions` bundle is produced for every rule whose ``when``
+    predicate evaluates truthy, even when that rule has no actions for the
+    requested ``kind`` — the bundle's ``actions`` list is simply empty. This
+    keeps the CLI loop's failure-tracking symmetric: a rule that ran zero
+    actions still has a known index/criticality for the summary.
 
     Args:
         rules: Project rules from the validated config.
@@ -136,31 +172,42 @@ def apply_actions(
         kind: Which action list to read — ``"after_clone"`` or ``"after_add"``.
 
     Returns:
-        Typed actions in execution order, ready to be passed to
-        :meth:`Action.run`.
+        Matched rules paired with their typed actions, in config order. Each
+        bundle carries the rule's index, predicate text, and criticality so
+        the CLI can attribute failures and choose exit codes.
 
     Raises:
         MatcherError: If a ``when`` predicate or a ``command`` template fails
-            to evaluate.
+            to evaluate. The CLI converts this to a config-error exit (2);
+            it is never swallowed.
     """
     context = _create_predicate_context(source_path, tags, dest_path)
 
-    matched: list[ProjectRule] = []
+    bundles: list[RuleActions] = []
     for i, rule in enumerate(rules):
         try:
-            if evaluate_predicate(rule.when, context):
-                matched.append(rule)
+            matched = evaluate_predicate(rule.when, context)
         except TemplateError as e:
             raise MatcherError(
                 f"Error evaluating 'when' for project rule {i}: {e}"
             ) from e
+        if not matched:
+            continue
 
-    actions: list[Action] = []
-    for rule in matched:
         source_actions = (
             rule.after_clone if kind == "after_clone" else rule.after_add
         )
+        actions: list[Action] = []
         for raw in source_actions:
             actions.append(_build_action(raw, context))
 
-    return actions
+        bundles.append(
+            RuleActions(
+                index=i,
+                predicate=rule.when,
+                critical=rule.critical,
+                actions=actions,
+            )
+        )
+
+    return bundles

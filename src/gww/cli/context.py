@@ -23,6 +23,9 @@ This module collects the boilerplate that every command used to inline:
 * :func:`resolve_source_repo` — same detect-or-walk pattern, but without the
   remote-origin requirement. Used by commands that only need the source path
   (e.g. ``pull``).
+* :class:`RuleFailure` / :func:`print_action_failure_summary` — shared
+  per-rule failure record and the grouped stderr summary used by
+  ``clone``/``add`` at the end of the action loop.
 
 Commands still own their own control flow. They raise :class:`CommandExit`
 when they want to bail out with a specific exit code; the ``@exit_on_error``
@@ -39,6 +42,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar
 
+from gww.actions import Action, ActionError, RuleActions
 from gww.config.loader import ConfigLoadError, ConfigNotFoundError, load_config
 from gww.config.validator import Config, ConfigValidationError, validate_config
 from gww.git.repository import (
@@ -313,3 +317,63 @@ def resolve_source_repo(cwd: Path) -> Path:
         except (NotGitRepositoryError, GitCommandError) as e:
             raise CommandExit(1, f"Error finding source repository: {e}") from e
     return repo.path
+
+
+@dataclass
+class RuleFailure:
+    """A single failing action in the clone/add action loop.
+
+    Pairs the failing :class:`Action` with the :class:`RuleActions` bundle it
+    came from and the :class:`ActionError` it raised. Used by
+    :func:`print_action_failure_summary` to produce the grouped stderr block,
+    and by the CLI to choose the exit code (any failure with
+    ``bundle.critical`` set → exit 1).
+
+    Attributes:
+        bundle: The rule that produced the action.
+        action: The action whose ``run()`` raised.
+        error: The exception raised by ``action.run()``.
+    """
+
+    bundle: RuleActions
+    action: Action
+    error: ActionError
+
+
+def _describe_action(action: Action) -> str:
+    """Return a short human-readable label for an action in failure messages.
+
+    Uses the action's concrete class name (e.g. ``"abs_copy"``,
+    ``"rel_copy"``, ``"command"``) — no need to add a method to the action
+    classes just for diagnostics.
+    """
+    name = type(action).__name__
+    if name.endswith("Action"):
+        name = name[: -len("Action")]
+    return name.lower()
+
+
+def print_action_failure_summary(failures: list[RuleFailure]) -> None:
+    """Print the grouped action-execution summary to stderr.
+
+    Lists every failing rule once, identified by its config index, with its
+    criticality, the failing action's type, and the error text. Suppressing
+    the ``say()`` success line is the caller's responsibility — the helper
+    only renders the block.
+
+    Args:
+        failures: Failures collected by the CLI action loop, in order.
+    """
+    print(
+        f"Action execution summary: {len(failures)} failure(s):",
+        file=sys.stderr,
+    )
+    for failure in failures:
+        criticality = "critical" if failure.bundle.critical else "non-critical"
+        action_label = _describe_action(failure.action)
+        print(
+            f"  Rule {failure.bundle.index} ({criticality}, "
+            f"when: {failure.bundle.predicate}): "
+            f"failed at {action_label}: {failure.error}",
+            file=sys.stderr,
+        )
