@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-import sys
-
-from gww.actions import ActionError, apply_actions
+from gww.actions import ActionError, MatcherError, apply_actions
 from gww.cli.context import (
     CommandContext,
     CommandExit,
+    RuleFailure,
     exit_on_error,
     load_config_or_exit,
     parse_uri_or_exit,
+    print_action_failure_summary,
 )
 from gww.config.resolver import ResolverError, resolve_source_path
 from gww.git.repository import (
@@ -29,7 +29,8 @@ def run_clone(ctx: CommandContext) -> int:
         ctx: Per-invocation command context.
 
     Returns:
-        Exit code (0 for success, 1 for error, 2 for config error).
+        Exit code (0 for success, 1 for runtime/action failure, 2 for config
+        error).
     """
     if ctx.uri is None:
         raise CommandExit(1, "Error: Missing repository URI.")
@@ -55,6 +56,7 @@ def run_clone(ctx: CommandContext) -> int:
     except GitCommandError as e:
         raise CommandExit(1, f"Error cloning repository: {e}") from e
 
+    failures: list[RuleFailure] = []
     if config.actions:
         branch = try_get_current_branch(source_path)
         context = TemplateContext(
@@ -65,23 +67,31 @@ def run_clone(ctx: CommandContext) -> int:
             tags=ctx.tags,
         )
         try:
-            actions = apply_actions(config.actions, context, kind="after_clone")
-        except Exception as e:  # MatcherError or its base
-            print(f"Error matching project rules: {e}", file=sys.stderr)
-            actions = []
+            rule_bundles = apply_actions(config.actions, context, kind="after_clone")
+        except MatcherError as e:
+            raise CommandExit(2, f"Config error: {e}") from e
 
-        if actions:
-            ctx.verbose_msg(f"Executing {len(actions)} source action(s)...")
-            for action in actions:
-                try:
-                    action.run(
-                        source_dir=None,
-                        target_dir=source_path,
-                        pass_through_stdout=not ctx.quiet,
-                    )
-                except ActionError as e:
-                    print(f"Error executing source action: {e}", file=sys.stderr)
+        if rule_bundles:
+            ctx.verbose_msg(f"Executing {len(rule_bundles)} rule(s)...")
+            for bundle in rule_bundles:
+                for action in bundle.actions:
+                    try:
+                        action.run(
+                            source_dir=None,
+                            target_dir=source_path,
+                            pass_through_stdout=not ctx.quiet,
+                        )
+                    except ActionError as e:
+                        failures.append(RuleFailure(bundle, action, e))
+                        if bundle.critical:
+                            break
 
-    ctx.say(str(source_path))
+    if failures:
+        print_action_failure_summary(failures)
 
+    if not failures:
+        ctx.say(str(source_path))
+
+    if any(f.bundle.critical for f in failures):
+        raise CommandExit(1, "")
     return 0

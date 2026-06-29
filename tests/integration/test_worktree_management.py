@@ -403,3 +403,128 @@ class TestPullCommand:
         result = run_pull(make_ctx())
 
         assert result == 1
+
+
+class TestAddActionFailureHandling:
+    """Integration tests for ADR-0010: per-rule criticality in add's action loop.
+
+    Mirrors :class:`TestCloneActionFailureHandling` but for ``gww add`` —
+    the action kind is ``after_add`` and the actions run inside the new
+    worktree, not the source repo.
+    """
+
+    def _write_config(
+        self, config_dir: Path, worktree_dir: Path, actions_block: str,
+    ) -> None:
+        config_path = config_dir / "gww" / "config.yml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(f"""
+default_sources: ~/sources
+default_worktrees: {worktree_dir}/norm_branch()
+
+actions:
+{actions_block}
+""")
+
+    def test_clean_run_prints_success_line_and_no_summary(
+        self,
+        git_repo_with_remote: tuple[Path, Path],
+        config_dir: Path,
+        worktree_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        local, _ = git_repo_with_remote
+        self._write_config(
+            config_dir, worktree_dir,
+            "  - when: 'True'\n"
+            "    after_add:\n"
+            "      - command: 'true'\n",
+        )
+        monkeypatch.chdir(local)
+
+        result = run_add(make_ctx(branch="feature-test"))
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert str(worktree_dir / "feature-test") in captured.out
+        assert "Action execution summary" not in captured.err
+
+    def test_critical_rule_failure_exits_one_and_prints_summary(
+        self,
+        git_repo_with_remote: tuple[Path, Path],
+        config_dir: Path,
+        worktree_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        local, _ = git_repo_with_remote
+        self._write_config(
+            config_dir, worktree_dir,
+            "  - when: 'True'\n"
+            "    after_add:\n"
+            "      - command: 'false'\n",
+        )
+        monkeypatch.chdir(local)
+
+        result = run_add(make_ctx(branch="feature-test"))
+
+        assert result == 1
+        captured = capsys.readouterr()
+        assert str(worktree_dir / "feature-test") not in captured.out
+        assert "Action execution summary" in captured.err
+        assert "Rule 0 (critical" in captured.err
+        assert "Command failed" in captured.err
+
+    def test_non_critical_rule_failure_exits_zero_but_prints_summary(
+        self,
+        git_repo_with_remote: tuple[Path, Path],
+        config_dir: Path,
+        worktree_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        local, _ = git_repo_with_remote
+        self._write_config(
+            config_dir, worktree_dir,
+            "  - when: 'True'\n"
+            "    critical: false\n"
+            "    after_add:\n"
+            "      - command: 'false'\n",
+        )
+        monkeypatch.chdir(local)
+
+        result = run_add(make_ctx(branch="feature-test"))
+
+        assert result == 0
+        captured = capsys.readouterr()
+        assert str(worktree_dir / "feature-test") not in captured.out
+        assert "Action execution summary" in captured.err
+        assert "Rule 0 (non-critical" in captured.err
+
+    def test_matcher_failure_exits_two_with_no_actions_run(
+        self,
+        git_repo_with_remote: tuple[Path, Path],
+        config_dir: Path,
+        worktree_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        local, _ = git_repo_with_remote
+        self._write_config(
+            config_dir, worktree_dir,
+            "  - when: 'undefined_variable'\n"
+            "    after_add:\n"
+            "      - command: 'true'\n",
+        )
+        monkeypatch.chdir(local)
+
+        result = run_add(make_ctx(branch="feature-test"))
+
+        assert result == 2
+        captured = capsys.readouterr()
+        assert "Config error" in captured.err
+        # The worktree was created before the action loop ran.
+        assert (worktree_dir / "feature-test").exists()
+        # But the success line was suppressed.
+        assert str(worktree_dir / "feature-test") not in captured.out
