@@ -95,7 +95,9 @@ graph TB
 
 2. **Add Worktree Flow**: `CLI` → `add` command → `ConfigMgr` resolves worktree path → `TemplateEngine` evaluates template → `GitOps` creates worktree → `ActionSys` matches, executes, and reports `after_add` actions (per-rule criticality, grouped summary on stderr)
 
-3. **Config Resolution**: `ConfigMgr` loads YAML → evaluates `when` conditions using `TemplateEngine` → selects matching source rule → evaluates path templates → returns resolved paths
+3. **Remove Worktree Flow** (ADR-0011): `CLI` → `remove` command → `ConfigMgr` loads config → `GitOps` resolves worktree by branch or path → `TemplateEngine` builds context (`source_path`/`dest_path`/`branch`/`tags`) → `ActionSys` matches, executes, and reports `before_remove` actions → critical failures abort; otherwise `GitOps` runs `git worktree remove`
+
+4. **Config Resolution**: `ConfigMgr` loads YAML → evaluates `when` conditions using `TemplateEngine` → selects matching source rule → evaluates path templates → returns resolved paths
 
 # Configuration
 Works with configuration file gww.yml located in $XDG_CONFIG_HOME compliant manner
@@ -134,17 +136,21 @@ sources:
 # branch() - git branch name as is
 actions:
     - when: file_exists(local.properties)
-      after_clone: 
+      after_clone:
         - abs_copy("~/sources/default-local.properties", "local.properties")
       after_add:
         - rel_copy("local.properties")
         - command("custom-handler")
-    
+    - when: tag("archive") == "true"
+      before_remove:
+        - command("tar -czf ~/archives/norm_branch()-time_id('%Y%m%d').tar.gz dest_path()")
+
 # where:
 # android - project type name, if 'when' condition evaluates to true after_clone executed after checkout, and after_add executed when worktree added
 # abs_copy - copy file from absolute path (first argument), to filename relative to checkout or worktree base folder
 # rel_copy - copy file with relative path from source to worktree, this action applicable only to worktree actions
 # command(custom_handler) - if executed for source receives a single argument a source folder, if executed for worktree receive 2 arguments source folder and worktree folder
+# before_remove - actions run before gww remove deletes the worktree; dest_path() is the worktree, source_path() is its parent repo, branch() is the checked-out branch (or "" on detached HEAD). Critical failures abort the remove and exit 1.
 ```
 
 # Commands:
@@ -152,7 +158,7 @@ gww clone <uri> - find proper location for new source and checkout there. Then a
 
 gww add <branch> - must executed inside a source or worktree folder. Add a worktree for branch. To get destination folder uses settings file
 
-gww remove <branch|worktree folder> [--force] - remove worktree folder by branch name or folder location. If force specified ignore that worktree is not clean, otherwise show error for not clean worktrees
+gww remove <branch|worktree folder> [--force] [--tag key=value]... - remove worktree folder by branch name or folder location. If force specified ignore that worktree is not clean, otherwise show error for not clean worktrees. `--tag` plumbs `key=value` into the action-loop context (visible to `tag()`/`tag_exist()` in `before_remove` rules). After resolving the worktree, `before_remove` actions from the project rules run against it; critical failures abort the remove and exit `1`, non-critical failures are reported but the remove still proceeds. `--force` is git-only and does not bypass `before_remove`.
 
 gww pull - check that sources has main / master branch checkout, it's clean and if it is execute git pull. Can be executed from source or worktree folder. If executed from inside worktree folder will update source folder
 

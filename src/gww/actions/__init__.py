@@ -16,6 +16,7 @@ Public surface:
   and the executable actions for the requested kind
 * :func:`apply_actions` — match rules and return executable bundles
 * :data:`ActionKind` — literal distinguishing ``after_clone`` vs ``after_add``
+  vs ``before_remove`` (ADR-0011)
 """
 
 from __future__ import annotations
@@ -50,7 +51,13 @@ class MatcherError(Exception):
     """Raised when project matching or command-template evaluation fails."""
 
 
-ActionKind = Literal["after_clone", "after_add"]
+ActionKind = Literal["after_clone", "after_add", "before_remove"]
+
+_KIND_TO_FIELD: dict[str, str] = {
+    "after_clone": "after_clone",
+    "after_add": "after_add",
+    "before_remove": "before_remove",
+}
 
 
 @dataclass
@@ -70,7 +77,8 @@ class RuleActions:
             ``True``, a failing action aborts the rule's remaining actions
             and causes the command to exit 1.
         actions: Executable actions for the requested ``kind``, in the order
-            they appear in the rule's ``after_clone`` or ``after_add`` list.
+            they appear in the rule's ``after_clone``/``after_add``/
+            ``before_remove`` list.
     """
 
     index: int
@@ -160,13 +168,15 @@ def apply_actions(
 
     The ``context`` carries the URI, branch, tags, source path, and
     destination path that ``when`` predicates and command templates evaluate
-    against. Callers (``clone``, ``add``) populate it from the operation in
-    progress; see :class:`TemplateContext` for the field-level contract.
+    against. Callers (``clone``, ``add``, ``remove``) populate it from the
+    operation in progress; see :class:`TemplateContext` for the field-level
+    contract.
 
     Args:
         rules: Project rules from the validated config.
         context: Evaluation context — see :class:`TemplateContext`.
-        kind: Which action list to read — ``"after_clone"`` or ``"after_add"``.
+        kind: Which action list to read — ``"after_clone"``, ``"after_add"``,
+            or ``"before_remove"`` (ADR-0011).
 
     Returns:
         Matched rules paired with their typed actions, in config order. Each
@@ -191,9 +201,7 @@ def apply_actions(
         if not matched:
             continue
 
-        source_actions = (
-            rule.after_clone if kind == "after_clone" else rule.after_add
-        )
+        source_actions = getattr(rule, _KIND_TO_FIELD[kind])
         actions: list[Action] = []
         for raw in source_actions:
             actions.append(_build_action(raw, eval_context))
