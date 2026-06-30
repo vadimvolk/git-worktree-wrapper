@@ -343,9 +343,10 @@ class RuleFailure:
 def _describe_action(action: Action) -> str:
     """Return a short human-readable label for an action in failure messages.
 
-    Uses the action's concrete class name (e.g. ``"abs_copy"``,
-    ``"rel_copy"``, ``"command"``) — no need to add a method to the action
-    classes just for diagnostics.
+    Uses the action's concrete class name (e.g. ``"copy"``, ``"command"``) —
+    no need to add a method to the action classes just for diagnostics. The
+    ``"Action"`` suffix is stripped and the result lowercased, so
+    ``CopyAction`` → ``"copy"`` and ``CommandAction`` → ``"command"``.
     """
     name = type(action).__name__
     if name.endswith("Action"):

@@ -179,24 +179,23 @@ DEFAULT_CONFIG_TEMPLATE = """\
 #
 # PROJECT-SPECIFIC FUNCTIONS (only in project 'when' conditions):
 # ---------------------------------------------------------
-#   source_path()        - Absolute path to current repository or worktree root (string)
-#                         Detects repository based on current working directory:
-#                         - If in source repository: returns source repository root
-#                         - If in worktree: returns worktree root
-#                         - If in subdirectory: finds and returns repository/worktree root
-#                         - If not in git repository: returns empty string
-#                         Examples:
-#                           source_path() returns "/home/user/Developer/sources/github/user/repo"
-#                           source_path() returns "/home/user/Developer/worktrees/github/user/repo/feature-branch"
+#   source_path(extra?)   - Absolute path to the source repository (string),
+#                           optionally joined with `extra` (which may itself be
+#                           a template). The CLI populates this for project
+#                           predicates; it is the same value in clone, add,
+#                           and before_remove.
+#                           Examples:
+#                             source_path() returns "/home/user/Developer/sources/github/user/repo"
+#                             source_path("local.properties")
+#                               returns "/home/user/Developer/sources/github/user/repo/local.properties"
 #
-#   dest_path()          - Absolute path to destination (clone target or worktree) (string)
-#                         Returns the destination path based on operation context:
-#                         - During clone: returns source_path (same as source_path())
-#                         - During add: returns the worktree path
-#                         Useful for commands that need the operation's output location
-#                         Examples:
-#                           After clone: dest_path() returns "/home/user/Developer/sources/github/user/repo"
-#                           After add: dest_path() returns "/home/user/Developer/worktrees/github/user/repo/feature-branch"
+#   current_worktree(extra?) - Absolute path to the operation target (the
+#                           freshly-cloned source for after_clone; the
+#                           worktree for after_add and before_remove),
+#                           optionally joined with `extra`.
+#                           Examples:
+#                             After clone: current_worktree() returns "/home/user/Developer/sources/github/user/repo"
+#                             After add:   current_worktree() returns "/home/user/Developer/worktrees/github/user/repo/feature-branch"
 #
 #   file_exists(path)    - Check if file exists in source repository (returns True/False)
 #                         Path is relative to source repository root
@@ -253,21 +252,24 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 # Actions (optional)
 # Execute actions after clone or worktree creation based on project detection
 #
-# Command action syntax:
+# Action syntax:
 #   - command: "single string with optional template functions"
-#   - Template functions are evaluated first, then the string is parsed as shell arguments
-#   - Commands always execute with dest_path() as the current working directory
+#   - copy: ["source-template", "destination-template"]  # templates are evaluated first
+#   - Template functions are evaluated first; for `command` the result is
+#     then parsed as shell arguments, for `copy` the resolved source and
+#     destination are passed to the copy action.
+#   - Commands always execute with current_worktree() as the current working directory.
 #   - Use quotes for arguments with spaces: command: "echo 'hello world'"
-#   - Available functions: dest_path(), source_path(), tag("name"), etc.
+#   - Available functions: current_worktree(), source_path(), tag("name"), etc.
 #
 # Uncomment and customize as needed:
 
 # actions:
 #   - when: 'file_exists("local.properties")'
 #     after_clone:
-#       - abs_copy: ["~/sources/default-local.properties", "local.properties"]
+#       - copy: ["~/sources/default-local.properties", "local.properties"]
 #     after_add:
-#       - rel_copy: ["local.properties"]
+#       - copy: ["source_path('local.properties')", "local.properties"]
 #       - command: "./setup-env.sh"
 #
 #   # Tag-based actions:
@@ -275,17 +277,17 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 #     after_clone:
 #       - command: "claude init"
 #     after_add:
-#       - rel_copy: ["CLAUDE.md"]
+#       - copy: ["source_path('CLAUDE.md')", "CLAUDE.md"]
 #
 #   # Commands with template functions:
 #   - when: file_exists("CLAUDE.md") and tag_exist("use-claude") and tag_exist("review")
 #     after_add:
-#       - command: "claude -p tag('prompt') --cwd dest_path()"
+#       - command: "claude -p tag('prompt') --cwd current_worktree()"
 #
-#   # Simple command with dest_path:
+#   # Simple command with current_worktree:
 #   - when: 'file_exists("package.json")'
 #     after_add:
-#       - command: "npm install --prefix dest_path()"
+#       - command: "npm install --prefix current_worktree()"
 """
 
 

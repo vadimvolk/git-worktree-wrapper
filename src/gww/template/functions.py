@@ -7,11 +7,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from gww.git.repository import (
-    NotGitRepositoryError,
-    get_repository_root,
-    is_git_repository,
-)
 from gww.utils.uri import ParsedURI
 
 
@@ -33,12 +28,13 @@ class TemplateContext:
             HEAD) after the clone operation completes; ``""`` if HEAD is
             detached.
         source_path: Source repository path. Always set for project-rule
-            predicates; used by ``source_path``, ``file_exists``,
-            ``dir_exists``, ``path_exists``.
+            predicates; feeds the ``source_path(extra?)`` template function
+            and the ``file_exists``/``dir_exists``/``path_exists`` helpers.
         dest_path: Destination path for project-rule actions — the worktree
-            path for ``after_add``, the source path for ``after_clone``. Used
-            by the ``dest_path()`` function. ``None`` in non-project
-            evaluation sites (URI predicates, path templates).
+            path for ``after_add`` and ``before_remove``, the source path
+            for ``after_clone``. Feeds the ``current_worktree(extra?)``
+            template function. ``None`` in non-project evaluation sites
+            (URI predicates, path templates).
         tags: Dictionary of tag key-value pairs from the CLI.
     """
 
@@ -267,15 +263,26 @@ def create_project_functions(
     """Create project-specific functions for project predicate evaluation.
 
     These functions are only available in project predicates, not in templates
-    or URI predicates. Reads ``source_path`` and ``dest_path`` off the
-    supplied :class:`TemplateContext` rather than taking them as separate
-    arguments — keeps the project-rule evaluation pipeline a single-context
-    pipeline.
+    or URI predicates. The path-bearing helpers follow a fixed mapping that
+    does not vary by operation (ADR-0012 §"Uniform semantics across
+    operations"):
+
+    * ``source_path(extra?)`` is ``context.source_path`` (optionally joined
+      with ``extra``).
+    * ``current_worktree(extra?)`` is ``context.dest_path`` (optionally joined
+      with ``extra``).
+
+    Neither function aliases the other under any condition. They may resolve
+    to the same path string during ``gww clone`` because the CLI populates
+    *both* context fields with the clone target, but that is a CLI-side
+    property of how the calling command populates the context — never an
+    aliasing inside the helper itself.
 
     Args:
         context: Template context whose ``source_path`` and ``dest_path`` are
             used by the returned functions. ``source_path`` must be set;
-            ``dest_path`` falls back to ``source_path`` when ``None``.
+            ``dest_path`` is required for ``current_worktree()`` to evaluate
+            and raises ``ValueError`` when ``None``.
 
     Returns:
         Dictionary of project-specific functions.
@@ -290,34 +297,41 @@ def create_project_functions(
     source_path = context.source_path
     dest_path = context.dest_path
 
-    def _source_path() -> str:
-        """Get absolute path to source repository or worktree root.
+    def _source_path(extra: str = "") -> str:
+        """Get absolute path to source repository, optionally joined with ``extra``.
 
-        Detects repository based on current working directory.
-        - If in source repository: returns source repository root
-        - If in worktree: returns worktree root
-        - If in subdirectory: finds and returns repository root
-        - If not in git repository: returns empty string
+        Args:
+            extra: Path segment to append to the source repository root. An
+                empty string returns the bare source path.
+
+        Returns:
+            Absolute, resolved path to the source repository (or the joined
+            path when ``extra`` is non-empty).
         """
-        try:
-            cwd = Path.cwd()
-            if not is_git_repository(cwd):
-                return ""
-            repo_root = get_repository_root(cwd)
-            return str(repo_root.resolve())
-        except NotGitRepositoryError:
-            return ""
+        return str((source_path / extra).resolve())
 
-    def _dest_path() -> str:
-        """Get absolute path to destination (clone target or worktree).
+    def _current_worktree(extra: str = "") -> str:
+        """Get absolute path to the current worktree, optionally joined with ``extra``.
 
-        Returns the destination path based on operation context:
-        - During clone: returns source_path (same as source_path())
-        - During add: returns worktree path
-        - If dest_path was not provided: returns source_path()
+        Args:
+            extra: Path segment to append to the worktree root. An empty
+                string returns the bare worktree path.
+
+        Returns:
+            Absolute, resolved path to the worktree (or the joined path when
+            ``extra`` is non-empty).
+
+        Raises:
+            ValueError: If ``context.dest_path`` is ``None``. The function
+                does not fall back to ``source_path()`` — that would re-
+                introduce the per-operation aliasing the uniform-mapping
+                principle rules out (ADR-0012).
         """
-        target = dest_path if dest_path is not None else source_path
-        return str(target.resolve())
+        if dest_path is None:
+            raise ValueError(
+                "current_worktree() requires context.dest_path"
+            )
+        return str((dest_path / extra).resolve())
 
     def _file_exists(path: str) -> bool:
         """Check if a file exists relative to source repository.
@@ -357,7 +371,7 @@ def create_project_functions(
 
     return {
         "source_path": _source_path,
-        "dest_path": _dest_path,
+        "current_worktree": _current_worktree,
         "file_exists": _file_exists,
         "dir_exists": _dir_exists,
         "path_exists": _path_exists,

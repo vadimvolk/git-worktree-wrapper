@@ -4,12 +4,13 @@ Each action is a small class that knows how to run itself against a target
 directory. Actions are constructed by :func:`gww.actions.apply_actions`,
 which evaluates any predicate and command-template context for them.
 
-The three concrete action classes cover the supported ``abs_copy``,
-``rel_copy``, and ``command`` action types from the YAML config.
+The concrete action classes cover the supported ``copy`` and ``command``
+action types from the YAML config (ADR-0012).
 """
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -37,11 +38,12 @@ class Action(Protocol):
         """Execute the action against ``target_dir``.
 
         Args:
-            source_dir: Path to the source repository. ``None`` for
-                ``abs_copy`` and source-only contexts; required for
-                ``rel_copy`` and worktree commands.
+            source_dir: Path to the source repository. Currently unused by
+                the shipped action types but retained on the protocol to
+                avoid touching every call site (ADR-0012 §"Notes for future
+                readers").
             target_dir: Path to operate on (source repo for ``after_clone``,
-                worktree for ``after_add``).
+                worktree for ``after_add`` and ``before_remove``).
             pass_through_stdout: Only meaningful for :class:`CommandAction`.
                 When ``True``, the external command's stdout is inherited from
                 the parent (so the user sees its progress in real time) while
@@ -53,12 +55,24 @@ class Action(Protocol):
         ...
 
 
-class AbsCopyAction:
-    """Copy a file from an absolute source path into ``target_dir``.
+class CopyAction:
+    """Copy a file or directory tree from a resolved source into ``target_dir``.
+
+    The two constructor arguments are *template-evaluated* strings supplied
+    by :func:`gww.actions.apply_actions` (i.e. any ``source_path(extra)``,
+    ``current_worktree(extra)``, or absolute-literal reference has already
+    been resolved before the action is constructed). The operation itself
+    is selected by the resolved source's filesystem type — ``shutil.copy2``
+    (silent overwrite) for files, ``shutil.copytree(src, dst,
+    dirs_exist_ok=True)`` (merge into an existing directory) for directory
+    trees. The destination's parent is created with
+    ``mkdir(parents=True, exist_ok=True)`` before either operation runs.
 
     Attributes:
-        source: Absolute source file path (may contain ``~``).
-        destination: Destination path relative to ``target_dir``.
+        source: Absolute source path (file or directory) as returned by the
+            template engine — no further template substitution happens here.
+        destination: Destination path relative to ``target_dir``. An absolute
+            destination bypasses the relative resolution and is used as-is.
     """
 
     def __init__(self, source: str, destination: str) -> None:
@@ -71,75 +85,56 @@ class AbsCopyAction:
         target_dir: Path,
         pass_through_stdout: bool = False,
     ) -> None:
-        """Copy ``source`` into ``target_dir / destination``.
+        """Copy ``source`` to ``target_dir / destination``.
 
         Raises:
-            ActionError: If the source is missing, not a file, or cannot be
-                copied.
+            ActionError: If the source is missing, is neither a file nor a
+                directory, or the copy operation fails.
         """
-        del source_dir, pass_through_stdout  # unused for absolute copy
-        source_path = Path(self.source).expanduser().resolve()
-        dest_path = target_dir / self.destination
+        del source_dir, pass_through_stdout  # unused for copy
+        literal = Path(self.source).expanduser()
+        dest_path = Path(self.destination)
+        if not dest_path.is_absolute():
+            dest_path = target_dir / dest_path
 
-        if not source_path.exists():
-            raise ActionError(f"Source file not found for abs_copy: {source_path}")
-        if not source_path.is_file():
-            raise ActionError(f"Source is not a file for abs_copy: {source_path}")
+        if not os.path.lexists(literal):
+            raise ActionError(f"Source path not found for copy: {literal}")
 
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
-
-        try:
-            shutil.copy2(source_path, dest_path)
-        except OSError as e:
+        # A broken symlink has ``is_symlink() == True`` but ``exists() ==
+        # False`` (the latter follows the link). ``Path.resolve()`` follows
+        # symlinks too, so a broken link resolves to its (non-existent)
+        # target — that would land in the "not found" branch above if we
+        # resolved first. Detect the broken-symlink case here so the error
+        # points at the symlink, not the missing target.
+        if literal.is_symlink() and not literal.exists():
             raise ActionError(
-                f"Failed to copy {source_path} to {dest_path}: {e}"
-            ) from e
+                f"Source is neither a file nor a directory for copy: {literal}"
+            )
 
+        source_path = literal.resolve()
 
-class RelCopyAction:
-    """Copy a file from ``source_dir`` into ``target_dir`` using relative paths.
+        if source_path.is_file():
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copy2(source_path, dest_path)
+            except OSError as e:
+                raise ActionError(
+                    f"Failed to copy {source_path} to {dest_path}: {e}"
+                ) from e
+            return
 
-    Attributes:
-        source: Path relative to ``source_dir``.
-        destination: Path relative to ``target_dir``; defaults to ``source``.
-    """
+        if source_path.is_dir():
+            try:
+                shutil.copytree(source_path, dest_path, dirs_exist_ok=True)
+            except OSError as e:
+                raise ActionError(
+                    f"Failed to copy directory {source_path} to {dest_path}: {e}"
+                ) from e
+            return
 
-    def __init__(self, source: str, destination: Optional[str] = None) -> None:
-        self.source = source
-        self.destination = destination
-
-    def run(
-        self,
-        source_dir: Optional[Path],
-        target_dir: Path,
-        pass_through_stdout: bool = False,
-    ) -> None:
-        """Copy ``source_dir / source`` into ``target_dir / destination``.
-
-        Raises:
-            ActionError: If ``source_dir`` is missing, the source file does
-                not exist, or the copy fails.
-        """
-        del pass_through_stdout  # unused for relative copy
-        if source_dir is None:
-            raise ActionError("rel_copy requires source_dir")
-
-        source_path = source_dir / self.source
-        dest_path = target_dir / (self.destination or self.source)
-
-        if not source_path.exists():
-            raise ActionError(f"Source file not found for rel_copy: {source_path}")
-        if not source_path.is_file():
-            raise ActionError(f"Source is not a file for rel_copy: {source_path}")
-
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
-
-        try:
-            shutil.copy2(source_path, dest_path)
-        except OSError as e:
-            raise ActionError(
-                f"Failed to copy {source_path} to {dest_path}: {e}"
-            ) from e
+        raise ActionError(
+            f"Source is neither a file nor a directory for copy: {source_path}"
+        )
 
 
 class CommandAction:

@@ -209,7 +209,7 @@ default_worktrees: {target_dir}/worktrees
 actions:
   - when: 'True'
     after_clone:
-      - abs_copy: ["{marker_file}", "copied_marker.txt"]
+      - copy: ["{marker_file}", "copied_marker.txt"]
 """)
 
         result = run_clone(make_ctx(uri=f"file://{bare_repo}"))
@@ -328,7 +328,7 @@ actions:
             f"  - when: 'True'\n"
             f"    after_clone:\n"
             f"      - command: 'false'\n"
-            f"      - abs_copy: ['{marker}', 'should-not-copy.txt']\n",
+            f"      - copy: ['{marker}', 'should-not-copy.txt']\n",
         )
 
         result = run_clone(make_ctx(uri=f"file://{bare_repo}"))
@@ -336,7 +336,7 @@ actions:
         assert result == 1
         captured = capsys.readouterr()
         assert "Action execution summary" in captured.err
-        # The abs_copy after the failing command must NOT have run.
+        # The copy after the failing command must NOT have run.
         expected_path = target_dir / "sources" / "test"
         assert not (expected_path / "should-not-copy.txt").exists()
 

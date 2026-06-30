@@ -15,8 +15,8 @@ Covers the full CLI flow:
   raising predicates that reference it.
 * Tag-driven predicate — ``--tag key=value`` flows through ``tag()``.
 * Matcher error — exit 2, ``git worktree remove`` not invoked.
-* ``dest_path()`` is the worktree being removed; ``source_path()`` is its
-  source repo.
+* ``current_worktree()`` is the worktree being removed; ``source_path()`` is
+  its source repo.
 * ``--force`` does *not* bypass ``before_remove`` — a critical failure still
   blocks the remove even with ``--force``.
 * Empty actions list — unchanged behaviour.
@@ -318,8 +318,8 @@ class TestRemoveBeforeRemoveFailures:
 
 class TestRemoveContextAndBranchLookup:
     """The ``TemplateContext`` passed to ``before_remove`` predicates and
-    commands must match the agreed contract: ``dest_path()`` is the worktree
-    being removed, ``source_path()`` is its source repo, ``branch()``
+    commands must match the agreed contract: ``current_worktree()`` is the
+    worktree being removed, ``source_path()`` is its source repo, ``branch()``
     resolves to the checked-out branch (or ``""`` on detached HEAD)."""
 
     def test_branch_predicate_matches_checked_out_branch(
@@ -348,14 +348,14 @@ class TestRemoveContextAndBranchLookup:
         assert result == 0
         assert not worktree_at.exists()
 
-    def test_dest_path_evaluates_to_worktree(
+    def test_current_worktree_evaluates_to_worktree(
         self,
         git_repo_with_remote: tuple[Path, Path],
         config_dir: Path,
         worktree_dir: Path,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """``{dest_path()}`` template should evaluate to the worktree path."""
+        """``{current_worktree()}`` template should evaluate to the worktree path."""
         local, _ = git_repo_with_remote
         wt = worktree_dir / "feature-test"
         subprocess.run(
@@ -366,7 +366,7 @@ class TestRemoveContextAndBranchLookup:
         _write_config(
             config_dir,
             f"""\
-  - when: 'dest_path() == "{wt}"'
+  - when: 'current_worktree() == "{wt}"'
     before_remove:
       - command: 'touch "{marker}"'
 """,

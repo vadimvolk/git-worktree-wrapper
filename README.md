@@ -223,16 +223,15 @@ Run actions after checking out a repository, after adding a worktree, or **befor
 actions:
   - when: file_exists("settings.gradle") # Check if it's actually a Gradle project
     after_clone:
-      - abs_copy: ["~/sources/default-local.properties", "local.properties"] # Copies your default file right after cloning the repo
+      - copy: ["~/sources/default-local.properties", "local.properties"] # Copies your default file right after cloning the repo
     after_add: 
-      - rel_copy: ["local.properties"] # Inherit existing repository file to worktree
+      - copy: ["source_path('local.properties')", "local.properties"] # Inherit existing repository file to worktree
 ```
 You can have multiple `when` subsections in actions. After clone/add, the library goes top-to-bottom and executes all actions with matching `when` conditions.
 Other functions available in the actions section: 
 | Action | Description | Example |
 |--------|-------------|---------|
-| `abs_copy` | Copy file from absolute path to relative destination in target directory | `abs_copy: ["~/sources/default-local.properties", "local.properties"]` |
-| `rel_copy` | Copy file from source repository to worktree (relative paths) | `rel_copy: ["local.properties"]` or `rel_copy: ["config.template", "config"]` |
+| `copy` | Copy a file or directory tree from a template-evaluated source to a template-evaluated destination (relative to `current_worktree()`) | `copy: ["source_path('local.properties')", "local.properties"]` or `copy: ["~/sources/default-local.properties", "local.properties"]` |
 | `command` | Execute external command (runs in destination directory, template functions available) | `command: "npm install"` or `command: "claude init"` |
 
 Each action rule also accepts an optional `critical:` flag (default `true`). When `true`, a failing action in that rule aborts the remaining actions in the rule and makes the command exit `1`. Set `critical: false` for non-critical rules — failures are reported in the action execution summary but the command still exits `0`. See [Failure handling](#-failure-handling) below for the full exit-code table.
@@ -245,16 +244,16 @@ actions:
 ```
 
 ##### 🪓 `before_remove` — cleanup actions before `gww remove`
-A third action kind, `before_remove`, runs user-defined cleanup steps **before** `git worktree remove` deletes the worktree. Use it to archive the worktree, post a notification, run a hook, etc. The same `critical:` / `command:` / `rel_copy:` / `abs_copy:` machinery applies; a critical `before_remove` failure aborts the remove and exits `1`, a non-critical failure is reported but the remove still proceeds. `--force` is git-only and does *not* bypass `before_remove`.
+A third action kind, `before_remove`, runs user-defined cleanup steps **before** `git worktree remove` deletes the worktree. Use it to archive the worktree, post a notification, run a hook, etc. The same `critical:` / `command:` / `copy:` machinery applies; a critical `before_remove` failure aborts the remove and exits `1`, a non-critical failure is reported but the remove still proceeds. `--force` is git-only and does *not* bypass `before_remove`.
 
-In `before_remove` rules, `dest_path()` is the worktree being removed, `source_path()` is its parent source repo, and `branch()` resolves to the worktree's currently checked-out branch (or `""` on detached HEAD). The `gww remove` command also accepts `--tag key=value`, which flows into `tag()` / `tag_exist()` predicates so per-call cleanup can be tag-driven.
+In `before_remove` rules, `current_worktree()` is the worktree being removed, `source_path()` is its parent source repo, and `branch()` resolves to the worktree's currently checked-out branch (or `""` on detached HEAD). The `gww remove` command also accepts `--tag key=value`, which flows into `tag()` / `tag_exist()` predicates so per-call cleanup can be tag-driven.
 
 ```yml
 actions:
   # Critical: archive the worktree before letting `gww remove` delete it.
   - when: 'tag_exist("archive")'
     before_remove:
-      - command: "tar -czf ~/archives/norm_branch()-time_id('%Y%m%d').tar.gz dest_path()"
+      - command: "tar -czf ~/archives/norm_branch()-time_id('%Y%m%d').tar.gz current_worktree()"
 
   # Non-critical: notify a Slack channel. A failed notification should not block the remove.
   - when: tag("notify") == "slack"
@@ -283,8 +282,8 @@ Action failures are reported per-rule, grouped at the end of the action loop on 
 
 | Function | Description | Example |
 |----------|-------------|---------|
-| `source_path()` | Get absolute path to source repository or worktree root | `source_path()` → `"/path/to/repo"` |
-| `dest_path()` | Get absolute path to destination (clone target or worktree) | `dest_path()` → `"/path/to/worktree"` |
+| `source_path(extra?)` | Get absolute path to source repository, optionally joined with `extra` | `source_path()` → `"/path/to/repo"`, `source_path("local.properties")` → `"/path/to/repo/local.properties"` |
+| `current_worktree(extra?)` | Get absolute path to the current worktree, optionally joined with `extra` | `current_worktree()` → `"/path/to/worktree"`, `current_worktree("local.properties")` → `"/path/to/worktree/local.properties"` |
 | `file_exists(path)` | Check if file exists relative to source repository | `file_exists("local.properties")` → `True` |
 | `dir_exists(path)` | Check if directory exists relative to source repository | `dir_exists("config")` → `True` |
 | `path_exists(path)` | Check if path exists (file or directory) relative to source repository | `path_exists("local.properties")` → `True` |

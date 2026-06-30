@@ -8,11 +8,10 @@ from pathlib import Path
 import pytest
 
 from gww.actions import (
-    AbsCopyAction,
     ActionError,
     CommandAction,
+    CopyAction,
     MatcherError,
-    RelCopyAction,
     RuleActions,
     apply_actions,
 )
@@ -150,7 +149,7 @@ class TestApplyActionsMatching:
             when="True",
             after_clone=[
                 RawAction(action_type="command", args=["first"]),
-                RawAction(action_type="abs_copy", args=["/tmp/a", "b"]),
+                RawAction(action_type="copy", args=["/tmp/a", "b"]),
                 RawAction(action_type="command", args=["third"]),
             ],
         )
@@ -159,7 +158,7 @@ class TestApplyActionsMatching:
 
         assert [type(a).__name__ for a in bundles[0].actions] == [
             "CommandAction",
-            "AbsCopyAction",
+            "CopyAction",
             "CommandAction",
         ]
 
@@ -272,7 +271,7 @@ class TestApplyActionsBuildsTypedObjects:
         rule = ProjectRule(
             when="True",
             after_clone=[
-                RawAction(action_type="command", args=["./setup.sh dest_path()"]),
+                RawAction(action_type="command", args=["./setup.sh current_worktree()"]),
             ],
         )
 
@@ -312,48 +311,109 @@ class TestApplyActionsBuildsTypedObjects:
         assert action.command == "echo"
         assert action.args == ["hello world"]
 
-    def test_abs_copy_action_built_from_args(self, tmp_path: Path) -> None:
+    def test_copy_action_built_from_absolute_args(self, tmp_path: Path) -> None:
+        """``copy`` with literal absolute source and destination: args pass
+        through unchanged (no template functions to evaluate)."""
         rule = ProjectRule(
             when="True",
             after_clone=[
-                RawAction(action_type="abs_copy", args=["/tmp/source.txt", "dst.txt"]),
+                RawAction(action_type="copy", args=["/tmp/source.txt", "dst.txt"]),
             ],
         )
 
         bundles = apply_actions([rule], _ctx(tmp_path), kind="after_clone")
 
         action = bundles[0].actions[0]
-        assert isinstance(action, AbsCopyAction)
+        assert isinstance(action, CopyAction)
         assert action.source == "/tmp/source.txt"
         assert action.destination == "dst.txt"
 
-    def test_rel_copy_action_built_with_default_destination(self, tmp_path: Path) -> None:
-        rule = ProjectRule(
-            when="True",
-            after_add=[RawAction(action_type="rel_copy", args=["local.properties"])],
-        )
+    def test_copy_action_evaluates_source_path_template(
+        self, tmp_path: Path,
+    ) -> None:
+        """``copy`` args go through the template engine: ``source_path('foo')``
+        resolves to an absolute path before the action runs."""
+        source_file = tmp_path / "marker.txt"
+        source_file.write_text("hi")
 
-        bundles = apply_actions([rule], _ctx(tmp_path), kind="after_add")
-
-        action = bundles[0].actions[0]
-        assert isinstance(action, RelCopyAction)
-        assert action.source == "local.properties"
-        assert action.destination is None
-
-    def test_rel_copy_action_built_with_explicit_destination(self, tmp_path: Path) -> None:
         rule = ProjectRule(
             when="True",
             after_add=[
-                RawAction(action_type="rel_copy", args=["a.txt", "b.txt"]),
+                RawAction(
+                    action_type="copy",
+                    args=["source_path('marker.txt')", "copied.txt"],
+                ),
             ],
         )
 
         bundles = apply_actions([rule], _ctx(tmp_path), kind="after_add")
 
         action = bundles[0].actions[0]
-        assert isinstance(action, RelCopyAction)
-        assert action.source == "a.txt"
-        assert action.destination == "b.txt"
+        assert isinstance(action, CopyAction)
+        assert action.source == str(source_file.resolve())
+        assert action.destination == "copied.txt"
+
+    def test_copy_action_evaluates_current_worktree_template(
+        self, tmp_path: Path,
+    ) -> None:
+        """``copy``'s second arg is also template-evaluated."""
+        source_file = tmp_path / "marker.txt"
+        source_file.write_text("hi")
+        worktree = tmp_path / "wt"
+        worktree.mkdir()
+
+        rule = ProjectRule(
+            when="True",
+            after_add=[
+                RawAction(
+                    action_type="copy",
+                    args=[
+                        "source_path('marker.txt')",
+                        "current_worktree('copied.txt')",
+                    ],
+                ),
+            ],
+        )
+
+        bundles = apply_actions(
+            [rule],
+            _ctx(tmp_path, dest_path=worktree),
+            kind="after_add",
+        )
+
+        action = bundles[0].actions[0]
+        assert isinstance(action, CopyAction)
+        assert action.source == str(source_file.resolve())
+        assert action.destination == str((worktree / "copied.txt").resolve())
+
+    def test_copy_action_evaluates_mixed_static_and_template_text(
+        self, tmp_path: Path,
+    ) -> None:
+        """``copy`` args are preprocessed by the template engine: literal
+        text is kept verbatim while a function call inside the same arg
+        string is replaced by its return value."""
+        source_file = tmp_path / "marker.txt"
+        source_file.write_text("hi")
+
+        rule = ProjectRule(
+            when="True",
+            after_add=[
+                RawAction(
+                    action_type="copy",
+                    args=[
+                        f"prefix-{source_file.name}",
+                        "copied.txt",
+                    ],
+                ),
+            ],
+        )
+
+        bundles = apply_actions([rule], _ctx(tmp_path), kind="after_add")
+
+        action = bundles[0].actions[0]
+        assert isinstance(action, CopyAction)
+        assert action.source == f"prefix-{source_file.name}"
+        assert action.destination == "copied.txt"
 
     def test_predicate_using_tag_function(self, tmp_path: Path) -> None:
         rule = ProjectRule(
