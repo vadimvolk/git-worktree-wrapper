@@ -122,7 +122,7 @@ GWW is a CLI tool (`gww`) that wraps git worktree functionality with:
 **Role**: Work with configuration files, templates, and path resolution.
 
 **Context**:
-- Config file: `~/.config/gww/config.yml` (Linux) or `~/Library/Application Support/gww/config.yml` (macOS)
+- Config file: `$XDG_CONFIG_HOME/gww/config.yml` (when set, any platform), otherwise `~/.config/gww/config.yml` (Linux), `~/Library/Application Support/gww/config.yml` (macOS), or `%APPDATA%\gww\config.yml` (Windows)
 - Config structure: `default_sources`, `default_worktrees`, `sources`, `actions`
 - Template evaluation uses `simpleeval` with custom functions
 

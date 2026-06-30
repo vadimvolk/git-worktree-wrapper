@@ -12,9 +12,14 @@ APP_NAME = "gww"
 def user_config_dir(appname: str = APP_NAME) -> Path:
     """Return cross-platform config directory following XDG/OS conventions.
 
-    - Linux: $XDG_CONFIG_HOME/{appname} or ~/.config/{appname}
-    - macOS: ~/Library/Application Support/{appname}
-    - Windows: %APPDATA%/{appname} or ~/AppData/Roaming/{appname}
+    On every platform, ``$XDG_CONFIG_HOME`` is honored when set to an
+    absolute path (per the XDG Base Directory spec). Otherwise the
+    platform default is used:
+
+    - Linux: ``~/.config/{appname}``
+    - macOS: ``~/Library/Application Support/{appname}``
+    - Windows: ``%APPDATA%/{appname}`` (falling back to
+      ``~/AppData/Roaming/{appname}``)
 
     Args:
         appname: Application name for the config subdirectory.
@@ -24,20 +29,20 @@ def user_config_dir(appname: str = APP_NAME) -> Path:
     """
     home = Path.home()
 
-    if sys.platform.startswith("win"):
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    if xdg and Path(xdg).is_absolute():
+        return Path(xdg) / appname
+
+    platform = sys.platform
+
+    if platform.startswith("win"):
         base = os.environ.get("APPDATA", str(home / "AppData" / "Roaming"))
         return Path(base) / appname
-    elif sys.platform == "darwin":
-        base = home / "Library" / "Application Support"
-        return base / appname
-    else:
-        # Linux/Unix: $XDG_CONFIG_HOME or ~/.config
-        xdg = os.environ.get("XDG_CONFIG_HOME")
-        if xdg and Path(xdg).is_absolute():
-            base = Path(xdg)
-        else:
-            base = home / ".config"
-        return base / appname
+
+    if platform == "darwin":
+        return home / "Library" / "Application Support" / appname
+
+    return home / ".config" / appname
 
 
 def get_config_path(appname: str = APP_NAME) -> Path:
