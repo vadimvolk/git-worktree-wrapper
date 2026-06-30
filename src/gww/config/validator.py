@@ -34,7 +34,7 @@ class Action:
     """Validated project action.
 
     Attributes:
-        action_type: One of "abs_copy", "rel_copy", "command".
+        action_type: One of "copy", "command".
         args: Action arguments.
     """
 
@@ -140,7 +140,7 @@ def _validate_action(action_data: Any, context: str) -> Action:
     action_type = list(action_data.keys())[0]
     args = action_data[action_type]
 
-    valid_types = {"abs_copy", "rel_copy", "command"}
+    valid_types = {"copy", "command"}
     if action_type not in valid_types:
         raise ConfigValidationError(
             f"{context}: invalid action type '{action_type}'. "
@@ -159,7 +159,7 @@ def _validate_action(action_data: Any, context: str) -> Action:
         # Store as single-element list for consistency
         args = [args]
     else:
-        # abs_copy and rel_copy accept string or list
+        # copy accepts a string or list of two template-evaluated strings
         if isinstance(args, str):
             args = [args]
         elif not isinstance(args, list):

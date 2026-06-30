@@ -1,7 +1,5 @@
 """Unit tests for template functions in src/gww/template/functions.py."""
 
-import os
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -14,57 +12,6 @@ from gww.template.functions import (
 )
 from gww.template.evaluator import evaluate_template
 from gww.utils.uri import parse_uri
-
-
-def _init_git_repo(path: Path) -> None:
-    """Initialize a git repository at the given path."""
-    subprocess.run(
-        ["git", "init"],
-        cwd=path,
-        check=True,
-        capture_output=True,
-    )
-    # Configure git user for the repo (needed for commits)
-    subprocess.run(
-        ["git", "config", "user.email", "test@example.com"],
-        cwd=path,
-        check=True,
-        capture_output=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.name", "Test User"],
-        cwd=path,
-        check=True,
-        capture_output=True,
-    )
-
-
-def _create_initial_commit(path: Path) -> None:
-    """Create an initial commit in the git repository."""
-    readme = path / "README.md"
-    readme.write_text("# Test Repo\n")
-    subprocess.run(
-        ["git", "add", "."],
-        cwd=path,
-        check=True,
-        capture_output=True,
-    )
-    subprocess.run(
-        ["git", "commit", "-m", "Initial commit"],
-        cwd=path,
-        check=True,
-        capture_output=True,
-    )
-
-
-def _add_worktree(repo_path: Path, worktree_path: Path, branch: str) -> None:
-    """Add a worktree to the repository."""
-    subprocess.run(
-        ["git", "worktree", "add", str(worktree_path), "-b", branch],
-        cwd=repo_path,
-        check=True,
-        capture_output=True,
-    )
 
 
 class TestTagFunction:
@@ -655,198 +602,195 @@ class TestProjectFunctions:
         functions = create_project_functions(TemplateContext(source_path=tmp_path))
 
         assert "source_path" in functions
-        assert "dest_path" in functions
+        assert "current_worktree" in functions
         assert "file_exists" in functions
         assert "dir_exists" in functions
         assert "path_exists" in functions
 
-    def test_source_path_from_source_repo_root(self, tmp_path: Path) -> None:
-        """Test source_path() returns repo root when called from source repository root."""
-        repo_path = tmp_path / "repo"
-        repo_path.mkdir()
-        _init_git_repo(repo_path)
-        _create_initial_commit(repo_path)
-
-        functions = create_project_functions(TemplateContext(source_path=tmp_path))  # param not used by source_path()
-
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(repo_path)
-            result = functions["source_path"]()
-            assert result == str(repo_path.resolve())
-        finally:
-            os.chdir(original_cwd)
-
-    def test_source_path_from_source_repo_subdirectory(self, tmp_path: Path) -> None:
-        """Test source_path() finds repo root when called from subdirectory."""
-        repo_path = tmp_path / "repo"
-        repo_path.mkdir()
-        _init_git_repo(repo_path)
-        _create_initial_commit(repo_path)
-
-        subdir = repo_path / "src" / "nested"
-        subdir.mkdir(parents=True)
-
-        functions = create_project_functions(TemplateContext(source_path=tmp_path))
-
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(subdir)
-            result = functions["source_path"]()
-            assert result == str(repo_path.resolve())
-        finally:
-            os.chdir(original_cwd)
-
-    def test_source_path_from_worktree_root(self, tmp_path: Path) -> None:
-        """Test source_path() returns worktree root when called from worktree."""
-        repo_path = tmp_path / "repo"
-        repo_path.mkdir()
-        _init_git_repo(repo_path)
-        _create_initial_commit(repo_path)
-
-        worktree_path = tmp_path / "worktree"
-        _add_worktree(repo_path, worktree_path, "feature-branch")
-
-        functions = create_project_functions(TemplateContext(source_path=tmp_path))
-
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(worktree_path)
-            result = functions["source_path"]()
-            assert result == str(worktree_path.resolve())
-        finally:
-            os.chdir(original_cwd)
-
-    def test_source_path_from_worktree_subdirectory(self, tmp_path: Path) -> None:
-        """Test source_path() finds worktree root when called from worktree subdirectory."""
-        repo_path = tmp_path / "repo"
-        repo_path.mkdir()
-        _init_git_repo(repo_path)
-        _create_initial_commit(repo_path)
-
-        worktree_path = tmp_path / "worktree"
-        _add_worktree(repo_path, worktree_path, "feature-branch")
-
-        subdir = worktree_path / "src" / "nested"
-        subdir.mkdir(parents=True)
-
-        functions = create_project_functions(TemplateContext(source_path=tmp_path))
-
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(subdir)
-            result = functions["source_path"]()
-            assert result == str(worktree_path.resolve())
-        finally:
-            os.chdir(original_cwd)
-
-    def test_source_path_outside_git_repo_returns_empty_string(self, tmp_path: Path) -> None:
-        """Test source_path() returns empty string when not in a git repository."""
-        non_git_dir = tmp_path / "not_a_repo"
-        non_git_dir.mkdir()
-
-        functions = create_project_functions(TemplateContext(source_path=tmp_path))
-
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(non_git_dir)
-            result = functions["source_path"]()
-            assert result == ""
-        finally:
-            os.chdir(original_cwd)
-
-    def test_source_path_returns_absolute_path(self, tmp_path: Path) -> None:
-        """Test source_path() returns absolute path string."""
-        repo_path = tmp_path / "repo"
-        repo_path.mkdir()
-        _init_git_repo(repo_path)
-        _create_initial_commit(repo_path)
-
-        functions = create_project_functions(TemplateContext(source_path=tmp_path))
-
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(repo_path)
-            result = functions["source_path"]()
-            # Should be absolute path
-            assert Path(result).is_absolute()
-            assert result == str(repo_path.resolve())
-        finally:
-            os.chdir(original_cwd)
-
-    def test_dest_path_returns_source_path_when_dest_path_not_provided(self, tmp_path: Path) -> None:
-        """Test dest_path() returns source_path when dest_path parameter is None (clone context)."""
-        source_path = tmp_path / "source"
-        source_path.mkdir()
-
-        functions = create_project_functions(TemplateContext(source_path=source_path))
-
-        result = functions["dest_path"]()
-
-        assert result == str(source_path.resolve())
-
-    def test_dest_path_returns_provided_path_when_set(self, tmp_path: Path) -> None:
-        """Test dest_path() returns the provided path when dest_path is set (add context)."""
-        source_path = tmp_path / "source"
-        source_path.mkdir()
-        worktree_path = tmp_path / "worktree"
-        worktree_path.mkdir()
+    def test_source_path_returns_source_repo(self, tmp_path: Path) -> None:
+        """Test source_path() with no arg returns the bare source path."""
+        source = tmp_path / "source"
+        source.mkdir()
 
         functions = create_project_functions(
-            TemplateContext(source_path=source_path, dest_path=worktree_path),
+            TemplateContext(source_path=source, dest_path=source),
         )
 
-        result = functions["dest_path"]()
+        assert functions["source_path"]() == str(source.resolve())
 
-        assert result == str(worktree_path.resolve())
-
-    def test_dest_path_returns_absolute_path(self, tmp_path: Path) -> None:
-        """Test dest_path() returns absolute path string."""
-        source_path = tmp_path / "source"
-        source_path.mkdir()
-        worktree_path = tmp_path / "worktree"
-        worktree_path.mkdir()
+    def test_source_path_with_extra_returns_joined_path(self, tmp_path: Path) -> None:
+        """Test source_path('foo') joins the extra segment onto the source path."""
+        source = tmp_path / "source"
+        source.mkdir()
 
         functions = create_project_functions(
-            TemplateContext(source_path=source_path, dest_path=worktree_path),
+            TemplateContext(source_path=source, dest_path=source),
         )
 
-        result = functions["dest_path"]()
+        assert functions["source_path"]("foo") == str((source / "foo").resolve())
 
+    def test_source_path_with_empty_extra_returns_source_path(self, tmp_path: Path) -> None:
+        """Test source_path('') is equivalent to source_path() (ADR-0012 Q5)."""
+        source = tmp_path / "source"
+        source.mkdir()
+
+        functions = create_project_functions(
+            TemplateContext(source_path=source, dest_path=source),
+        )
+
+        assert functions["source_path"]("") == str(source.resolve())
+
+    def test_source_path_returns_absolute_resolved_path(self, tmp_path: Path) -> None:
+        """Test source_path() resolves and returns an absolute path string."""
+        source = tmp_path / "source"
+        source.mkdir()
+
+        functions = create_project_functions(
+            TemplateContext(source_path=source, dest_path=source),
+        )
+
+        result = functions["source_path"]()
         assert Path(result).is_absolute()
-        assert result == str(worktree_path.resolve())
+        assert result == str(source.resolve())
 
-    def test_dest_path_clone_context(self, tmp_path: Path) -> None:
-        """Test dest_path() in clone context (dest_path equals source_path)."""
-        source_path = tmp_path / "clone_target"
-        source_path.mkdir()
+    def test_source_path_does_not_alias_current_worktree(
+        self, tmp_path: Path,
+    ) -> None:
+        """``source_path()`` must always read ``context.source_path`` —
+        never ``context.dest_path``. ADR-0012 §"Uniform semantics across
+        operations" — divergence in ``add`` and ``before_remove`` is
+        expected, not an error."""
+        source = tmp_path / "source"
+        source.mkdir()
+        worktree = tmp_path / "worktree"
+        worktree.mkdir()
 
-        # In clone context, dest_path is set to the same as source_path
         functions = create_project_functions(
-            TemplateContext(source_path=source_path, dest_path=source_path),
+            TemplateContext(source_path=source, dest_path=worktree),
         )
 
-        result = functions["dest_path"]()
+        assert functions["source_path"]() == str(source.resolve())
+        assert functions["source_path"]() != functions["current_worktree"]()
 
-        assert result == str(source_path.resolve())
+    def test_current_worktree_returns_dest_path(self, tmp_path: Path) -> None:
+        """Test current_worktree() with no arg returns the bare dest path."""
+        source = tmp_path / "source"
+        source.mkdir()
+        worktree = tmp_path / "worktree"
+        worktree.mkdir()
 
-    def test_dest_path_add_context(self, tmp_path: Path) -> None:
-        """Test dest_path() in add context (dest_path is worktree path)."""
-        source_path = tmp_path / "source_repo"
-        source_path.mkdir()
-        worktree_path = tmp_path / "worktrees" / "feature-branch"
-        worktree_path.mkdir(parents=True)
-
-        # In add context, dest_path is the worktree path
         functions = create_project_functions(
-            TemplateContext(source_path=source_path, dest_path=worktree_path),
+            TemplateContext(source_path=source, dest_path=worktree),
         )
 
-        result = functions["dest_path"]()
+        assert functions["current_worktree"]() == str(worktree.resolve())
 
-        assert result == str(worktree_path.resolve())
-        # Verify it's different from source_path
-        assert result != str(source_path.resolve())
+    def test_current_worktree_with_extra_returns_joined_path(
+        self, tmp_path: Path,
+    ) -> None:
+        """Test current_worktree('foo') joins the extra segment onto the dest path."""
+        source = tmp_path / "source"
+        source.mkdir()
+        worktree = tmp_path / "worktree"
+        worktree.mkdir()
+
+        functions = create_project_functions(
+            TemplateContext(source_path=source, dest_path=worktree),
+        )
+
+        assert functions["current_worktree"]("foo") == str(
+            (worktree / "foo").resolve()
+        )
+
+    def test_current_worktree_with_empty_extra_returns_dest_path(
+        self, tmp_path: Path,
+    ) -> None:
+        """Test current_worktree('') is equivalent to current_worktree()."""
+        source = tmp_path / "source"
+        source.mkdir()
+        worktree = tmp_path / "worktree"
+        worktree.mkdir()
+
+        functions = create_project_functions(
+            TemplateContext(source_path=source, dest_path=worktree),
+        )
+
+        assert functions["current_worktree"]("") == str(worktree.resolve())
+
+    def test_current_worktree_in_clone_context_equals_source_path(
+        self, tmp_path: Path,
+    ) -> None:
+        """``gww clone`` populates both context fields with the same path;
+        ``current_worktree()`` then reads ``context.dest_path`` (which the
+        CLI set to the same value) and matches ``source_path()``. This is a
+        CLI-side property of how the command populates the context, not
+        aliasing inside either helper — the test pins the convention so
+        regressions surface immediately."""
+        clone_target = tmp_path / "clone_target"
+        clone_target.mkdir()
+
+        functions = create_project_functions(
+            TemplateContext(source_path=clone_target, dest_path=clone_target),
+        )
+
+        assert functions["current_worktree"]() == functions["source_path"]()
+        assert functions["current_worktree"]() == str(clone_target.resolve())
+
+    def test_current_worktree_in_add_context_diverges_from_source_path(
+        self, tmp_path: Path,
+    ) -> None:
+        """``gww add`` populates ``source_path`` with the source repo and
+        ``dest_path`` with the worktree being added. ``current_worktree()``
+        must return the worktree path, not the source path."""
+        source = tmp_path / "source_repo"
+        source.mkdir()
+        worktree = tmp_path / "worktrees" / "feature-branch"
+        worktree.mkdir(parents=True)
+
+        functions = create_project_functions(
+            TemplateContext(source_path=source, dest_path=worktree),
+        )
+
+        assert functions["current_worktree"]() == str(worktree.resolve())
+        assert functions["current_worktree"]() != functions["source_path"]()
+
+    def test_current_worktree_in_before_remove_context_points_to_worktree(
+        self, tmp_path: Path,
+    ) -> None:
+        """``gww remove`` populates ``source_path`` with the source repo and
+        ``dest_path`` with the worktree being removed. ``current_worktree()``
+        returns the doomed worktree, not the source."""
+        source = tmp_path / "source_repo"
+        source.mkdir()
+        doomed = tmp_path / "worktrees" / "doomed"
+        doomed.mkdir(parents=True)
+
+        functions = create_project_functions(
+            TemplateContext(source_path=source, dest_path=doomed),
+        )
+
+        assert functions["current_worktree"]() == str(doomed.resolve())
+        assert functions["current_worktree"]() != functions["source_path"]()
+
+    def test_current_worktree_with_none_dest_path_raises_value_error(
+        self, tmp_path: Path,
+    ) -> None:
+        """When ``context.dest_path`` is ``None`` (non-project evaluation
+        site), ``current_worktree()`` must raise ``ValueError`` — never
+        silently fall back to ``source_path()``. ADR-0012 §"Uniform
+        semantics across operations" rules the fallback out."""
+        source = tmp_path / "source"
+        source.mkdir()
+
+        functions = create_project_functions(
+            TemplateContext(source_path=source, dest_path=None),
+        )
+
+        with pytest.raises(ValueError, match="requires context.dest_path"):
+            functions["current_worktree"]()
+
+        with pytest.raises(ValueError, match="requires context.dest_path"):
+            functions["current_worktree"]("foo")
 
     def test_file_exists_returns_true_for_existing_file(self, tmp_path: Path) -> None:
         """Test file_exists() returns True for existing file."""

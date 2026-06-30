@@ -7,8 +7,8 @@ returned bundles and call :meth:`Action.run` for each action.
 
 Public surface:
 
-* :class:`Action` protocol and concrete :class:`AbsCopyAction`,
-  :class:`RelCopyAction`, :class:`CommandAction` (in :mod:`gww.actions.types`)
+* :class:`Action` protocol and concrete :class:`CopyAction`,
+  :class:`CommandAction` (in :mod:`gww.actions.types`)
 * :class:`ActionError` raised by ``run()`` on failure
 * :class:`MatcherError` raised by :func:`apply_actions` when a rule predicate
   or command template cannot be evaluated
@@ -23,15 +23,13 @@ from __future__ import annotations
 
 import shlex
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 from gww.actions.types import (
-    AbsCopyAction,
     Action,
     ActionError,
     CommandAction,
-    RelCopyAction,
+    CopyAction,
 )
 from gww.config.validator import Action as RawAction
 from gww.config.validator import ProjectRule
@@ -88,13 +86,12 @@ class RuleActions:
 
 
 __all__ = [
-    "AbsCopyAction",
     "Action",
     "ActionError",
     "ActionKind",
     "CommandAction",
+    "CopyAction",
     "MatcherError",
-    "RelCopyAction",
     "RuleActions",
     "apply_actions",
 ]
@@ -104,7 +101,7 @@ def _create_predicate_context(context: TemplateContext) -> dict[str, object]:
     """Build the evaluation context shared by ``when`` predicates and command
     templates.
 
-    Adds project-specific functions (``source_path``, ``dest_path``,
+    Adds project-specific functions (``source_path``, ``current_worktree``,
     ``file_exists``, ``dir_exists``, ``path_exists``) on top of the unified
     URI/branch/tag registry seeded by ``context``.
     """
@@ -119,20 +116,29 @@ def _build_action(
 ) -> Action:
     """Turn a config-level :class:`Action` into a typed executable.
 
-    For ``command`` actions the template is evaluated against ``context`` and
-    parsed with :mod:`shlex` so the resulting :class:`CommandAction` already
-    holds the resolved argv. For copy actions the args pass through.
+    For ``copy`` actions the two template-evaluated args become
+    :class:`CopyAction`'s ``source`` and ``destination`` (both template-
+    evaluated, so ``source_path('local.properties')`` resolves to an absolute
+    path before the action runs). For ``command`` actions the template is
+    evaluated against ``context`` and parsed with :mod:`shlex` so the
+    resulting :class:`CommandAction` already holds the resolved argv.
     """
-    if raw.action_type == "abs_copy":
+    if raw.action_type == "copy":
         if len(raw.args) < 2:
-            raise MatcherError("abs_copy requires source and destination arguments")
-        return AbsCopyAction(source=raw.args[0], destination=raw.args[1])
-
-    if raw.action_type == "rel_copy":
-        if len(raw.args) < 1:
-            raise MatcherError("rel_copy requires at least source argument")
-        destination = raw.args[1] if len(raw.args) > 1 else None
-        return RelCopyAction(source=raw.args[0], destination=destination)
+            raise MatcherError("copy requires source and destination arguments")
+        try:
+            source = evaluate_command_template(raw.args[0], context)
+        except TemplateError as e:
+            raise MatcherError(
+                f"Error evaluating copy source '{raw.args[0]}': {e}"
+            ) from e
+        try:
+            destination = evaluate_command_template(raw.args[1], context)
+        except TemplateError as e:
+            raise MatcherError(
+                f"Error evaluating copy destination '{raw.args[1]}': {e}"
+            ) from e
+        return CopyAction(source=source, destination=destination)
 
     if raw.action_type == "command":
         template = raw.args[0] if raw.args else ""

@@ -224,7 +224,7 @@ def evaluate_command_template(
     """Evaluate a command template string with function calls.
 
     Command template syntax:
-    - Function calls: dest_path(), tag("name"), source_path()
+    - Function calls: current_worktree(), tag("name"), source_path()
     - Escaped parentheses: (( -> (
     - Static text: passed through as-is
 

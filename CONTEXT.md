@@ -37,8 +37,12 @@ A single entry from the `actions:` list in the config, evaluated against a `when
 _Avoid_: hook, callback.
 
 **Project rule evaluation context**:
-The :class:`TemplateContext` instance a project rule's `when` predicate and command templates evaluate against. Carries every piece of state that the calling command (`clone` or `add`) actually knows — URI, branch, tags, source path, destination path — so authors can mix `host()`, `branch()`, `tag()`, `file_exists()`, `dest_path()` and friends in the same predicate. Each command populates it from its own operation; see URI-as-seen-by-`clone`-vs-`add` for the asymmetry.
+The :class:`TemplateContext` instance a project rule's `when` predicate and command templates evaluate against. Carries every piece of state that the calling command (`clone`, `add`, or `before_remove`) actually knows — URI, branch, tags, source path, destination path — so authors can mix `host()`, `branch()`, `tag()`, `file_exists()`, `current_worktree()` and friends in the same predicate. Each command populates it from its own operation; see URI-as-seen-by-`clone`-vs-`add`, Branch-as-seen-by-`clone`-vs-`add`, and Paths-as-seen-by-`clone`-vs-`add`-vs-`remove` for the asymmetries. Path-bearing helpers available here are `source_path(extra?)` (`context.source_path`, optionally joined with `extra`) and `current_worktree(extra?)` (`context.dest_path`, optionally joined with `extra`) — both project-only, neither registered in source-rule predicates or `default_sources`/`default_worktrees` path templates, because those evaluate before the git operation has produced a source or a target. The mapping from helper to context field is fixed across operations; any coincidence or divergence between the two helpers is a property of what the CLI populated, never an aliasing inside the helper itself.
 _Avoid_: URI context, action context (too narrow — the context also feeds command templates and tags, not just URI predicates).
+
+**Copy action**:
+A project action that copies a file or directory tree. Takes two template-evaluated arguments, `from` and `to`, with the implementation selecting the operation by the source's resolved type: `shutil.copy2` (silent overwrite) when the source is a file, `shutil.copytree(src, dst, dirs_exist_ok=True)` (merge into an existing destination) when the source is a directory. The destination is interpreted relative to `current_worktree()` when written as a relative path; an absolute destination bypasses that resolution. Missing source raises `ActionError`; the destination's parent is created with `mkdir(parents=True, exist_ok=True)` before either operation runs.
+_Avoid_: `abs_copy`, `rel_copy` (removed).
 
 **URI as seen by `clone` vs `add`**:
 In `clone`, the URI in the project rule context is whatever the user typed on the command line. In `add`, it is whatever `git remote get-url origin` of the source repository returns *now*. If the user later rewrote the remote (`git remote set-url …` from HTTPS to SSH, host rename, etc.), the `clone` rule still sees the original URL while the `add` rule sees the rewritten one. For host-based predicates this rarely matters; for protocol-sensitive predicates it can.
@@ -67,7 +71,7 @@ A git branch (refs/heads/&lt;name&gt;) that is currently checked out in some wor
 _Avoid_: worktree branch (informal only), bound branch.
 
 **`before_remove`**:
-A third section in a project rule, sibling of `after_clone` and `after_add`. Holds actions that run *before* `git worktree remove` is invoked by `gww remove`, against the worktree that is about to be deleted. Uses the same per-rule `critical` flag as the `after_*` sections — a failing critical rule aborts the remove; a failing non-critical rule is reported but the remove still proceeds. `--force` does NOT bypass or alter `before_remove` execution; it continues to mean "pass `--force` to `git worktree remove`". The section accepts the same three action types (`abs_copy`, `rel_copy`, `command`) — copying into a doomed directory is unusual but the validator does not enforce type-vs-kind compatibility (runtime `ActionError` if it can't do its job).
+A third section in a project rule, sibling of `after_clone` and `after_add`. Holds actions that run *before* `git worktree remove` is invoked by `gww remove`, against the worktree that is about to be deleted. Uses the same per-rule `critical` flag as the `after_*` sections — a failing critical rule aborts the remove; a failing non-critical rule is reported but the remove still proceeds. `--force` does NOT bypass or alter `before_remove` execution; it continues to mean "pass `--force` to `git worktree remove`". The section accepts the same action types as `after_*` (`copy`, `command`) — copying into a doomed directory is unusual but the validator does not enforce type-vs-kind compatibility (runtime `ActionError` if it can't do its job).
 _Avoid_: pre_remove, on_remove, remove hook, cleanup hook.
 
 **Branch as seen by `gww remove`**:
@@ -75,3 +79,14 @@ For `before_remove` predicates, `branch()` is the branch checked out in the work
 
 **`gww remove` `--tag`**:
 Repeatable `key=value` flag on `gww remove`, mirroring `clone` / `add`. Feeds `tag()` and `tag_exist()` in `before_remove` predicates; absent tags default to empty. Tags do NOT affect path resolution (none happens for `remove`) and do NOT affect the `git worktree remove` step; their only purpose is to make `before_remove` predicates discriminating.
+
+**Paths as seen by `clone` vs `add` vs `remove`**:
+For project predicates, `source_path()` is `context.source_path` and `current_worktree()` is `context.dest_path` — uniformly. The CLI populates the two context fields per operation:
+
+| Operation | `context.source_path` | `context.dest_path` |
+|---|---|---|
+| `clone` | the freshly-cloned source repo | the same path (clone target = source) |
+| `add` | the source repo | the worktree being added |
+| `before_remove` | the source repo | the worktree being removed |
+
+So `source_path()` and `current_worktree()` happen to coincide in `clone` and diverge in `add` / `before_remove`. The coincidence during `clone` is a CLI-side property of how the calling command populates the context, NOT an aliasing inside either helper — neither function ever substitutes the other for its caller. See ADR-0012 §"Uniform semantics across operations" for the principle that supersedes the now-obsolete `dest_path()`-side aliasing decisions.

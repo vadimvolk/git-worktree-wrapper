@@ -223,16 +223,15 @@ worktrees: ~/Downloads/temp/worktrees/time_id("%Y")/time_id("%m")/time_id("%H-%M
 actions:
   - when: file_exists("settings.gradle") # Проверить, что это действительно проект Gradle
     after_clone:
-      - abs_copy: ["~/sources/default-local.properties", "local.properties"] # Копирует ваш файл по умолчанию сразу после клонирования репозитория
+      - copy: ["~/sources/default-local.properties", "local.properties"] # Копирует ваш файл по умолчанию сразу после клонирования репозитория
     after_add:
-      - rel_copy: ["local.properties"] # Наследовать существующий файл репозитория в worktree
+      - copy: ["source_path('local.properties')", "local.properties"] # Наследовать существующий файл репозитория в worktree
 ```
 Вы можете иметь несколько подсекций `when` в действиях. После clone/add библиотека проходит сверху вниз и выполняет все действия с соответствующими условиями `when`.
 Другие функции, доступные в секции действий:
 | Action | Description | Example |
 |--------|-------------|---------|
-| `abs_copy` | Копировать файл из абсолютного пути в относительное место назначения в целевой директории | `abs_copy: ["~/sources/default-local.properties", "local.properties"]` |
-| `rel_copy` | Копировать файл из исходного репозитория в worktree (относительные пути) | `rel_copy: ["local.properties"]` или `rel_copy: ["config.template", "config"]` |
+| `copy` | Копировать файл или дерево каталогов из шаблонного источника в шаблонное назначение (относительно `current_worktree()`) | `copy: ["source_path('local.properties')", "local.properties"]` или `copy: ["~/sources/default-local.properties", "local.properties"]` |
 | `command` | Выполнить внешнюю команду (запускается в директории назначения, функции шаблонов доступны) | `command: "npm install"` или `command: "claude init"` |
 
 Каждое правило действий также принимает необязательный флаг `critical:` (по умолчанию `true`). Когда `true`, ошибка в любом действии правила прерывает оставшиеся действия этого правила и команда завершается с кодом `1`. Установите `critical: false` для некритичных правил — ошибки сообщаются в сводке выполнения действий, но команда всё равно завершается с `0`. Полную таблицу кодов выхода см. в [Обработке ошибок](#-обработка-ошибок) ниже.
@@ -245,16 +244,16 @@ actions:
 ```
 
 ##### 🪓 `before_remove` — действия очистки перед `gww remove`
-Третий вид действий, `before_remove`, запускает пользовательские шаги очистки **до** того, как `git worktree remove` удалит worktree. Используйте его для архивации worktree, отправки уведомления, запуска хука и т. п. Применяется тот же механизм `critical:` / `command:` / `rel_copy:` / `abs_copy:`; критичная ошибка `before_remove` прерывает удаление и завершается с кодом `1`, некритичная ошибка сообщается, но удаление всё равно продолжается. `--force` действует только на git и *не* обходит `before_remove`.
+Третий вид действий, `before_remove`, запускает пользовательские шаги очистки **до** того, как `git worktree remove` удалит worktree. Используйте его для архивации worktree, отправки уведомления, запуска хука и т. п. Применяется тот же механизм `critical:` / `command:` / `copy:`; критичная ошибка `before_remove` прерывает удаление и завершается с кодом `1`, некритичная ошибка сообщается, но удаление всё равно продолжается. `--force` действует только на git и *не* обходит `before_remove`.
 
-В правилах `before_remove` `dest_path()` — это удаляемый worktree, `source_path()` — родительский исходный репозиторий, а `branch()` возвращает текущую ветку worktree (или `""` для отсоединённого HEAD). Команда `gww remove` также принимает `--tag key=value`, который попадает в предикаты `tag()` / `tag_exist()`, так что очистка для конкретного вызова может управляться тегами.
+В правилах `before_remove` `current_worktree()` — это удаляемый worktree, `source_path()` — родительский исходный репозиторий, а `branch()` возвращает текущую ветку worktree (или `""` для отсоединённого HEAD). Команда `gww remove` также принимает `--tag key=value`, который попадает в предикаты `tag()` / `tag_exist()`, так что очистка для конкретного вызова может управляться тегами.
 
 ```yml
 actions:
   # Критичное: заархивировать worktree перед тем, как `gww remove` его удалит.
   - when: 'tag_exist("archive")'
     before_remove:
-      - command: "tar -czf ~/archives/norm_branch()-time_id('%Y%m%d').tar.gz dest_path()"
+      - command: "tar -czf ~/archives/norm_branch()-time_id('%Y%m%d').tar.gz current_worktree()"
 
   # Некритичное: уведомить Slack. Ошибка уведомления не должна блокировать удаление.
   - when: tag("notify") == "slack"
@@ -283,8 +282,8 @@ actions:
 
 | Function | Description | Example |
 |----------|-------------|---------|
-| `source_path()` | Получить абсолютный путь к исходному репозиторию или корню worktree | `source_path()` → `"/path/to/repo"` |
-| `dest_path()` | Получить абсолютный путь к назначению (цель clone или worktree) | `dest_path()` → `"/path/to/worktree"` |
+| `source_path(extra?)` | Получить абсолютный путь к исходному репозиторию, опционально с присоединённым `extra` | `source_path()` → `"/path/to/repo"`, `source_path("local.properties")` → `"/path/to/repo/local.properties"` |
+| `current_worktree(extra?)` | Получить абсолютный путь к текущему worktree, опционально с присоединённым `extra` | `current_worktree()` → `"/path/to/worktree"`, `current_worktree("local.properties")` → `"/path/to/worktree/local.properties"` |
 | `file_exists(path)` | Проверить наличие файла относительно исходного репозитория | `file_exists("local.properties")` → `True` |
 | `dir_exists(path)` | Проверить наличие директории относительно исходного репозитория | `dir_exists("config")` → `True` |
 | `path_exists(path)` | Проверить наличие пути (файл или директория) относительно исходного репозитория | `path_exists("local.properties")` → `True` |
