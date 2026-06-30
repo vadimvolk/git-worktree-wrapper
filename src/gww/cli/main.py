@@ -116,6 +116,13 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Force removal even if worktree has uncommitted changes",
     )
+    remove_parser.add_argument(
+        "-t", "--tag",
+        action="append",
+        default=[],
+        help="Tag in format key=value or just key (can be specified multiple times)",
+        metavar="TAG",
+    )
 
     # pull command
     pull_parser = subparsers.add_parser(

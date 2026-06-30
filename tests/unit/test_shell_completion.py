@@ -597,3 +597,36 @@ class TestRemoveCompletionListsWorktrees:
         # The `__gww_remove_worktrees` helper should be wired into the
         # `complete -a` line for remove.
         assert "(__gww_remove_worktrees)" in remove_section
+
+
+class TestRemoveCommandTagCompletion:
+    """`gww remove` accepts ``--tag key=value`` (ADR-0011) — completion
+    scripts must advertise it so users can discover the flag."""
+
+    def test_bash_remove_lists_tag_option(self) -> None:
+        """Bash: the ``-t|--tag`` ``case`` branch must terminate cleanly
+        (returning 0) so ``-t`` is not completed as a path."""
+        script = generate_bash_completion()
+        # The ``-t|--tag)`` arm lives after the ``remove)`` arm, in the same
+        # ``case "${prev}"`` block. Look for it explicitly.
+        assert "-t|--tag)" in script
+        tag_block = _extract_case_block(script, "-t|--tag)")
+        assert "return 0" in tag_block
+
+    def test_zsh_remove_lists_tag_option(self) -> None:
+        script = generate_zsh_completion()
+        start = script.find("remove)")
+        assert start != -1
+        end = script.find(";;", start)
+        arm = script[start:end]
+        assert "'-t[Tag" in arm
+        assert "'--tag[Tag" in arm
+
+    def test_fish_remove_lists_tag_option(self) -> None:
+        script = generate_fish_completion()
+        remove_arm_start = script.find("# remove completions")
+        assert remove_arm_start != -1
+        next_section = script.find("# migrate", remove_arm_start)
+        assert next_section != -1
+        remove_section = script[remove_arm_start:next_section]
+        assert "-s t -l tag" in remove_section

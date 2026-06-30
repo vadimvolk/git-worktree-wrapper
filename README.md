@@ -218,7 +218,7 @@ Generates nested structure: `YYYY/HH-MM.ss/host()-path(-2)-path(-1)-norm-branch(
 
 
 #### ⚙️ Actions (available in `actions` section)
-Run actions after checking out a repository or adding a worktree. Common example: copying `local.properties` for Gradle projects.
+Run actions after checking out a repository, after adding a worktree, or **before removing a worktree**. Common example: copying `local.properties` for Gradle projects.
 ```yml
 actions:
   - when: file_exists("settings.gradle") # Check if it's actually a Gradle project
@@ -243,6 +243,31 @@ actions:
     after_clone:
       - command: "npm install"
 ```
+
+##### 🪓 `before_remove` — cleanup actions before `gww remove`
+A third action kind, `before_remove`, runs user-defined cleanup steps **before** `git worktree remove` deletes the worktree. Use it to archive the worktree, post a notification, run a hook, etc. The same `critical:` / `command:` / `rel_copy:` / `abs_copy:` machinery applies; a critical `before_remove` failure aborts the remove and exits `1`, a non-critical failure is reported but the remove still proceeds. `--force` is git-only and does *not* bypass `before_remove`.
+
+In `before_remove` rules, `dest_path()` is the worktree being removed, `source_path()` is its parent source repo, and `branch()` resolves to the worktree's currently checked-out branch (or `""` on detached HEAD). The `gww remove` command also accepts `--tag key=value`, which flows into `tag()` / `tag_exist()` predicates so per-call cleanup can be tag-driven.
+
+```yml
+actions:
+  # Critical: archive the worktree before letting `gww remove` delete it.
+  - when: 'tag_exist("archive")'
+    before_remove:
+      - command: "tar -czf ~/archives/norm_branch()-time_id('%Y%m%d').tar.gz dest_path()"
+
+  # Non-critical: notify a Slack channel. A failed notification should not block the remove.
+  - when: tag("notify") == "slack"
+    critical: false
+    before_remove:
+      - command: "curl -sf -X POST https://hooks.slack.com/... -d branch=branch()"
+
+  # Path-based remove: when removing by absolute path, `branch()` still resolves.
+  - when: branch() == "main"
+    before_remove:
+      - command: "echo refusing to remove main branch"
+```
+> Note: `gww remove` accepts an absolute worktree path as well as a branch name. When invoked with a path, `branch()` reads the worktree's current branch via `git rev-parse --abbrev-ref HEAD` and falls back to `""` for detached HEAD, so predicates referencing `branch()` never raise.
 
 #### ❗ Failure handling
 Action failures are reported per-rule, grouped at the end of the action loop on stderr as the **action execution summary**. The summary lists every failing rule by its index in `actions:`, its criticality flag, and the failing action's error. Its non-emptiness also gates the success line: `say()` (the line scripts `cd $(gwc …)`) is suppressed whenever the summary has any entry, so `cd` only ever lands on a fully-configured worktree.
@@ -309,7 +334,7 @@ gwa feature-branch --tag review
 |---------|-------------|
 | `gwc <uri> [--tag key=value]...` | 📥 Clone repository to configured location (tags available in templates/conditions) |
 | `gwa <branch> [-c] [--tag key=value]...` | ➕ Add worktree for branch (optionally create branch, tags available in templates/conditions) |
-| `gwr <branch\|path> [-f]` | ➖ Remove worktree |
+| `gwr <branch\|path> [-f] [--tag key=value]...` | ➖ Remove worktree (tags available in `before_remove` predicates) |
 | `gww pull` | 🔄 Update source repository (works from worktrees if source is clean and on main/master) |
 | `gww migrate <path>... [--dry-run] [--copy \| --inplace]` | 🚚 Migrate repositories to new locations |
 | `gww init config` | ⚙️ Create default configuration file |

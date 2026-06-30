@@ -145,6 +145,10 @@ _{APP_NAME}_completions() {{
             fi
             return 0
             ;;
+        -t|--tag)
+            # Tag value is a free-form key[=value]; no completion to offer.
+            return 0
+            ;;
         init)
             COMPREPLY=( $(compgen -W "config shell" -- "${{cur}}") )
             return 0
@@ -263,6 +267,8 @@ _{APP_NAME}() {{
                     _arguments \\
                         '-f[Force removal]' \\
                         '--force[Force removal]' \\
+                        '-t[Tag in key=value form]:tag:' \\
+                        '--tag[Tag in key=value form]:tag:' \\
                         '1:branch or path:_{APP_NAME}_worktrees'
                     ;;
                 pull)
@@ -384,6 +390,7 @@ function __{APP_NAME}_remove_worktrees
     git worktree list --porcelain 2>/dev/null | awk -v skip=1 '{_FISH_REMOVE_AWK}'
 end
 complete -c {APP_NAME} -n '__fish_seen_subcommand_from remove' -s f -l force -d 'Force removal'
+complete -c {APP_NAME} -n '__fish_seen_subcommand_from remove' -s t -l tag -d 'Tag in key=value form'
 complete -c {APP_NAME} -n '__fish_seen_subcommand_from remove' -a '(__{APP_NAME}_remove_worktrees)'
 
 # migrate completions

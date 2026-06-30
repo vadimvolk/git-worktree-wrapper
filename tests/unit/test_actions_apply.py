@@ -92,6 +92,59 @@ class TestApplyActionsMatching:
         assert isinstance(bundles[0].actions[0], CommandAction)
         assert bundles[0].actions[0].command == "add-cmd"
 
+    def test_before_remove_kind_returns_only_before_remove_actions(
+        self, tmp_path: Path,
+    ) -> None:
+        """``apply_actions(kind="before_remove")`` must read the rule's
+        ``before_remove`` field, not ``after_clone``/``after_add``."""
+        rule = ProjectRule(
+            when="True",
+            after_clone=[RawAction(action_type="command", args=["clone-cmd"])],
+            after_add=[RawAction(action_type="command", args=["add-cmd"])],
+            before_remove=[
+                RawAction(action_type="command", args=["before-remove-cmd"]),
+            ],
+        )
+
+        bundles = apply_actions([rule], _ctx(tmp_path), kind="before_remove")
+
+        assert len(bundles) == 1
+        assert len(bundles[0].actions) == 1
+        assert isinstance(bundles[0].actions[0], CommandAction)
+        assert bundles[0].actions[0].command == "before-remove-cmd"
+
+    def test_rule_with_only_after_clone_emits_empty_bundle_for_before_remove(
+        self, tmp_path: Path,
+    ) -> None:
+        """A rule that matches but only has ``after_clone`` actions must still
+        emit a bundle for ``kind="before_remove"`` — the bundle's
+        ``actions`` list is just empty. Mirrors the after_clone/after_add
+        symmetry."""
+        rule = ProjectRule(
+            when="True",
+            after_clone=[RawAction(action_type="command", args=["clone-only"])],
+        )
+
+        bundles = apply_actions([rule], _ctx(tmp_path), kind="before_remove")
+
+        assert len(bundles) == 1
+        assert bundles[0].actions == []
+
+    def test_matcher_error_on_before_remove_command_template(
+        self, tmp_path: Path,
+    ) -> None:
+        """A ``before_remove`` command whose template fails to evaluate
+        propagates as ``MatcherError`` (same path as ``after_clone``)."""
+        rule = ProjectRule(
+            when="True",
+            before_remove=[
+                RawAction(action_type="command", args=["echo undefined_var()"]),
+            ],
+        )
+
+        with pytest.raises(MatcherError, match="Error evaluating command template"):
+            apply_actions([rule], _ctx(tmp_path), kind="before_remove")
+
     def test_preserves_action_order(self, tmp_path: Path) -> None:
         rule = ProjectRule(
             when="True",

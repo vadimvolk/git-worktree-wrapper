@@ -48,10 +48,14 @@ class ProjectRule:
 
     Attributes:
         when: Expression evaluated against the :class:`TemplateContext`
-            populated by the calling command (``clone`` or ``add``). Sees
-            URI, branch, tags, source path, and destination path.
+            populated by the calling command (``clone``, ``add``, or
+            ``remove``). Sees URI, branch, tags, source path, and
+            destination path.
         after_clone: Actions executed after source checkout.
         after_add: Actions executed when worktree is added.
+        before_remove: Actions executed before a worktree is removed by
+            ``gww remove``. Allows cleanup (archive, notify, stash) before
+            ``git worktree remove`` deletes the worktree. ADR-0011.
         critical: Whether failures in this rule abort the command with exit 1.
             Defaults to ``True`` so that a fresh rule behaves like a setup
             step that must succeed. Set to ``False`` for best-effort rules
@@ -61,6 +65,7 @@ class ProjectRule:
     when: str
     after_clone: list[Action] = field(default_factory=list)
     after_add: list[Action] = field(default_factory=list)
+    before_remove: list[Action] = field(default_factory=list)
     critical: bool = True
 
 
@@ -264,15 +269,26 @@ def _validate_project_rule(data: Any, index: int) -> ProjectRule:
             action = _validate_action(action_data, f"{context}.after_add[{i}]")
             after_add.append(action)
 
-    if not after_clone and not after_add:
+    before_remove: list[Action] = []
+    if "before_remove" in data:
+        actions_data = data["before_remove"]
+        if not isinstance(actions_data, list):
+            raise ConfigValidationError(f"{context}.before_remove must be a list")
+        for i, action_data in enumerate(actions_data):
+            action = _validate_action(action_data, f"{context}.before_remove[{i}]")
+            before_remove.append(action)
+
+    if not after_clone and not after_add and not before_remove:
         raise ConfigValidationError(
-            f"{context} must have at least one of: after_clone, after_add"
+            f"{context} must have at least one of: after_clone, after_add, "
+            f"before_remove"
         )
 
     return ProjectRule(
         when=when,
         after_clone=after_clone,
         after_add=after_add,
+        before_remove=before_remove,
         critical=critical,
     )
 

@@ -218,13 +218,13 @@ worktrees: ~/Downloads/temp/worktrees/time_id("%Y")/time_id("%m")/time_id("%H-%M
 
 
 #### ⚙️ Действия (доступны в секции `actions`)
-Запускать действия после клонирования репозитория или добавления worktree. Распространенный пример: копирование `local.properties` для проектов Gradle.
+Запускать действия после клонирования репозитория, после добавления worktree или **перед удалением worktree**. Распространенный пример: копирование `local.properties` для проектов Gradle.
 ```yml
 actions:
   - when: file_exists("settings.gradle") # Проверить, что это действительно проект Gradle
     after_clone:
       - abs_copy: ["~/sources/default-local.properties", "local.properties"] # Копирует ваш файл по умолчанию сразу после клонирования репозитория
-    after_add: 
+    after_add:
       - rel_copy: ["local.properties"] # Наследовать существующий файл репозитория в worktree
 ```
 Вы можете иметь несколько подсекций `when` в действиях. После clone/add библиотека проходит сверху вниз и выполняет все действия с соответствующими условиями `when`.
@@ -243,6 +243,31 @@ actions:
     after_clone:
       - command: "npm install"
 ```
+
+##### 🪓 `before_remove` — действия очистки перед `gww remove`
+Третий вид действий, `before_remove`, запускает пользовательские шаги очистки **до** того, как `git worktree remove` удалит worktree. Используйте его для архивации worktree, отправки уведомления, запуска хука и т. п. Применяется тот же механизм `critical:` / `command:` / `rel_copy:` / `abs_copy:`; критичная ошибка `before_remove` прерывает удаление и завершается с кодом `1`, некритичная ошибка сообщается, но удаление всё равно продолжается. `--force` действует только на git и *не* обходит `before_remove`.
+
+В правилах `before_remove` `dest_path()` — это удаляемый worktree, `source_path()` — родительский исходный репозиторий, а `branch()` возвращает текущую ветку worktree (или `""` для отсоединённого HEAD). Команда `gww remove` также принимает `--tag key=value`, который попадает в предикаты `tag()` / `tag_exist()`, так что очистка для конкретного вызова может управляться тегами.
+
+```yml
+actions:
+  # Критичное: заархивировать worktree перед тем, как `gww remove` его удалит.
+  - when: 'tag_exist("archive")'
+    before_remove:
+      - command: "tar -czf ~/archives/norm_branch()-time_id('%Y%m%d').tar.gz dest_path()"
+
+  # Некритичное: уведомить Slack. Ошибка уведомления не должна блокировать удаление.
+  - when: tag("notify") == "slack"
+    critical: false
+    before_remove:
+      - command: "curl -sf -X POST https://hooks.slack.com/... -d branch=branch()"
+
+  # Удаление по пути: когда удаляем по абсолютному пути, `branch()` всё равно разрешается.
+  - when: branch() == "main"
+    before_remove:
+      - command: "echo refusing to remove main branch"
+```
+> Примечание: `gww remove` принимает как абсолютный путь к worktree, так и имя ветки. При вызове с путём `branch()` читает текущую ветку worktree через `git rev-parse --abbrev-ref HEAD` и возвращает `""` для отсоединённого HEAD, поэтому предикаты с `branch()` никогда не падают.
 
 #### ❗ Обработка ошибок
 Ошибки действий сообщаются по правилам, сгруппированно в конце цикла действий в stderr как **сводка выполнения действий**. Сводка перечисляет каждое упавшее правило по его индексу в `actions:`, флагу критичности и ошибке упавшего действия. Непустота сводки также блокирует строку успеха: `say()` (строка, в которую скрипты делают `cd $(gwc …)`) подавляется, если в сводке есть хотя бы одна запись, поэтому `cd` всегда попадает в полностью настроенный worktree.
@@ -309,7 +334,7 @@ gwa feature-branch --tag review
 |---------|-------------|
 | `gwc <uri> [--tag key=value]...` | 📥 Клонировать репозиторий в настроенную локацию (теги доступны в шаблонах/условиях) |
 | `gwa <branch> [-c] [--tag key=value]...` | ➕ Добавить worktree для ветки (опционально создать ветку, теги доступны в шаблонах/условиях) |
-| `gwr <branch\|path> [-f]` | ➖ Удалить worktree |
+| `gwr <branch\|path> [-f] [--tag key=value]...` | ➖ Удалить worktree (теги доступны в `before_remove`-предикатах) |
 | `gww pull` | 🔄 Обновить исходный репозиторий (работает из worktree, если исходный репозиторий чист и на main/master) |
 | `gww migrate <path>... [--dry-run] [--copy \| --inplace]` | 🚚 Мигрировать репозитории в новые локации |
 | `gww init config` | ⚙️ Создать конфиг по умолчанию |

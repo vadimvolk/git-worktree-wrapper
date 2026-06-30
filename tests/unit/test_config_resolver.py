@@ -894,3 +894,107 @@ class TestProjectRuleCritical:
                     {"command": "echo", "critical": True},
                 ]},
             ]))
+
+
+class TestProjectRuleBeforeRemove:
+    """Schema tests for the new ``before_remove`` action kind (ADR-0011).
+
+    ``before_remove`` lives alongside ``after_clone``/``after_add`` in project
+    rules — every existing per-action validation must apply to it as well,
+    including the "at least one of" rule guard.
+    """
+
+    @staticmethod
+    def _base_config(actions: object) -> dict[str, object]:
+        return {
+            "default_sources": "~/sources/default/path(-1)",
+            "default_worktrees": "~/worktrees/default",
+            "actions": actions,
+        }
+
+    def test_rule_with_only_before_remove_is_accepted(self) -> None:
+        """A rule that *only* has ``before_remove`` is valid — no
+        ``after_clone``/``after_add`` required."""
+        config = validate_config(self._base_config([
+            {"when": "True", "before_remove": [{"command": "echo"}]},
+        ]))
+
+        assert len(config.actions) == 1
+        assert len(config.actions[0].before_remove) == 1
+        assert config.actions[0].before_remove[0].action_type == "command"
+
+    def test_rule_with_after_clone_and_before_remove_is_accepted(self) -> None:
+        config = validate_config(self._base_config([
+            {"when": "True", "after_clone": [
+                {"command": "echo a"},
+            ], "before_remove": [
+                {"command": "echo b"},
+            ]},
+        ]))
+
+        assert len(config.actions[0].after_clone) == 1
+        assert len(config.actions[0].before_remove) == 1
+
+    def test_critical_propagates_to_before_remove(self) -> None:
+        config = validate_config(self._base_config([
+            {"when": "True", "critical": False,
+             "before_remove": [{"command": "echo"}]},
+        ]))
+
+        assert config.actions[0].critical is False
+
+    def test_before_remove_must_be_a_list(self) -> None:
+        """A scalar or mapping under ``before_remove`` is rejected up front."""
+        with pytest.raises(
+            ConfigValidationError,
+            match=r"\.before_remove must be a list",
+        ):
+            validate_config(self._base_config([
+                {"when": "True", "before_remove": "not a list"},
+            ]))
+
+    def test_before_remove_action_without_action_key_is_rejected(self) -> None:
+        """``before_remove`` shares the per-action validation rules with the
+        existing kinds — an empty mapping has zero keys, not one."""
+        with pytest.raises(
+            ConfigValidationError,
+            match=r"action must have exactly one key",
+        ):
+            validate_config(self._base_config([
+                {"when": "True", "before_remove": [{}]},
+            ]))
+
+    def test_before_remove_unknown_action_type_is_rejected(self) -> None:
+        with pytest.raises(
+            ConfigValidationError,
+            match=r"invalid action type",
+        ):
+            validate_config(self._base_config([
+                {"when": "True", "before_remove": [{"not_a_type": []}]},
+            ]))
+
+    def test_critical_on_before_remove_action_is_rejected(self) -> None:
+        """The per-action ``critical`` rejection applies to ``before_remove`` too."""
+        with pytest.raises(
+            ConfigValidationError,
+            match=r"'critical' is only valid at the rule level",
+        ):
+            validate_config(self._base_config([
+                {"when": "True", "before_remove": [
+                    {"command": "echo", "critical": True},
+                ]},
+            ]))
+
+    def test_rule_with_only_empty_before_remove_still_fails_at_least_one_guard(
+        self,
+    ) -> None:
+        """An empty ``before_remove`` list alone must NOT satisfy the
+        "at least one of" guard — the rule is then indistinguishable from one
+        that declares no actions at all."""
+        with pytest.raises(
+            ConfigValidationError,
+            match=r"must have at least one of",
+        ):
+            validate_config(self._base_config([
+                {"when": "True", "before_remove": []},
+            ]))

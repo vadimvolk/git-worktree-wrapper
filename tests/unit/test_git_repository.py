@@ -19,6 +19,7 @@ from gww.git.repository import (
     get_source_repository,
     get_remote_uri,
     get_current_branch,
+    try_get_current_branch,
     is_clean,
     get_current_commit,
     detect_repository,
@@ -547,3 +548,39 @@ class TestPullRepositoryPassThrough:
         kwargs = mock_run.call_args.kwargs
         assert kwargs["stdout"] is None
         assert kwargs["stderr"] is None
+
+
+class TestTryGetCurrentBranch:
+    """``try_get_current_branch`` is the soft-fail variant used by
+    ``gww remove`` to look up the branch on a worktree path before applying
+    ``before_remove`` actions. It must return ``""`` instead of raising on
+    detached HEAD."""
+
+    def test_returns_branch_on_source_repo(self, git_repo: Path) -> None:
+        assert try_get_current_branch(git_repo) in ("main", "master")
+
+    def test_returns_branch_on_worktree(self, git_repo: Path, tmp_path: Path) -> None:
+        """ADR-0011: ``gww remove`` calls ``try_get_current_branch(worktree_path)``."""
+        subprocess.run(
+            ["git", "branch", "feature/lookup"], cwd=git_repo,
+            check=True, capture_output=True,
+        )
+        wt = tmp_path / "wt"
+        subprocess.run(
+            ["git", "worktree", "add", str(wt), "feature/lookup"],
+            cwd=git_repo, check=True, capture_output=True,
+        )
+
+        assert try_get_current_branch(wt) == "feature/lookup"
+
+    def test_returns_empty_string_on_detached_head(self, git_repo: Path) -> None:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=git_repo,
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        subprocess.run(
+            ["git", "checkout", "--detach", commit],
+            cwd=git_repo, check=True, capture_output=True,
+        )
+
+        assert try_get_current_branch(git_repo) == ""
