@@ -72,7 +72,7 @@ gww --help
 gww init config
 ```
 
-Это создаст конфигурационный файл по умолчанию в `~/.config/gww/config.yml` (Linux) или `~/Library/Application Support/gww/config.yml` (macOS). Отредактируйте эти 2 значения: `default_sources` и `default_worktrees`. Проверьте [раздел с руководством](#tutorial) для деталей маршрутизации.
+Это создаст конфигурационный файл по умолчанию в `~/.config/gww/config.yml` (Linux), `~/Library/Application Support/gww/config.yml` (macOS) или `%APPDATA%\gww\config.yml` (Windows). На любой платформе установка `XDG_CONFIG_HOME` в абсолютный путь переопределяет путь по умолчанию и сохраняет конфиг там. Отредактируйте эти 2 значения: `default_sources` и `default_worktrees`. Проверьте [раздел с руководством](#tutorial) для деталей маршрутизации.
 
 ### 2. 🐚 Инициализировать интеграцию с shell
 

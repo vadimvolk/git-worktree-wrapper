@@ -72,7 +72,7 @@ gww --help
 gww init config
 ```
 
-This creates a default configuration file at `~/.config/gww/config.yml` (Linux) or `~/Library/Application Support/gww/config.yml` (macOS). Edit these 2 values: `default_sources` and `default_worktrees`. Check the [tutorial section](#tutorial) for routing details.
+This creates a default configuration file at `~/.config/gww/config.yml` (Linux), `~/Library/Application Support/gww/config.yml` (macOS), or `%APPDATA%\gww\config.yml` (Windows). On any platform, exporting `XDG_CONFIG_HOME` to an absolute path overrides the default and stores the config there instead. Edit these 2 values: `default_sources` and `default_worktrees`. Check the [tutorial section](#tutorial) for routing details.
 
 ### 2. 🐚 Initialize Shell Integration
 
