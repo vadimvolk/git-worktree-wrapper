@@ -1,0 +1,3 @@
+# Always repaint the fish prompt at the end of every generated alias
+
+Every generated fish alias (`gwc`, `gwa`, `gwr`) ends with `commandline -f repaint` inside every terminal branch — before every `return` and at the tail of every return-less branch. The bash and zsh generators do not emit the equivalent: their prompts re-evaluate automatically on the next command and they have no queue-based repaint primitive. We picked the unconditional-every-branch rule for fish so the prompt stays correct even when it renders derived state (worktree count, git status) that the alias may have changed without `cd`-ing.

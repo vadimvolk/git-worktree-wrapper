@@ -648,6 +648,7 @@ function gwc --wraps="{APP_NAME} clone" --description "Clone a repository and na
             read -P "Navigate to $target_path? [Y/n] " reply
             if test -z "$reply" -o "$reply" = "y" -o "$reply" = "Y"
                 cd "$target_path"
+                commandline -f repaint
             end
         end
     else
@@ -670,6 +671,7 @@ function gwa --wraps="{APP_NAME} add" --description "Add a worktree and navigate
             read -P "Navigate to $target_path? [Y/n] " reply
             if test -z "$reply" -o "$reply" = "y" -o "$reply" = "Y"
                 cd "$target_path"
+                commandline -f repaint
             end
         end
     else
@@ -690,18 +692,22 @@ function gwr --wraps="{APP_NAME} remove" --description "Remove a worktree (promp
     set -l exit_code $status
     if test $exit_code -eq 0
         rm -f $errfile
+        commandline -f repaint
     else if grep -q -E "uncommitted changes|untracked files" $errfile
         cat $errfile >&2
         rm -f $errfile
         read -P "Force removal? [y/N] " reply
         if test "$reply" = "y" -o "$reply" = "Y"
             command {APP_NAME} remove --force $argv
+            commandline -f repaint
         else
+            commandline -f repaint
             return 1
         end
     else
         cat $errfile >&2
         rm -f $errfile
+        commandline -f repaint
         return $exit_code
     end
 end
