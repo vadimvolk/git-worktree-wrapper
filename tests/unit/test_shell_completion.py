@@ -15,9 +15,12 @@ from gww.utils.shell import (
     _FISH_REMOVE_AWK,
     _ZSH_REMOVE_AWK,
     get_completion_path,
+    generate_bash_aliases,
     generate_bash_completion,
-    generate_zsh_completion,
+    generate_fish_aliases,
     generate_fish_completion,
+    generate_zsh_aliases,
+    generate_zsh_completion,
     generate_completion,
     install_completion,
     get_installation_instructions,
@@ -630,3 +633,110 @@ class TestRemoveCommandTagCompletion:
         assert next_section != -1
         remove_section = script[remove_arm_start:next_section]
         assert "-s t -l tag" in remove_section
+
+
+class TestFishAliasPromptRepaint:
+    """ADR-0013: every fish alias must end every terminal branch with
+    ``commandline -f repaint`` so the prompt redraws after navigation.
+    Bash and zsh aliases must NOT receive the call: their prompts re-evaluate
+    automatically and they have no queue-based repaint primitive.
+    """
+
+    @staticmethod
+    def _line_index(lines: list[str], needle: str) -> int:
+        """Return the index of the first line that contains ``needle``.
+
+        Raises ``AssertionError`` if no line matches; useful to express
+        "X appears before Y" without leaning on textual ordering tricks.
+        """
+        for i, line in enumerate(lines):
+            if needle in line:
+                return i
+        raise AssertionError(f"line containing {needle!r} not found")
+
+    def test_gwc_contains_repaint(self) -> None:
+        """``gwc`` calls ``commandline -f repaint`` exactly once."""
+        script = generate_fish_aliases()["gwc"]
+        assert script.count("commandline -f repaint") == 1
+
+    def test_gwa_contains_repaint(self) -> None:
+        """``gwa`` calls ``commandline -f repaint`` exactly once."""
+        script = generate_fish_aliases()["gwa"]
+        assert script.count("commandline -f repaint") == 1
+
+    def test_gwr_contains_repaint_per_terminal_branch(self) -> None:
+        """``gwr`` calls ``commandline -f repaint`` once per terminal branch
+        (clean-remove, force-accept, decline, error-return) — four total.
+        See ADR-0013 §"placement rule"."""
+        script = generate_fish_aliases()["gwr"]
+        count = script.count("commandline -f repaint")
+        # Spec floor in the handoff: at least three occurrences (one per
+        # terminal branch as described). The implementation emits four
+        # (clean-remove, force-accept, decline, error-return) — assert
+        # the actual placement rather than a bare count.
+        assert count >= 3, f"expected >= 3 repaint calls in gwr, got {count}"
+
+    def test_gwc_repaint_runs_after_cd(self) -> None:
+        """``gwc`` must repaint AFTER it has changed directory.
+
+        Guard against someone moving the call to the top of the function
+        — the prompt would render against the stale PWD.
+        """
+        lines = generate_fish_aliases()["gwc"].splitlines()
+        cd_idx = self._line_index(lines, 'cd "$target_path"')
+        repaint_idx = self._line_index(lines, "commandline -f repaint")
+        assert cd_idx < repaint_idx, (
+            "repaint must come after cd so the prompt reflects the new PWD"
+        )
+
+    def test_gwa_repaint_runs_after_cd(self) -> None:
+        """``gwa`` must repaint AFTER it has changed directory."""
+        lines = generate_fish_aliases()["gwa"].splitlines()
+        cd_idx = self._line_index(lines, 'cd "$target_path"')
+        repaint_idx = self._line_index(lines, "commandline -f repaint")
+        assert cd_idx < repaint_idx, (
+            "repaint must come after cd so the prompt reflects the new PWD"
+        )
+
+    def test_gwr_repaint_precedes_every_return(self) -> None:
+        """``gwr`` repaints immediately before each ``return`` statement.
+
+        The force-decline branch returns 1 and the error branch returns
+        $exit_code — both must repaint just before. Catches a regression
+        where someone writes the repaint at the wrong indent level or
+        attaches it to the wrong branch.
+        """
+        lines = generate_fish_aliases()["gwr"].splitlines()
+
+        for return_needle in ("return 1", "return $exit_code"):
+            return_idx = self._line_index(lines, return_needle)
+            # Walk backwards to find the nearest preceding line that is
+            # neither blank nor a trailing comment.
+            prev_idx = return_idx - 1
+            while prev_idx >= 0 and (
+                lines[prev_idx].strip() == ""
+                or lines[prev_idx].lstrip().startswith("#")
+            ):
+                prev_idx -= 1
+            assert prev_idx >= 0, f"no preceding line before {return_needle!r}"
+            assert "commandline -f repaint" in lines[prev_idx], (
+                f"expected repaint immediately before {return_needle!r}, "
+                f"found: {lines[prev_idx]!r}"
+            )
+
+    def test_bash_aliases_have_no_repaint(self) -> None:
+        """Bash aliases must NOT call ``commandline -f repaint``.
+
+        Bash's PS1 re-evaluates automatically on the next prompt; the
+        fish-specific queue-based repaint has no equivalent there.
+        """
+        script = generate_bash_aliases()
+        assert "commandline" not in script
+        assert "repaint" not in script
+
+    def test_zsh_aliases_have_no_repaint(self) -> None:
+        """Zsh aliases must NOT call ``commandline -f repaint`` for the
+        same reason as bash (PROMPT/RPROMPT re-evaluate automatically)."""
+        script = generate_zsh_aliases()
+        assert "commandline" not in script
+        assert "repaint" not in script
