@@ -25,7 +25,36 @@ A CLI tool that wraps git worktree functionality with configurable path template
 
 ## 📦 Installation
 
-### Install the CLI (recommended)
+### Install from PyPI (recommended)
+
+The package is published on PyPI as `git-worktree-wrapper`; the CLI
+command it installs is `gww`.
+
+#### Using uv
+
+```bash
+uv tool install git-worktree-wrapper
+gww --help
+```
+
+#### Using pipx
+
+```bash
+pipx install git-worktree-wrapper
+gww --help
+```
+
+#### Using pip
+
+```bash
+python -m pip install --user git-worktree-wrapper
+gww --help
+```
+
+### From Git (no PyPI)
+
+Use this if you need a specific commit or branch that hasn't been
+released yet.
 
 #### Using uv
 
