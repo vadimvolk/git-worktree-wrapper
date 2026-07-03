@@ -104,7 +104,7 @@ toml = [
 ]
 
 [[package]]
-name = "gww"
+name = "git-worktree-wrapper"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

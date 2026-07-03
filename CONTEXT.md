@@ -94,3 +94,21 @@ So `source_path()` and `current_worktree()` happen to coincide in `clone` and di
 **Prompt repaint**:
 The `commandline -f repaint` line at the end of every generated fish alias (`gwc`, `gwa`, `gwr`). It queues fish's `repaint` input function, forcing the prompt to redraw after the alias returns. Bash and zsh generated aliases do not include this call: their prompts re-evaluate automatically on the next command and have no equivalent queue-based repaint primitive. The fish call appears inside every terminal branch of each alias — before every `return` and at the tail of every return-less branch — so it fires regardless of which branch the alias took (success, force-accept, force-decline, error-return). Placing it earlier than the work that changed prompt-relevant state (the `cd` for `gwc`/`gwa`; the `git worktree add/remove` for all three, since the prompt may render derived state such as the worktree count) would repaint against a still-stale prompt. See ADR-0013.
 _Avoid_: redraw, refresh (less precise about the queueing mechanism); `$PWD reset` (the issue is not the variable — fish has updated it — but the on-screen prompt render).
+
+## Distribution
+
+**Release**:
+A new version of `gww` published to GitHub Releases and PyPI. Triggered by pushing a `vX.Y.Z` tag; produces a sdist + per-Python-version wheels as GitHub Release artifacts and a `gww` package on PyPI. The published version is read from `[project].version` in `pyproject.toml`, which the workflow asserts matches the stripped tag — the tag is the trigger, the file is the source of truth.
+_Avoid_: deploy, publish (use for the PyPI side specifically), ship (too informal).
+
+**Release trigger**:
+The git tag push that initiates a release, of the form `vX.Y.Z` (SemVer, `v` prefix). Annotated tags are not required; lightweight tags work because the workflow reads the version from `pyproject.toml`, not from the tag object.
+_Avoid_: version bump (that's the file edit, not the trigger), release commit.
+
+**Trusted Publishing**:
+PyPI's OIDC-based authentication for upload workflows. PyPI issues a short-lived token to the `release.yml` workflow run based on the repository, workflow file path, and `pypi` GitHub Environment; no long-lived API token exists. See ADR-0014.
+_Avoid_: OIDC auth (mechanism, not the product), tokenless upload (PyPI still issues a token — it just lives for one workflow run).
+
+**`pypi` GitHub Environment**:
+A GitHub Environment named `pypi` configured on the repo with a required-reviewer protection rule. The release workflow targets this environment so the OIDC token exchange only succeeds when the run is gated by an approver — even a successful tag push is blocked at the approval step without reviewer consent. See ADR-0014.
+_Avoid_: production environment (PyPI *is* production for this project, but "production" is ambiguous when the repo has no other deploys).

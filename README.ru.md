@@ -25,7 +25,36 @@ CLI-инструмент, который оборачивает функцион
 
 ## 📦 Установка
 
-### Установить CLI (рекомендуется)
+### Установить из PyPI (рекомендуется)
+
+Пакет публикуется на PyPI под именем `git-worktree-wrapper`;
+устанавливаемая CLI-команда — `gww`.
+
+#### Через uv
+
+```bash
+uv tool install git-worktree-wrapper
+gww --help
+```
+
+#### Через pipx
+
+```bash
+pipx install git-worktree-wrapper
+gww --help
+```
+
+#### Через pip
+
+```bash
+python -m pip install --user git-worktree-wrapper
+gww --help
+```
+
+### Из Git (минуя PyPI)
+
+Используйте этот способ, если нужен конкретный коммит или ветка,
+которая ещё не опубликована.
 
 #### Через uv
 
