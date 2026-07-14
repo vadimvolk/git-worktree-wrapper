@@ -13,7 +13,7 @@ The state enabled by the `-v` / `--verbose` flag (repeatable). When on and quiet
 _Avoid_: debug mode, loud mode.
 
 **Pass-through stdout**:
-A boolean parameter on `_run_git`, `clone_repository`, `pull_repository`, `add_worktree`, `remove_worktree`, `prune_worktrees`, `repair_worktrees`, and `CommandAction.run`. When `True`, the subprocess inherits both stdout and stderr from the parent process (so the user sees git's progress and the external command's output in real time); when `False` (the default for internal checks), both streams are captured into `CompletedProcess`. Used only by user-facing call sites in `clone`/`pull`/`add`/`remove`/`migrate`, which pass `pass_through_stdout=not ctx.quiet`.
+A boolean parameter on `run_git` (the single public git runner; see ADR-0020), `clone_repository`, `pull_repository`, `add_worktree`, `remove_worktree`, `prune_worktrees`, `repair_worktrees`, and `CommandAction.run`. When `True`, the subprocess inherits both stdout and stderr from the parent process (so the user sees git's progress and the external command's output in real time); when `False` (the default for internal checks), both streams are captured into `CompletedProcess`. Used only by user-facing call sites in `clone`/`pull`/`add`/`remove`/`migrate`, which pass `pass_through_stdout=not ctx.quiet`.
 _Avoid_: stream stdout (the name is intentionally about the mechanism — *passing the fd through*, not about which stream).
 
 **`say()`**:

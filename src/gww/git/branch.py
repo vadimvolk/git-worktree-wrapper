@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from gww.git.repository import GitCommandError, _run_git
+from gww.git.repository import GitCommandError, run_git
 
 
 class BranchError(Exception):
@@ -37,7 +37,7 @@ def branch_exists(repo_path: Path, branch: str) -> bool:
         True if branch exists.
     """
     # Check local branches
-    result = _run_git(
+    result = run_git(
         ["rev-parse", "--verify", f"refs/heads/{branch}"],
         cwd=repo_path,
         check=False,
@@ -46,7 +46,7 @@ def branch_exists(repo_path: Path, branch: str) -> bool:
         return True
 
     # Check remote branches
-    result = _run_git(
+    result = run_git(
         ["rev-parse", "--verify", f"refs/remotes/origin/{branch}"],
         cwd=repo_path,
         check=False,
@@ -67,7 +67,7 @@ def local_branch_exists(repo_path: Path, branch: str) -> bool:
     Returns:
         True if local branch exists.
     """
-    result = _run_git(
+    result = run_git(
         ["rev-parse", "--verify", f"refs/heads/{branch}"],
         cwd=repo_path,
         check=False,
@@ -86,7 +86,7 @@ def remote_branch_exists(repo_path: Path, branch: str, remote: str = "origin") -
     Returns:
         True if remote branch exists.
     """
-    result = _run_git(
+    result = run_git(
         ["rev-parse", "--verify", f"refs/remotes/{remote}/{branch}"],
         cwd=repo_path,
         check=False,
@@ -117,7 +117,7 @@ def create_branch(
     if start_point:
         args.append(start_point)
 
-    _run_git(args, cwd=repo_path, check=True)
+    run_git(args, cwd=repo_path, check=True)
 
 
 def delete_branch(
@@ -140,7 +140,7 @@ def delete_branch(
         raise BranchNotFoundError(f"Branch '{branch}' not found")
 
     flag = "-D" if force else "-d"
-    _run_git(["branch", flag, branch], cwd=repo_path, check=True)
+    run_git(["branch", flag, branch], cwd=repo_path, check=True)
 
 
 def list_local_branches(repo_path: Path) -> list[str]:
@@ -152,7 +152,7 @@ def list_local_branches(repo_path: Path) -> list[str]:
     Returns:
         List of branch names.
     """
-    result = _run_git(
+    result = run_git(
         ["branch", "--format=%(refname:short)"],
         cwd=repo_path,
         check=True,
@@ -172,7 +172,7 @@ def list_remote_branches(repo_path: Path, remote: str = "origin") -> list[str]:
     Returns:
         List of branch names (without remote prefix).
     """
-    result = _run_git(
+    result = run_git(
         ["branch", "-r", "--format=%(refname:short)"],
         cwd=repo_path,
         check=True,
@@ -201,7 +201,7 @@ def get_tracking_branch(repo_path: Path, branch: str) -> Optional[str]:
     Returns:
         Tracking branch name (e.g., "origin/main") or None.
     """
-    result = _run_git(
+    result = run_git(
         ["rev-parse", "--abbrev-ref", f"{branch}@{{upstream}}"],
         cwd=repo_path,
         check=False,
@@ -223,7 +223,7 @@ def fetch_remote(repo_path: Path, remote: str = "origin") -> None:
     Raises:
         GitCommandError: If command fails.
     """
-    _run_git(["fetch", remote], cwd=repo_path, check=True)
+    run_git(["fetch", remote], cwd=repo_path, check=True)
 
 
 def is_main_branch(branch: str) -> bool:

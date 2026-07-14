@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from gww.git.repository import GitCommandError, _run_git, get_repository_root, is_worktree
+from gww.git.repository import GitCommandError, get_repository_root, is_worktree, run_git
 
 
 def read_gitdir(gitfile: Path) -> Optional[str]:
@@ -119,7 +119,7 @@ def list_worktrees(repo_path: Path) -> list[Worktree]:
     Raises:
         GitCommandError: If command fails.
     """
-    result = _run_git(
+    result = run_git(
         ["worktree", "list", "--porcelain"],
         cwd=repo_path,
         check=True,
@@ -234,7 +234,7 @@ def is_worktree_clean(worktree_path: Path) -> bool:
     Returns:
         True if worktree is clean.
     """
-    result = _run_git(
+    result = run_git(
         ["status", "--porcelain"],
         cwd=worktree_path,
         check=False,
@@ -259,7 +259,7 @@ def add_worktree(
         branch: Branch to checkout in worktree.
         create_branch: If True, create branch if it doesn't exist.
         base_commit: Commit to base new branch on (if create_branch=True).
-        pass_through_stdout: Forwarded to :func:`_run_git`. When ``True``,
+        pass_through_stdout: Forwarded to :func:`run_git`. When ``True``,
             git's ``worktree add`` progress (``Preparing worktree…``) streams
             to the parent process's stderr.
 
@@ -290,7 +290,7 @@ def add_worktree(
         args.append(branch)
 
     try:
-        _run_git(args, cwd=repo_path, check=True, pass_through_stdout=pass_through_stdout)
+        run_git(args, cwd=repo_path, check=True, pass_through_stdout=pass_through_stdout)
     except GitCommandError as e:
         if "already exists" in str(e):
             raise WorktreeExistsError(
@@ -313,7 +313,7 @@ def remove_worktree(
         repo_path: Path to source repository.
         worktree_path: Path to worktree to remove.
         force: If True, remove even if dirty.
-        pass_through_stdout: Forwarded to :func:`_run_git`. When ``True``,
+        pass_through_stdout: Forwarded to :func:`run_git`. When ``True``,
             git's ``worktree remove`` output (if any) streams to the parent
             process's stdout.
 
@@ -339,7 +339,7 @@ def remove_worktree(
         args.append("--force")
     args.append(str(worktree_path))
 
-    _run_git(args, cwd=repo_path, check=True, pass_through_stdout=pass_through_stdout)
+    run_git(args, cwd=repo_path, check=True, pass_through_stdout=pass_through_stdout)
 
 
 def prune_worktrees(repo_path: Path, dry_run: bool = False) -> list[str]:
@@ -356,7 +356,7 @@ def prune_worktrees(repo_path: Path, dry_run: bool = False) -> list[str]:
     if dry_run:
         args.append("--dry-run")
 
-    result = _run_git(args, cwd=repo_path, check=True)
+    result = run_git(args, cwd=repo_path, check=True)
 
     # Parse output for pruned paths
     pruned: list[str] = []
@@ -382,7 +382,7 @@ def repair_worktrees(
         worktree_paths: Optional list of worktree paths to repair. When provided,
             git worktree repair is called with these paths so the repo updates
             to point to the new locations.
-        pass_through_stdout: Forwarded to :func:`_run_git`. When ``True``,
+        pass_through_stdout: Forwarded to :func:`run_git`. When ``True``,
             git's ``worktree repair`` output (if any) streams to the parent
             process's stdout.
 
@@ -392,4 +392,4 @@ def repair_worktrees(
     args = ["worktree", "repair"]
     if worktree_paths:
         args.extend(str(p) for p in worktree_paths)
-    _run_git(args, cwd=repo_path, check=True, pass_through_stdout=pass_through_stdout)
+    run_git(args, cwd=repo_path, check=True, pass_through_stdout=pass_through_stdout)

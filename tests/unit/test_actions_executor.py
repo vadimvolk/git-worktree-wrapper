@@ -251,7 +251,7 @@ class TestCommandAction:
 class TestCommandActionPassThroughStdout:
     """``CommandAction.run`` must let callers opt into streaming subprocess stdout.
 
-    Same contract as ``_run_git``: default keeps both streams captured; with
+    Same contract as ``run_git``: default keeps both streams captured; with
     ``pass_through_stdout=True`` stdout inherits from the parent and stderr
     stays captured so ``ActionError`` can still surface it.
     """

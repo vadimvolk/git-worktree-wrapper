@@ -11,7 +11,7 @@ from gww.git.repository import (
     NotGitRepositoryError,
     GitCommandError,
     Repository,
-    _run_git,
+    run_git,
     is_git_repository,
     get_repository_root,
     is_worktree,
@@ -440,7 +440,7 @@ class TestCloneRepository:
 
 
 class TestRunGitPassThroughStdout:
-    """``_run_git`` must let callers opt into streaming subprocess stdout.
+    """``run_git`` must let callers opt into streaming subprocess stdout.
 
     The default keeps the historic capture-both behavior. When
     ``pass_through_stdout=True``, stdout is inherited from the parent (None)
@@ -461,7 +461,7 @@ class TestRunGitPassThroughStdout:
             "gww.git.repository.subprocess.run",
             return_value=self._fake_completed(),
         ) as mock_run:
-            _run_git(["status"], cwd=tmp_path)
+            run_git(["status"], cwd=tmp_path)
 
         kwargs = mock_run.call_args.kwargs
         assert kwargs["stdout"] == subprocess.PIPE
@@ -473,7 +473,7 @@ class TestRunGitPassThroughStdout:
             "gww.git.repository.subprocess.run",
             return_value=self._fake_completed(),
         ) as mock_run:
-            _run_git(["status"], cwd=tmp_path, pass_through_stdout=True)
+            run_git(["status"], cwd=tmp_path, pass_through_stdout=True)
 
         kwargs = mock_run.call_args.kwargs
         assert kwargs["stdout"] is None
@@ -489,11 +489,11 @@ class TestRunGitPassThroughStdout:
             return_value=self._fake_completed(returncode=128, stderr=""),
         ):
             with pytest.raises(GitCommandError):
-                _run_git(["bad"], cwd=tmp_path, pass_through_stdout=True)
+                run_git(["bad"], cwd=tmp_path, pass_through_stdout=True)
 
 
 class TestCloneRepositoryPassThrough:
-    """``clone_repository`` must forward ``pass_through_stdout`` to ``_run_git``."""
+    """``clone_repository`` must forward ``pass_through_stdout`` to ``run_git``."""
 
     def test_default_does_not_pass_through_stdout(self, tmp_path: Path) -> None:
         """clone_repository defaults to capture-both, same as before."""
@@ -525,7 +525,7 @@ class TestCloneRepositoryPassThrough:
 
 
 class TestPullRepositoryPassThrough:
-    """``pull_repository`` must forward ``pass_through_stdout`` to ``_run_git``."""
+    """``pull_repository`` must forward ``pass_through_stdout`` to ``run_git``."""
 
     def test_default_does_not_pass_through_stdout(self, tmp_path: Path) -> None:
         with patch(

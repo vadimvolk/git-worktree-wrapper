@@ -336,7 +336,7 @@ class TestRemovePassesPassThroughToWorktreeRemove:
         monkeypatch.chdir(local_clone)
 
         with patch(
-            "gww.git.worktree._run_git", side_effect=self._fake_run_git
+            "gww.git.worktree.run_git", side_effect=self._fake_run_git
         ) as mock_run:
             result = run_remove(make_ctx(branch_or_path="feature"))
 
@@ -359,7 +359,7 @@ class TestRemovePassesPassThroughToWorktreeRemove:
         monkeypatch.chdir(local_clone)
 
         with patch(
-            "gww.git.worktree._run_git", side_effect=self._fake_run_git
+            "gww.git.worktree.run_git", side_effect=self._fake_run_git
         ) as mock_run:
             result = run_remove(make_ctx(branch_or_path="feature", quiet=True))
 

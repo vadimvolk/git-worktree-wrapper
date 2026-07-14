@@ -45,6 +45,7 @@ from gww.git.branch import (
 from gww.git.repository import (
     GitCommandError,
     get_remote_uri,
+    run_git,
 )
 from gww.git.worktree import (
     Worktree,
@@ -166,11 +167,12 @@ def _provider_template_for_branch(
 def _git_merged_branch_set(source_path: Path, default_branch: str) -> set[str]:
     """Return the set of local branches fully merged into ``default_branch``.
 
-    Implements the ``--merged`` git fallback (ADR-0015) by shelling out
-    to ``git branch --merged <default_branch> --format=%(refname:short)``
-    from the source. ``--format`` is documented in git since 2.10 and is
-    used by the existing :func:`list_local_branches` so we know it
-    works in our supported git versions.
+    Implements the ``--merged`` git fallback (ADR-0015) by routing
+    ``git branch --merged <default_branch> --format=%(refname:short)``
+    through :func:`gww.git.repository.run_git` (ADR-0020). ``--format``
+    is documented in git since 2.10 and is used by the existing
+    :func:`list_local_branches` so we know it works in our supported git
+    versions.
 
     Args:
         source_path: Path to the source repository.
@@ -179,17 +181,19 @@ def _git_merged_branch_set(source_path: Path, default_branch: str) -> set[str]:
 
     Returns:
         Set of local branch names fully merged into ``default_branch``.
-        Returns an empty set on git failure so the caller treats
-        everything as "not merged" rather than crashing.
+        Returns an empty set on git failure (non-zero exit, or a missing
+        git binary surfacing as :class:`GitCommandError`) so the caller
+        treats everything as "not merged" rather than crashing.
     """
-    proc = subprocess.run(
-        ["git", "branch", "--merged", default_branch,
-         "--format=%(refname:short)"],
-        cwd=source_path,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        proc = run_git(
+            ["branch", "--merged", default_branch,
+             "--format=%(refname:short)"],
+            cwd=source_path,
+            check=False,
+        )
+    except GitCommandError:
+        return set()
     if proc.returncode != 0:
         return set()
     return {
@@ -352,32 +356,6 @@ def _format_summary(
     return "; ".join(parts)
 
 
-def _run_git_pass_through(args: list[str], cwd: Path) -> int:
-    """Run a git command with both stdout and stderr inherited.
-
-    Used for ``git worktree remove`` and ``git branch -d`` in ``gww
-    clean``. Mirrors the existing ``_run_git(..., pass_through_stdout=...)``
-    semantics from ``src/gww/git/repository.py`` but adds stderr
-    pass-through too, which the existing helper does not provide.
-
-    Args:
-        args: Git command arguments (without the leading ``git``).
-        cwd: Working directory.
-
-    Returns:
-        The git command's exit code.
-    """
-    cmd = ["git"] + args
-    return subprocess.run(
-        cmd,
-        cwd=cwd,
-        stdout=None,
-        stderr=None,
-        text=True,
-        check=False,
-    ).returncode
-
-
 def _delete_branch_silent(
     source_path: Path,
     branch: str,
@@ -409,7 +387,12 @@ def _delete_branch_silent(
         if not local_branch_exists(source_path, branch):
             return 0
         flag = "-D" if force else "-d"
-        return _run_git_pass_through(["branch", flag, branch], source_path)
+        return run_git(
+            ["branch", flag, branch],
+            source_path,
+            check=False,
+            pass_through_stdout=True,
+        ).returncode
     try:
         delete_branch(source_path, branch, force=force)
     except BranchNotFoundError:
