@@ -42,7 +42,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar
 
-from gww.actions import Action, ActionError, RuleActions
+from gww.actions import Action
+from gww.actions.removal import RuleFailure as RuleFailure  # re-export
 from gww.config.loader import ConfigLoadError, ConfigNotFoundError, load_config
 from gww.config.validator import Config, ConfigValidationError, validate_config
 from gww.git.repository import (
@@ -329,27 +330,6 @@ def resolve_source_repo(cwd: Path) -> Path:
         except (NotGitRepositoryError, GitCommandError) as e:
             raise CommandExit(1, f"Error finding source repository: {e}") from e
     return repo.path
-
-
-@dataclass
-class RuleFailure:
-    """A single failing action in the clone/add action loop.
-
-    Pairs the failing :class:`Action` with the :class:`RuleActions` bundle it
-    came from and the :class:`ActionError` it raised. Used by
-    :func:`print_action_failure_summary` to produce the grouped stderr block,
-    and by the CLI to choose the exit code (any failure with
-    ``bundle.critical`` set → exit 1).
-
-    Attributes:
-        bundle: The rule that produced the action.
-        action: The action whose ``run()`` raised.
-        error: The exception raised by ``action.run()``.
-    """
-
-    bundle: RuleActions
-    action: Action
-    error: ActionError
 
 
 def _describe_action(action: Action) -> str:

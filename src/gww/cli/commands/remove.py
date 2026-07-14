@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gww.actions import ActionError, MatcherError, apply_actions
+from gww.actions import MatcherError
+from gww.actions.removal import remove_one_worktree
 from gww.cli.context import (
     CommandContext,
     CommandExit,
-    RuleFailure,
     exit_on_error,
     load_config_or_exit,
     parse_uri_or_exit,
@@ -22,12 +22,7 @@ from gww.git.repository import (
     get_source_repository,
     try_get_current_branch,
 )
-from gww.git.worktree import (
-    WorktreeDirtyError,
-    WorktreeNotFoundError,
-    find_worktree_by_branch,
-    remove_worktree,
-)
+from gww.git.worktree import find_worktree_by_branch
 from gww.template.functions import TemplateContext
 
 
@@ -101,52 +96,35 @@ def run_remove(ctx: CommandContext) -> int:
         else:
             ctx.verbose_msg(f"Removing worktree: {worktree_path}...")
 
-    failures: list[RuleFailure] = []
-    if config.actions:
-        context = TemplateContext(
-            uri=uri,
-            branch=branch,
-            source_path=source_path,
-            dest_path=worktree_path,
-            tags=ctx.tags,
-        )
-        try:
-            rule_bundles = apply_actions(
-                config.actions, context, kind="before_remove",
-            )
-        except MatcherError as e:
-            raise CommandExit(2, f"Config error: {e}") from e
-
-        if rule_bundles:
-            ctx.verbose_msg(f"Executing {len(rule_bundles)} rule(s)...")
-            for bundle in rule_bundles:
-                for action in bundle.actions:
-                    try:
-                        action.run(
-                            source_dir=source_path,
-                            target_dir=worktree_path,
-                            pass_through_stdout=not ctx.quiet,
-                        )
-                    except ActionError as e:
-                        failures.append(RuleFailure(bundle, action, e))
-                        if bundle.critical:
-                            break
-
-    if failures:
-        print_action_failure_summary(failures)
-
-    if any(f.bundle.critical for f in failures):
-        raise CommandExit(1, "")
-
+    context = TemplateContext(
+        uri=uri,
+        branch=branch,
+        source_path=source_path,
+        dest_path=worktree_path,
+        tags=ctx.tags,
+    )
     try:
-        remove_worktree(
+        outcome = remove_one_worktree(
             source_path,
             worktree_path,
+            actions=config.actions,
+            context=context,
             force=ctx.force,
-            pass_through_stdout=not ctx.quiet,
+            quiet=ctx.quiet,
         )
-    except (WorktreeNotFoundError, WorktreeDirtyError, GitCommandError) as e:
-        raise CommandExit(1, f"Error: {e}") from e
+    except MatcherError as e:
+        raise CommandExit(2, f"Config error: {e}") from e
+
+    if outcome.failures:
+        print_action_failure_summary(outcome.failures)
+
+    if outcome.critical_failure:
+        raise CommandExit(1, "")
+
+    if not outcome.removed:
+        # git worktree remove failed; surface its message (dirty-worktree,
+        # not-found, etc.) on stderr, matching the pre-refactor behaviour.
+        raise CommandExit(1, f"Error: {outcome.error}" if outcome.error else "")
 
     ctx.say(f"Removed worktree: {worktree_path}")
 
