@@ -69,17 +69,19 @@ def _run_provider_command(rendered: str) -> int:
     happens here -- the caller treats any non-zero exit as "do not remove".
 
     The shell binary itself is always present (it is the Python executable
-    that calls into ``/bin/sh``), so ``FileNotFoundError`` cannot be
-    raised for a missing leading command under ``shell=True``. The shell
-    exits with ``127`` for "command not found"; the caller distinguishes
-    that case from other non-zero exits so the per-branch ``X: skip
-    (<command> not found)`` label fires correctly.
+    that calls into bash via ``executable=``), so ``FileNotFoundError``
+    cannot be raised for a missing leading command under ``shell=True``.
+    The shell exits with ``127`` for "command not found"; the caller
+    distinguishes that case from other non-zero exits so the per-branch
+    ``X: skip (<command> not found)`` label fires correctly.
 
-    ``set -o pipefail`` is enabled at the shell level so composed
-    pipelines (e.g. ``tea pulls list … | jq -e …``) propagate an
-    upstream provider failure rather than letting ``jq`` exit 0 on an
-    empty stream mask it. POSIX shells that do not recognise the option
-    (``dash``, macOS ``/bin/bash`` 3.x) silently ignore it.
+    The invocation goes through ``/bin/bash`` (not the platform's
+    ``/bin/sh``) because ``set -o pipefail`` is required for composed
+    pipelines (e.g. ``tea pulls list … | jq -e …``) to propagate an
+    upstream provider failure, and ``/bin/sh`` on Linux runners is
+    ``dash`` which rejects the option with exit 2 -- masking every real
+    command exit code and breaking the caller. Bash 3.0+ (including
+    macOS's ``bash 3.2.57``) supports ``pipefail`` directly.
 
     Args:
         rendered: Shell command to execute.
@@ -89,9 +91,11 @@ def _run_provider_command(rendered: str) -> int:
 
     Raises:
         subprocess.TimeoutExpired: If the command exceeds the 60s timeout.
+        FileNotFoundError: If ``/bin/bash`` is unavailable on the host.
     """
     return subprocess.run(
         f"set -o pipefail; {rendered}",
+        executable="/bin/bash",
         shell=True,
         timeout=PROVIDER_TIMEOUT_SECONDS,
         stdout=None,
