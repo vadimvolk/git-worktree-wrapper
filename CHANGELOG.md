@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-14
+
+### Added
+
+- `gww clean --merged` now emits a stderr warning when the filter falls
+  back to `git merge --no-ff` because the origin URI is unparseable or
+  its host matches no declared provider. Deliberate-fallback cases (no
+  origin remote, no providers declared) stay silent.
+
+### Notes
+
+- Several internal refactors since 0.2.0: `gww clean` was split into a
+  package (removal primitive, plan, provider, report); the source URI
+  is now parsed once and threaded through as `ParsedURI`; the per-kind
+  provider reference modules and `Provider` dataclass were dropped;
+  all git invocations were consolidated behind a single public
+  `run_git`. No user-facing API changes.
+- The architecture docs and ADR-0019 still describe the dropped
+  per-kind provider reference modules; this is intentional for this
+  release and will be cleaned up in a follow-up.
+
 ## [0.2.0] - 2026-07-14
 
 ### Added
@@ -59,6 +80,7 @@ First published release.
 - See `CONTEXT.md` for domain terminology and `docs/adr/` for
   architectural decisions.
 
-[Unreleased]: https://github.com/vadimvolk/git-worktree-wrapper/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/vadimvolk/git-worktree-wrapper/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/vadimvolk/git-worktree-wrapper/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/vadimvolk/git-worktree-wrapper/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/vadimvolk/git-worktree-wrapper/releases/tag/v0.1.0
