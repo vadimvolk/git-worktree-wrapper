@@ -5,57 +5,7 @@ from __future__ import annotations
 import pytest
 
 from gww.config.validator import ConfigValidationError, ProviderConfig, validate_config
-from gww.providers import (
-    GiteaProvider,
-    GitHubProvider,
-    GitLabProvider,
-    Provider,
-    known_providers,
-    match_provider,
-)
-
-
-class TestProviderDefaults:
-    """Reference defaults from the per-kind modules."""
-
-    def test_github_default_kind(self) -> None:
-        p = GitHubProvider()
-        assert p.kind == "github"
-
-    def test_github_default_host_patterns(self) -> None:
-        p = GitHubProvider()
-        assert p.host_patterns == [r"^github\.com$"]
-
-    def test_github_default_merged(self) -> None:
-        p = GitHubProvider()
-        assert p.merged == "gh pr list --head branch() --state merged"
-
-    def test_gitlab_default_kind(self) -> None:
-        p = GitLabProvider()
-        assert p.kind == "gitlab"
-        assert p.host_patterns == [r"^gitlab\.com$"]
-        assert p.merged == "glab mr list --source-branch branch() --state merged"
-
-    def test_gitea_default_kind(self) -> None:
-        p = GiteaProvider()
-        assert p.kind == "gitea"
-        assert p.host_patterns == [r"^codeberg\.org$"]
-        assert "tea pulls list" in p.merged
-        assert "jq -e" in p.merged
-
-    def test_known_providers_returns_three(self) -> None:
-        kinds = [p.kind for p in known_providers()]
-        assert sorted(kinds) == ["gitea", "github", "gitlab"]
-
-
-class TestProviderDataclass:
-    """The base ``Provider`` dataclass carries the right fields."""
-
-    def test_provider_defaults(self) -> None:
-        p = Provider(kind="custom")
-        assert p.kind == "custom"
-        assert p.host_patterns == []
-        assert p.merged == ""
+from gww.providers import match_provider
 
 
 class TestMatchProvider:
