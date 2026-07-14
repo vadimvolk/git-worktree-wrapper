@@ -19,6 +19,7 @@ from gww.cli.commands.clean import (
     _run_provider_command,
 )
 from gww.config.validator import ProviderConfig
+from gww.utils.uri import parse_uri
 
 
 class TestFormatSummary:
@@ -83,21 +84,21 @@ class TestProviderTemplateRendering:
     def test_renders_branch_function(self) -> None:
         provider = self._pcfg("gh pr list --head branch() --state merged")
         rendered = _provider_template_for_branch(
-            provider, "feature/x", "https://github.com/user/repo.git",
+            provider, "feature/x", parse_uri("https://github.com/user/repo.git"),
         )
         assert rendered == "gh pr list --head feature/x --state merged"
 
     def test_renders_with_uri_function(self) -> None:
         provider = self._pcfg("echo host()")
         rendered = _provider_template_for_branch(
-            provider, "x", "https://github.com/user/repo.git",
+            provider, "x", parse_uri("https://github.com/user/repo.git"),
         )
         assert rendered == "echo github.com"
 
     def test_renders_without_uri(self) -> None:
         """When the source has no remote URI, the URI context is absent
         and template functions referencing URI fields raise. We pass
-        ``uri_string=None`` so the rendering context has no URI; using
+        ``uri=None`` so the rendering context has no URI; using
         only ``branch()`` keeps the template evaluable."""
         provider = self._pcfg("gh pr list --head branch() --state merged")
         rendered = _provider_template_for_branch(provider, "main", None)
