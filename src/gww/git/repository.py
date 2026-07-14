@@ -41,9 +41,10 @@ class Repository:
     remote_uri: Optional[str] = None
 
 
-def _run_git(
+def run_git(
     args: list[str],
     cwd: Path,
+    *,
     check: bool = True,
     pass_through_stdout: bool = False,
 ) -> subprocess.CompletedProcess[str]:
@@ -101,7 +102,7 @@ def is_git_repository(path: Path) -> bool:
     if not path.exists():
         return False
 
-    result = _run_git(
+    result = run_git(
         ["rev-parse", "--git-dir"],
         cwd=path,
         check=False,
@@ -124,7 +125,7 @@ def get_repository_root(path: Path) -> Path:
     if not path.exists():
         raise NotGitRepositoryError(f"Path does not exist: {path}")
 
-    result = _run_git(
+    result = run_git(
         ["rev-parse", "--show-toplevel"],
         cwd=path,
         check=False,
@@ -228,7 +229,7 @@ def get_remote_uri(repo_path: Path) -> Optional[str]:
     Returns:
         Remote URI string, or None if not configured.
     """
-    result = _run_git(
+    result = run_git(
         ["remote", "get-url", "origin"],
         cwd=repo_path,
         check=False,
@@ -252,7 +253,7 @@ def get_current_branch(repo_path: Path) -> str:
     Raises:
         GitCommandError: If command fails or HEAD is detached.
     """
-    result = _run_git(
+    result = run_git(
         ["rev-parse", "--abbrev-ref", "HEAD"],
         cwd=repo_path,
         check=True,
@@ -295,7 +296,7 @@ def is_clean(repo_path: Path) -> bool:
     Returns:
         True if repository is clean (no changes).
     """
-    result = _run_git(
+    result = run_git(
         ["status", "--porcelain"],
         cwd=repo_path,
         check=False,
@@ -316,7 +317,7 @@ def get_current_commit(repo_path: Path) -> str:
     Raises:
         GitCommandError: If command fails.
     """
-    result = _run_git(
+    result = run_git(
         ["rev-parse", "HEAD"],
         cwd=repo_path,
         check=True,
@@ -358,7 +359,7 @@ def clone_repository(
     Args:
         uri: Repository URI to clone.
         target_path: Path where repository should be cloned.
-        pass_through_stdout: Forwarded to :func:`_run_git`. When ``True``,
+        pass_through_stdout: Forwarded to :func:`run_git`. When ``True``,
             git's progress messages (``Cloning into '…'``, ``Receiving
             objects: 100%``, …) stream to the parent process's stderr.
 
@@ -371,7 +372,7 @@ def clone_repository(
     # Ensure parent directory exists
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
-    _run_git(
+    run_git(
         ["clone", uri, str(target_path)],
         cwd=target_path.parent,
         check=True,
@@ -389,13 +390,13 @@ def pull_repository(
 
     Args:
         repo_path: Path to repository.
-        pass_through_stdout: Forwarded to :func:`_run_git`. When ``True``,
+        pass_through_stdout: Forwarded to :func:`run_git`. When ``True``,
             git's pull progress streams to the parent process's stdout.
 
     Raises:
         GitCommandError: If pull fails.
     """
-    _run_git(
+    run_git(
         ["pull"],
         cwd=repo_path,
         check=True,
