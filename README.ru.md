@@ -364,6 +364,7 @@ gwa feature-branch --tag review
 | `gwa <branch> [-c] [--tag key=value]...` | ➕ Добавить worktree для ветки (опционально создать ветку, теги доступны в шаблонах/условиях) |
 | `gwr <branch\|path> [-f] [--tag key=value]...` | ➖ Удалить worktree (теги доступны в `before_remove`-предикатах) |
 | `gww pull` | 🔄 Обновить исходный репозиторий (работает из worktree, если исходный репозиторий чист и на main/master) |
+| `gww clean [--merged\|--all] [--dry-run] [--yes] [--force]` | 🧹 Удалить worktree, чьи ветки уже слиты (через провайдера или git fallback) |
 | `gww migrate <path>... [--dry-run] [--copy \| --inplace]` | 🚚 Мигрировать репозитории в новые локации |
 | `gww init config` | ⚙️ Создать конфиг по умолчанию |
 | `gww init shell <shell>` | 🐚 Установить автодополнение (bash/zsh/fish) |
@@ -372,6 +373,79 @@ gwa feature-branch --tag review
 
 **Часто используемые опции**:
 - `--tag`, `-t`: Тег в формате `key=value` или просто `key` (можно указывать несколько раз).
+
+### 🧹 `gww clean`
+
+Удаляет worktree (и их локальные ветки) из текущего исходного репозитория, чьи ветки удовлетворяют активному фильтру. Основной checkout и ветка по умолчанию исходного репозитория никогда не удаляются.
+
+```bash
+gww clean [--merged|--all] [--dry-run] [--yes|-y] [--force]
+```
+
+| Флаг | Поведение |
+|---|---|
+| `--merged` (по умолчанию) | Для каждого подходящего worktree выполняется команда `merged` провайдера (или `git branch --merged <default>` как fallback). **Удалить при exit 0**, иначе оставить. |
+| `--all` | Пропустить проверку статуса MR. Каждый подходящий worktree подлежит подтверждению. |
+| `--dry-run` | Выполнить весь процесс без побочных эффектов и без подтверждения. |
+| `--yes` / `-y` | Пропустить пакетный запрос подтверждения. |
+| `--force` | Передать `--force` в `git worktree remove` и использовать `-D` вместо `-d` для `git branch`. НЕ повышает фильтр MR. |
+
+Точечное удаление — `gww remove <branch>`. `gww clean` никогда не удаляет удалённые ветки.
+
+**Вывод (по веткам)**:
+
+```text
+checking feature-a
+feature-a: clean       # или "keep", "skip (timeout)", "skip (gh not found)"
+```
+
+**Запрос подтверждения** (пропускается `--yes` / `--dry-run`):
+
+```text
+Filter: --merged (provider: github). Delete matching worktrees? [y/N]
+```
+
+Токен `--merged` заменяется на `--all` при активном фильтре `--all`; суффикс `(provider: <kind>)` появляется только когда активен `--merged` И провайдер резолвится, иначе промпт выглядит как `Filter: --merged. Delete matching worktrees? [y/N]`. Ответьте `y` (без учёта регистра) для продолжения; любой другой ответ (включая EOF) отклоняет операцию без побочных эффектов с кодом выхода `0`.
+
+**Сводка (в конце)**:
+
+```text
+Removed N; kept M
+# или с --dry-run:
+Would remove N; would keep M
+```
+
+Нулевые счётчики опускаются; `; F failed` и/или `; T timed out` добавляются только при ненулевых значениях.
+
+**Коды выхода**:
+- `0` — подтверждение принято (или `--yes`), команда выполнена без ошибок git-операций над worktree. Отказ / EOF тоже даёт `0`.
+- `1` — хотя бы один из `git worktree remove` или `git branch -d` завершился с ошибкой.
+- `2` — ошибка конфигурации.
+
+Сбои провайдера **не влияют** на код выхода команды. Число `kept M` одинаково и при истёкшем токене `gh`, и при репозитории без слитых MR.
+
+#### 🔌 Провайдеры
+
+Чтобы включить фильтрацию по MR-merged через провайдера, объявите блок `providers:` в `config.yml` с паттернами хостов и шаблоном команды `merged` для каждого типа:
+
+```yaml
+providers:
+  github:
+    host_patterns: ['^github\.com$']
+    merged: 'gh pr list --head branch() --state merged'
+  gitlab:
+    host_patterns: ['^gitlab\.com$']
+    merged: 'glab mr list --source-branch branch() --state merged'
+  gitea:
+    host_patterns: ['^codeberg\.org$']
+    merged: 'tea pulls list --head branch() --state closed --output json | jq -e "[.[] | select(.merged)] | length > 0"'
+```
+
+**Разрешение**: `gww clean` проверяет origin-хост исходного репозитория против каждого `providers.<kind>.host_patterns` в порядке конфига; побеждает первое совпадение. **Без переменной окружения `GWW_PROVIDER`. Без встроенных дефолтов** — пользователи на hosted-инстансах должны объявить провайдера в конфиге или полагаться на git-fallback (`git branch --merged <default>`), если ни один паттерн не подошёл. Справочные дефолты для GitHub / GitLab / Gitea лежат в `src/gww/providers/` и задокументированы в шаблоне `gww init config`.
+
+**Контракт**: отрендеренная команда `merged` должна выходить с 0 тогда и только тогда, когда для ветки worktree существует MR/PR в состоянии merged. `gww clean` читает только код выхода; он никогда не парсит stdout/stderr провайдера. stdout и stderr провайдера пробрасываются в ваш терминал напрямую.
+
+**Функции шаблонов**, доступные в `providers.<kind>.merged`: `branch()`, `host()`, `port()`, `protocol()`, `uri()`, `path(n)`, а также project-context хелперы (`source_path()`, `current_worktree()`, `file_exists()` и т.д.) и функции тегов.
 
 ## 🔄 Обновление
 

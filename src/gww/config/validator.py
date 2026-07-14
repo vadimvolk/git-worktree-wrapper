@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -70,6 +71,27 @@ class ProjectRule:
 
 
 @dataclass
+class ProviderConfig:
+    """Validated provider block from ``providers:`` in the config.
+
+    Each provider kind has a list of host-pattern regex strings and a
+    command template evaluated per-branch by ``gww clean`` (see ADR-0018).
+
+    Attributes:
+        kind: Provider kind (``"github"``, ``"gitlab"``, ``"gitea"``) — the
+            key under ``providers:`` in the config.
+        host_patterns: List of regex strings. The first pattern that matches
+            the source's origin host wins (ADR-0019).
+        merged: Command template evaluated per-branch; exit code 0 means
+            "merged MR/PR exists" and the worktree is cleanable.
+    """
+
+    kind: str
+    host_patterns: list[str]
+    merged: str
+
+
+@dataclass
 class Config:
     """Validated configuration.
 
@@ -78,12 +100,15 @@ class Config:
         default_worktrees: Template string for default worktree location.
         sources: Named source routing rules.
         actions: Action rules for project detection.
+        providers: Provider rules keyed by kind (``github``/``gitlab``/
+            ``gitea``). Used by ``gww clean`` (ADR-0019).
     """
 
     default_sources: str
     default_worktrees: str
     sources: dict[str, SourceRule] = field(default_factory=dict)
     actions: list[ProjectRule] = field(default_factory=list)
+    providers: dict[str, ProviderConfig] = field(default_factory=dict)
 
 
 def _validate_string(value: Any, field_name: str) -> str:
@@ -216,6 +241,62 @@ def _validate_source_rule(name: str, data: Any) -> SourceRule:
     )
 
 
+def _validate_provider(kind: str, data: Any) -> ProviderConfig:
+    """Validate and parse a single provider block.
+
+    Args:
+        kind: Provider kind (``"github"``, ``"gitlab"``, ``"gitea"``) — the
+            key under ``providers:``.
+        data: Provider data from config.
+
+    Returns:
+        Validated :class:`ProviderConfig` object.
+
+    Raises:
+        ConfigValidationError: If validation fails.
+    """
+    if not isinstance(data, dict):
+        raise ConfigValidationError(
+            f"Provider '{kind}' must be a mapping, got {type(data).__name__}"
+        )
+
+    host_patterns_data = data.get("host_patterns")
+    if not isinstance(host_patterns_data, list) or not host_patterns_data:
+        raise ConfigValidationError(
+            f"Provider '{kind}' requires a non-empty 'host_patterns' list"
+        )
+
+    host_patterns: list[str] = []
+    for i, pattern in enumerate(host_patterns_data):
+        if not isinstance(pattern, str):
+            raise ConfigValidationError(
+                f"Provider '{kind}'.host_patterns[{i}] must be a string, "
+                f"got {type(pattern).__name__}"
+            )
+        try:
+            re.compile(pattern)
+        except re.error as e:
+            raise ConfigValidationError(
+                f"Provider '{kind}'.host_patterns[{i}] is not a valid regex: {e}"
+            ) from e
+        host_patterns.append(pattern)
+
+    merged_data = data.get("merged")
+    if not isinstance(merged_data, str):
+        raise ConfigValidationError(
+            f"Provider '{kind}' requires a 'merged' template string, "
+            f"got {type(merged_data).__name__}"
+        )
+    if not merged_data.strip():
+        raise ConfigValidationError(f"Provider '{kind}'.merged cannot be empty")
+
+    return ProviderConfig(
+        kind=kind,
+        host_patterns=host_patterns,
+        merged=merged_data,
+    )
+
+
 def _validate_project_rule(data: Any, index: int) -> ProjectRule:
     """Validate and parse a project detection rule.
 
@@ -336,9 +417,21 @@ def validate_config(data: dict[str, Any]) -> Config:
         for i, rule_data in enumerate(actions_data):
             actions.append(_validate_project_rule(rule_data, i))
 
+    # Validate optional providers (used by `gww clean`, ADR-0019)
+    providers: dict[str, ProviderConfig] = {}
+    if "providers" in data:
+        providers_data = data["providers"]
+        if not isinstance(providers_data, dict):
+            raise ConfigValidationError(
+                f"'providers' must be a mapping, got {type(providers_data).__name__}"
+            )
+        for kind, provider_data in providers_data.items():
+            providers[kind] = _validate_provider(kind, provider_data)
+
     return Config(
         default_sources=default_sources,
         default_worktrees=default_worktrees,
         sources=sources,
         actions=actions,
+        providers=providers,
     )
