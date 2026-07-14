@@ -57,6 +57,7 @@ from gww.git.worktree import (
 from gww.providers import match_provider
 from gww.template.evaluator import TemplateError, evaluate_template
 from gww.template.functions import TemplateContext
+from gww.utils.uri import ParsedURI
 
 
 PROVIDER_TIMEOUT_SECONDS = 60
@@ -122,27 +123,28 @@ def _command_name(rendered: str) -> str:
     Returns:
         Leading command name, or ``""`` if the string is empty.
     """
-    return rendered.split()[0] if rendered.strip() else ""
+    parts = rendered.split()
+    return parts[0] if parts else ""
 
 
 def _provider_template_for_branch(
     provider: ProviderConfig,
     branch: str,
-    uri_string: str | None,
+    uri: ParsedURI | None,
 ) -> str:
     """Render the provider's ``merged`` template against ``branch``.
 
     Builds a :class:`TemplateContext` populated with branch and (when
     available) the source's origin URI so predicates in the command
-    template can reference ``branch()`` / ``host()`` etc. ``uri_string``
-    is parsed defensively; a malformed remote URI is treated as "no URI
-    context" rather than failing the whole command.
+    template can reference ``branch()`` / ``host()`` etc. The URI is
+    parsed once by the caller; a malformed remote URI is passed as
+    ``None`` (treated as "no URI context") rather than failing here.
 
     Args:
         provider: User-declared :class:`ProviderConfig` whose ``merged``
             template to render.
         branch: Worktree branch to substitute into the template.
-        uri_string: Source's origin URI string, or ``None`` if not set.
+        uri: Parsed source origin URI, or ``None`` if unset/malformed.
 
     Returns:
         Rendered shell command string.
@@ -155,8 +157,8 @@ def _provider_template_for_branch(
         branch=branch,
         tags={},
     )
-    if uri_string:
-        context.uri = parse_uri_or_exit(uri_string)
+    if uri is not None:
+        context.uri = uri
 
     try:
         return evaluate_template(provider.merged, context)
@@ -196,11 +198,12 @@ def _git_merged_branch_set(source_path: Path, default_branch: str) -> set[str]:
         return set()
     if proc.returncode != 0:
         return set()
-    return {
-        line.strip()
-        for line in proc.stdout.splitlines()
-        if line.strip() and line.strip() != default_branch
-    }
+    merged: set[str] = set()
+    for line in proc.stdout.splitlines():
+        name = line.strip()
+        if name and name != default_branch:
+            merged.add(name)
+    return merged
 
 
 def _resolve_default_branch(source_path: Path) -> str:
@@ -454,18 +457,21 @@ def run_clean(ctx: CommandContext) -> int:
 
     origin_uri: str | None = get_remote_uri(source_path)
 
-    provider: ProviderConfig | None = None
-    if use_merged and origin_uri:
+    parsed_uri: ParsedURI | None = None
+    if origin_uri:
         try:
             parsed_uri = parse_uri_or_exit(origin_uri)
         except CommandExit:
             parsed_uri = None
-        if parsed_uri is not None:
-            provider = match_provider(config.providers, parsed_uri.host)
+
+    provider: ProviderConfig | None = None
+    if use_merged and parsed_uri is not None:
+        provider = match_provider(config.providers, parsed_uri.host)
 
     worktrees = _enumerate_worktrees(source_path)
 
     candidate_branches: list[str] = []
+    worktree_by_branch: dict[str, Path] = {}
     for wt in worktrees:
         if _is_main_worktree(wt.path, main_path):
             continue
@@ -476,13 +482,11 @@ def run_clean(ctx: CommandContext) -> int:
         if is_main_branch(wt.branch):
             continue
         candidate_branches.append(wt.branch)
+        worktree_by_branch[wt.branch] = wt.path
 
     if not candidate_branches:
         label = "--merged" if use_merged else "--all"
-        if dry_run:
-            print(f"Filter: {label}. No matching worktrees.")
-        else:
-            print(f"Filter: {label}. No matching worktrees.")
+        print(f"Filter: {label}. No matching worktrees.")
         return 0
 
     git_merged_set: set[str] | None = None
@@ -506,7 +510,7 @@ def run_clean(ctx: CommandContext) -> int:
         elif provider is not None:
             try:
                 rendered = _provider_template_for_branch(
-                    provider, branch, origin_uri,
+                    provider, branch, parsed_uri,
                 )
             except CommandExit as e:
                 print(f"{branch}: {e.message or ''}".rstrip(), file=sys.stderr)
@@ -577,11 +581,6 @@ def run_clean(ctx: CommandContext) -> int:
     removed = 0
     failed = 0
 
-    worktree_by_branch: dict[str, Path] = {}
-    for wt in worktrees:
-        if wt.branch is not None:
-            worktree_by_branch[wt.branch] = wt.path
-
     for branch in cleanable:
         worktree_path = worktree_by_branch.get(branch)
         if worktree_path is None:
@@ -591,14 +590,8 @@ def run_clean(ctx: CommandContext) -> int:
         per_branch_failures: list[RuleFailure] = []
 
         if config.actions:
-            uri = None
-            if origin_uri:
-                try:
-                    uri = parse_uri_or_exit(origin_uri)
-                except CommandExit:
-                    uri = None
             context = TemplateContext(
-                uri=uri,
+                uri=parsed_uri,
                 branch=branch,
                 source_path=source_path,
                 dest_path=worktree_path,
