@@ -426,6 +426,125 @@ class TestCleanMergedGitFallback:
         assert "feature-a: keep" in captured.out
 
 
+class TestCleanMergedFallbackWarning:
+    """``--merged`` warns on stderr when it silently downgrades to the git
+    merge-status fallback (unparseable origin, or a declared-but-unmatched
+    provider host). It stays silent for the deliberate-fallback cases: no
+    origin remote, or no providers declared."""
+
+    def test_unparseable_origin_warns_and_falls_back(
+        self,
+        git_repo_with_remote: tuple[Path, str],
+        config_dir: Path,
+        worktrees_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        local, _ = git_repo_with_remote
+        _add_worktree(local, "feature-a", worktrees_dir / "feature-a")
+        _make_config(config_dir)
+        monkeypatch.chdir(local)
+        # Origin resolves but is not a parseable git URI.
+        monkeypatch.setattr(
+            "gww.cli.commands.clean.command.get_remote_uri",
+            lambda _path: "not-a-valid-uri",
+        )
+
+        result = run_clean(make_ctx(clean_merged=True, clean_yes=True))
+
+        assert result == 0
+        # Git fallback still ran: ``feature-a`` is fully merged -> removed.
+        assert not (worktrees_dir / "feature-a").exists()
+        captured = capsys.readouterr()
+        assert "warning: could not parse origin URI 'not-a-valid-uri'" in captured.err
+        assert "falling back to git merge status" in captured.err
+        assert "feature-a: clean" in captured.out
+
+    def test_host_matches_no_declared_provider_warns_and_falls_back(
+        self,
+        git_repo_with_remote: tuple[Path, str],
+        config_dir: Path,
+        worktrees_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        local, _ = git_repo_with_remote
+        _add_worktree(local, "feature-a", worktrees_dir / "feature-a")
+        # A provider is declared, but its host pattern cannot match the
+        # (empty) host of the local ``file://`` origin.
+        providers_block = """\
+providers:
+  github:
+    host_patterns: ['^github\\.com$']
+    merged: "true"
+"""
+        _make_config(config_dir, providers=providers_block)
+        monkeypatch.chdir(local)
+
+        result = run_clean(make_ctx(clean_merged=True, clean_yes=True))
+
+        assert result == 0
+        assert not (worktrees_dir / "feature-a").exists()
+        captured = capsys.readouterr()
+        assert "matched no configured provider" in captured.err
+        assert "falling back to git merge status" in captured.err
+        assert "feature-a: clean" in captured.out
+
+    def test_no_providers_declared_falls_back_silently(
+        self,
+        git_repo_with_remote: tuple[Path, str],
+        config_dir: Path,
+        worktrees_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        local, _ = git_repo_with_remote
+        _add_worktree(local, "feature-a", worktrees_dir / "feature-a")
+        _make_config(config_dir)  # no providers: block
+        monkeypatch.chdir(local)
+
+        result = run_clean(make_ctx(clean_merged=True, clean_yes=True))
+
+        assert result == 0
+        assert not (worktrees_dir / "feature-a").exists()
+        captured = capsys.readouterr()
+        assert "warning:" not in captured.err
+        assert "feature-a: clean" in captured.out
+
+    def test_no_origin_remote_falls_back_silently(
+        self,
+        git_repo_with_remote: tuple[Path, str],
+        config_dir: Path,
+        worktrees_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        local, _ = git_repo_with_remote
+        _add_worktree(local, "feature-a", worktrees_dir / "feature-a")
+        # Declare a provider so the only reason for silence is the missing
+        # origin remote, not an empty providers block.
+        providers_block = """\
+providers:
+  github:
+    host_patterns: ['^github\\.com$']
+    merged: "true"
+"""
+        _make_config(config_dir, providers=providers_block)
+        monkeypatch.chdir(local)
+        monkeypatch.setattr(
+            "gww.cli.commands.clean.command.get_remote_uri",
+            lambda _path: None,
+        )
+
+        result = run_clean(make_ctx(clean_merged=True, clean_yes=True))
+
+        assert result == 0
+        assert not (worktrees_dir / "feature-a").exists()
+        captured = capsys.readouterr()
+        assert "warning:" not in captured.err
+        assert "feature-a: clean" in captured.out
+
+
 # ---------------------------------------------------------------------------
 # Confirmation prompt
 # ---------------------------------------------------------------------------

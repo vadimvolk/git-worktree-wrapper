@@ -9,6 +9,7 @@ primitive.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from gww.actions import MatcherError
@@ -151,10 +152,22 @@ def run_clean(ctx: CommandContext) -> int:
             parsed_uri = parse_uri_or_exit(origin_uri)
         except CommandExit:
             parsed_uri = None
+            if use_merged:
+                print(
+                    f"warning: could not parse origin URI '{origin_uri}'; "
+                    "provider matching disabled, falling back to git merge status",
+                    file=sys.stderr,
+                )
 
     provider: ProviderConfig | None = None
     if use_merged and parsed_uri is not None:
         provider = match_provider(config.providers, parsed_uri.host)
+        if provider is None and config.providers:
+            print(
+                f"warning: origin host '{parsed_uri.host}' matched no configured "
+                "provider; falling back to git merge status",
+                file=sys.stderr,
+            )
 
     if not plan.branches:
         label = "--merged" if use_merged else "--all"
