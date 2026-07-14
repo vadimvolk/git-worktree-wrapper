@@ -157,6 +157,12 @@ class CommandContext:
         inplace: Whether to move in place instead of copying (migrate command).
         init_command: ``"config"`` or ``"shell"`` for ``gww init``.
         shell: Shell name for ``gww init shell``.
+        clean_merged: ``gww clean --merged`` -- use the merged-MR filter
+            (the default; see ADR-0015).
+        clean_all: ``gww clean --all`` -- skip the MR filter and treat
+            every cleanable worktree as eligible.
+        clean_yes: ``gww clean --yes`` / ``-y`` -- skip the batch
+            confirmation prompt.
     """
 
     verbose: int = 0
@@ -172,6 +178,9 @@ class CommandContext:
     inplace: bool = False
     init_command: Optional[str] = None
     shell: Optional[str] = None
+    clean_merged: bool = False
+    clean_all: bool = False
+    clean_yes: bool = False
 
     @classmethod
     def from_args(cls, args: argparse.Namespace) -> CommandContext:
@@ -202,6 +211,9 @@ class CommandContext:
             inplace=getattr(args, "inplace", False),
             init_command=getattr(args, "init_command", None),
             shell=getattr(args, "shell", None),
+            clean_merged=getattr(args, "clean_merged", False),
+            clean_all=getattr(args, "clean_all", False),
+            clean_yes=getattr(args, "clean_yes", False),
         )
 
     def say(self, message: str) -> None:

@@ -288,6 +288,36 @@ default_worktrees: ~/Developer/worktrees/default/path(-2)/path(-1)/norm_branch()
 #   - when: 'file_exists("package.json")'
 #     after_add:
 #       - command: "npm install --prefix current_worktree()"
+#
+# Providers (optional; consumed by `gww clean`, ADR-0019)
+# -------------------------------------------------------
+# Each provider kind declares:
+#   - host_patterns: list of regex strings against the source's origin host
+#                    (first match wins).
+#   - merged: shell command template evaluated per worktree; exit 0 means
+#             "an MR/PR for this branch is in the merged state".
+#             Available template functions: branch(), host(), path(n),
+#             protocol(), uri(), port(), and the project's tag / file_exists
+#             helpers. The rendered command runs through the shell so
+#             composed pipelines (e.g. `tea | jq -e`) work; `set -o pipefail`
+#             is set at the shell level so an upstream failure isn't hidden
+#             by `jq` exiting 0 on an empty stream.
+#
+# `gww clean` does not auto-apply built-in defaults. To enable provider-
+# aware merged-MR filtering, uncomment the entries below (or write your own
+# patterns for self-hosted instances). Without an entry, `--merged` falls
+# back to `git branch --merged <default>`.
+
+# providers:
+#   github:
+#     host_patterns: ['^github\\.com$']
+#     merged: 'gh pr list --head branch() --state merged'
+#   gitlab:
+#     host_patterns: ['^gitlab\\.com$']
+#     merged: 'glab mr list --source-branch branch() --state merged'
+#   gitea:
+#     host_patterns: ['^codeberg\\.org$']
+#     merged: 'tea pulls list --head branch() --state closed --output json | jq -e "[.[] | select(.merged)] | length > 0"'
 """
 
 

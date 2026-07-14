@@ -364,6 +364,7 @@ gwa feature-branch --tag review
 | `gwa <branch> [-c] [--tag key=value]...` | ➕ Add worktree for branch (optionally create branch, tags available in templates/conditions) |
 | `gwr <branch\|path> [-f] [--tag key=value]...` | ➖ Remove worktree (tags available in `before_remove` predicates) |
 | `gww pull` | 🔄 Update source repository (works from worktrees if source is clean and on main/master) |
+| `gww clean [--merged\|--all] [--dry-run] [--yes] [--force]` | 🧹 Remove worktrees whose branch has been merged (provider or git fallback) |
 | `gww migrate <path>... [--dry-run] [--copy \| --inplace]` | 🚚 Migrate repositories to new locations |
 | `gww init config` | ⚙️ Create default configuration file |
 | `gww init shell <shell>` | 🐚 Install shell completion (bash/zsh/fish) |
@@ -372,6 +373,79 @@ gwa feature-branch --tag review
 
 **Common Options**:
 - `--tag`, `-t`: Tag in the format `key=value` or just `key` (can be specified multiple times).
+
+### 🧹 `gww clean`
+
+Removes worktrees (and their local branches) from the current source repository whose branch satisfies the active filter. The main checkout and the source's default branch are never removed.
+
+```bash
+gww clean [--merged|--all] [--dry-run] [--yes|-y] [--force]
+```
+
+| Flag | Behaviour |
+|---|---|
+| `--merged` (default) | Per cleanable worktree, evaluate the provider's `merged` command (or `git branch --merged <default>` as a fallback). **Remove if exit 0**, leave in place otherwise. |
+| `--all` | Skip MR-status checks. Every cleanable worktree is subject to confirmation. |
+| `--dry-run` | Run the full flow with no side effects and no prompt. |
+| `--yes` / `-y` | Skip the batch confirmation prompt. |
+| `--force` | Pass `--force` to `git worktree remove` and use `-D` instead of `-d` for `git branch`. Does NOT escalate the MR filter. |
+
+Targeted removal is `gww remove <branch>`. `gww clean` never deletes remote branches.
+
+**Output (per branch)**:
+
+```text
+checking feature-a
+feature-a: clean       # or "keep", "skip (timeout)", "skip (gh not found)"
+```
+
+**Confirmation prompt** (skipped by `--yes` / `--dry-run`):
+
+```text
+Filter: --merged (provider: github). Delete matching worktrees? [y/N]
+```
+
+The `--merged` token becomes `--all` when that filter is active; the `(provider: <kind>)` suffix appears only when `--merged` is active AND a provider resolved, otherwise the prompt is just `Filter: --merged. Delete matching worktrees? [y/N]`. Answer `y` (case-insensitive) to proceed; anything else (including EOF) declines with no side effects and exit code `0`.
+
+**Summary (end of run)**:
+
+```text
+Removed N; kept M
+# or with --dry-run:
+Would remove N; would keep M
+```
+
+Zero counts are omitted; `; F failed` and/or `; T timed out` are appended only when non-zero.
+
+**Exit codes**:
+- `0` — confirmation accepted (or `--yes`), command ran to completion with no per-worktree git failures. Confirmation rejected / EOF is also `0`.
+- `1` — any per-worktree `git worktree remove` or `git branch -d` failed.
+- `2` — config error (validation, missing required field).
+
+Provider failures do **not** affect the command's exit code. The summary's `kept M` count is the same whether a token-expired `gh` produced 1s or whether the repo genuinely has no merged MRs.
+
+#### 🔌 Providers
+
+To enable provider-aware merged-MR filtering, declare a `providers:` block in your `config.yml` with the host patterns and a `merged` command template for each kind:
+
+```yaml
+providers:
+  github:
+    host_patterns: ['^github\.com$']
+    merged: 'gh pr list --head branch() --state merged'
+  gitlab:
+    host_patterns: ['^gitlab\.com$']
+    merged: 'glab mr list --source-branch branch() --state merged'
+  gitea:
+    host_patterns: ['^codeberg\.org$']
+    merged: 'tea pulls list --head branch() --state closed --output json | jq -e "[.[] | select(.merged)] | length > 0"'
+```
+
+**Resolution**: `gww clean` tests the source's origin host against each declared `providers.<kind>.host_patterns` in config order; first match wins. **No `GWW_PROVIDER` env override. No auto-applied built-in defaults** — users on hosted instances must declare the provider in their config, or rely on the `--merged` git fallback (`git branch --merged <default>`) when no declared pattern matches. Reference defaults for GitHub / GitLab / Gitea live in `src/gww/providers/` and are documented in the default config template.
+
+**Contract**: the rendered `merged` command must exit 0 iff an MR/PR for the worktree's branch is in the merged state. `gww clean` reads only the exit code; it never parses the provider's stdout or stderr. The provider's stdout and stderr are passed through to your terminal live.
+
+**Template functions** available in `providers.<kind>.merged`: `branch()`, `host()`, `port()`, `protocol()`, `uri()`, `path(n)`, plus project-context helpers (`source_path()`, `current_worktree()`, `file_exists()`, etc.) and tag functions.
 
 ## 🔄 Update
 

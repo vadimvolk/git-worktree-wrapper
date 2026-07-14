@@ -131,6 +131,58 @@ def create_parser() -> argparse.ArgumentParser:
         description="Pull changes from remote in the source repository.",
     )
 
+    # clean command
+    clean_parser = subparsers.add_parser(
+        "clean",
+        help="Remove worktrees whose branch has been merged",
+        description=(
+            "Remove worktrees (and their local branches) from the current "
+            "source repository whose branch satisfies the active filter. "
+            "By default (--merged) worktrees whose branch has an upstream "
+            "MR/PR in the merged state are removed; --all skips that check. "
+            "Provider interaction is exit-code-only via gh/glab/tea."
+        ),
+    )
+    clean_filter = clean_parser.add_mutually_exclusive_group()
+    clean_filter.add_argument(
+        "--merged",
+        dest="clean_merged",
+        action="store_true",
+        help=(
+            "Filter: remove worktrees whose branch has a merged MR/PR "
+            "(default). Falls back to 'git branch --merged <default>' "
+            "when no provider resolves for the source's origin host."
+        ),
+    )
+    clean_filter.add_argument(
+        "--all",
+        dest="clean_all",
+        action="store_true",
+        help=(
+            "Skip MR-status checks: every cleanable worktree in the source "
+            "is subject to confirmation."
+        ),
+    )
+    clean_parser.add_argument(
+        "-n", "--dry-run",
+        action="store_true",
+        help="Run the full flow with no side effects and no prompt.",
+    )
+    clean_parser.add_argument(
+        "-y", "--yes",
+        dest="clean_yes",
+        action="store_true",
+        help="Skip the batch confirmation prompt.",
+    )
+    clean_parser.add_argument(
+        "-f", "--force",
+        action="store_true",
+        help=(
+            "Pass --force to 'git worktree remove' and use -D instead of "
+            "-d for 'git branch'. Does NOT escalate the MR filter."
+        ),
+    )
+
     # migrate command
     migrate_parser = subparsers.add_parser(
         "migrate",
@@ -240,6 +292,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         elif args.command == "pull":
             from gww.cli.commands.pull import run_pull
             return run_pull(ctx)
+
+        elif args.command == "clean":
+            from gww.cli.commands.clean import run_clean
+            return run_clean(ctx)
 
         elif args.command == "migrate":
             from gww.cli.commands.migrate import run_migrate
