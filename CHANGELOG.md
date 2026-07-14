@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-14
+
+### Added
+
+- `gww clean` subcommand that removes worktrees whose branches have a
+  merged upstream MR/PR, gated by a configurable provider abstraction
+  (`github`, `gitlab`, `gitea`). Providers are CLI-based with an
+  exit-code-only contract (no direct API calls) and resolved
+  exclusively from user-declared config.
+- `providers:` config block in `config.yml`, with reference defaults
+  shipped under `src/gww/providers/` (see ADR-0017, ADR-0018,
+  ADR-0019).
+
+### Fixed
+
+- `gww clean` now invokes provider commands via `/bin/bash` so that
+  `set -o pipefail` works uniformly on macOS and Linux (dash on Linux
+  was rejecting it with exit code 2, masking real provider exit
+  codes).
+
+### Notes
+
+- See ADR-0015 through ADR-0019 for the design decisions behind
+  `gww clean`.
+
 ## [0.1.0] - 2026-07-03
 
 First published release.
@@ -34,5 +59,6 @@ First published release.
 - See `CONTEXT.md` for domain terminology and `docs/adr/` for
   architectural decisions.
 
-[Unreleased]: https://github.com/vadimvolk/git-worktree-wrapper/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/vadimvolk/git-worktree-wrapper/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/vadimvolk/git-worktree-wrapper/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/vadimvolk/git-worktree-wrapper/releases/tag/v0.1.0
