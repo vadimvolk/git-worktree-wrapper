@@ -93,20 +93,22 @@ def _provider_template_for_branch(
     provider: ProviderConfig,
     branch: str,
     uri: ParsedURI | None,
+    tags: dict[str, str],
 ) -> str:
-    """Render the provider's ``merged`` template against ``branch``.
+    """Render the provider's ``filter`` template against ``branch``.
 
-    Builds a :class:`TemplateContext` populated with branch and (when
+    Builds a :class:`TemplateContext` populated with branch, tags, and (when
     available) the source's origin URI so predicates in the command
-    template can reference ``branch()`` / ``host()`` etc. The URI is
-    parsed once by the caller; a malformed remote URI is passed as
+    template can reference ``branch()`` / ``host()`` / ``tag()`` etc. The URI
+    is parsed once by the caller; a malformed remote URI is passed as
     ``None`` (treated as "no URI context") rather than failing here.
 
     Args:
-        provider: User-declared :class:`ProviderConfig` whose ``merged``
+        provider: User-declared :class:`ProviderConfig` whose ``filter``
             template to render.
         branch: Worktree branch to substitute into the template.
         uri: Parsed source origin URI, or ``None`` if unset/malformed.
+        tags: Tag key-value pairs from CLI ``--tag`` options.
 
     Returns:
         Rendered shell command string.
@@ -117,15 +119,15 @@ def _provider_template_for_branch(
     """
     context = TemplateContext(
         branch=branch,
-        tags={},
+        tags=tags,
     )
     if uri is not None:
         context.uri = uri
 
     try:
-        return evaluate_template(provider.merged, context)
+        return evaluate_template(provider.filter, context)
     except TemplateError as e:
-        raise CommandExit(2, f"Config error: provider merged template: {e}") from e
+        raise CommandExit(2, f"Config error: provider filter template: {e}") from e
 
 
 def _git_merged_branch_set(source_path: Path, default_branch: str) -> set[str]:
@@ -189,6 +191,7 @@ def select_cleanable(
     use_all: bool,
     provider: ProviderConfig | None,
     parsed_uri: ParsedURI | None,
+    tags: dict[str, str],
     git_merged_set: set[str] | None,
 ) -> Selection:
     """Decide, per branch, whether it is cleanable.
@@ -203,6 +206,7 @@ def select_cleanable(
         use_all: ``--all`` filter -- every candidate is cleanable.
         provider: Resolved provider, or ``None`` for the git fallback.
         parsed_uri: Parsed source origin URI for template context.
+        tags: Tag key-value pairs from CLI ``--tag`` options.
         git_merged_set: Local branches merged into the default branch, used
             by the git fallback; ``None`` when a provider resolved.
 
@@ -229,7 +233,7 @@ def select_cleanable(
         elif provider is not None:
             try:
                 rendered = _provider_template_for_branch(
-                    provider, branch, parsed_uri,
+                    provider, branch, parsed_uri, tags,
                 )
             except CommandExit as e:
                 print(f"{branch}: {e.message or ''}".rstrip(), file=sys.stderr)

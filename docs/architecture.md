@@ -76,7 +76,7 @@ graph TB
 
 **Config Layer** (`src/gww/config/`)
 - **loader.py**: YAML config file loading/saving using ruamel.yaml
-- **validator.py**: Config structure validation (`providers:` block lives here too — ADR-0019)
+- **validator.py**: Config structure validation (`providers:` block lives here too — ADR-0021)
 - **resolver.py**: Path resolution based on URI conditions and templates
 
 **Template Layer** (`src/gww/template/`)
@@ -92,10 +92,10 @@ graph TB
 - **matcher.py**: Match project rules based on `when` conditions
 - **executor.py**: Execute actions (abs_copy, rel_copy, command)
 
-**Providers Layer** (`src/gww/providers/`)
-- **base.py**: `Provider` dataclass + host-pattern matching primitive (ADR-0019)
-- **github.py / gitlab.py / gitea.py**: Reference defaults — **NOT auto-applied**; users copy the relevant fields into their config
-- The `clean` command resolves the source's origin host against user-declared `providers.<kind>.host_patterns` in config order; first match wins. No env override, no built-in defaults for hosted instances.
+**Provider selection** (in `src/gww/config/`, ADR-0021)
+- **rule_matching.py**: `first_matching_rule` — the shared `when`-predicate matching primitive used by both `sources:` and `providers:`.
+- **resolver.py**: `find_matching_provider` wraps it; providers are a named map selected by a `when` predicate (no dedicated `providers/` package).
+- The `clean` command evaluates each user-declared `providers.<name>.when` against the source's URI+tag context in config order; first match wins. No env override, no built-in defaults for hosted instances.
 
 **Utils Layer** (`src/gww/utils/`)
 - **shell.py**: Shell completion generation
@@ -110,7 +110,7 @@ graph TB
 
 3. **Remove Worktree Flow** (ADR-0011): `CLI` → `remove` command → `ConfigMgr` loads config → `GitOps` resolves worktree by branch or path → `TemplateEngine` builds context (`source_path`/`dest_path`/`branch`/`tags`) → `ActionSys` matches, executes, and reports `before_remove` actions → critical failures abort; otherwise `GitOps` runs `git worktree remove`
 
-4. **Clean Flow** (ADR-0015 / ADR-0018 / ADR-0019): `CLI` → `clean` command → `ConfigMgr` loads config (incl. `providers:` block) → `GitOps` lists worktrees, filters out main checkout and default branch → for each surviving worktree, `Providers` resolve a provider via host-pattern match (or fall back to `git branch --merged <default>`) → `TemplateEngine` renders the per-branch `merged` template → subprocess runs the rendered command, **exit-code-only**; streams pass through to the user → after batch confirmation, `ActionSys` runs `before_remove`, then `GitOps` runs `git worktree remove` and `git branch -d`
+4. **Clean Flow** (ADR-0015 / ADR-0018 / ADR-0019 / ADR-0021): `CLI` → `clean` command → `ConfigMgr` loads config (incl. `providers:` block) → `GitOps` lists worktrees, filters out main checkout and default branch → for each surviving worktree, a provider is resolved via `when`-predicate match against the source URI (or fall back to `git branch --merged <default>`) → `TemplateEngine` renders the per-branch `merged` template → subprocess runs the rendered command, **exit-code-only**; streams pass through to the user → after batch confirmation, `ActionSys` runs `before_remove`, then `GitOps` runs `git worktree remove` and `git branch -d`
 
 5. **Config Resolution**: `ConfigMgr` loads YAML → evaluates `when` conditions using `TemplateEngine` → selects matching source rule → evaluates path templates → returns resolved paths
 
@@ -167,19 +167,19 @@ actions:
 # command(custom_handler) - if executed for source receives a single argument a source folder, if executed for worktree receive 2 arguments source folder and worktree folder
 # before_remove - actions run before gww remove deletes the worktree; dest_path() is the worktree, source_path() is its parent repo, branch() is the checked-out branch (or "" on detached HEAD). Critical failures abort the remove and exit 1.
 #
-# Providers (consumed by `gww clean`, ADR-0019)
+# Providers (consumed by `gww clean`, ADR-0021)
 # Optional. Without an entry, `--merged` falls back to `git branch --merged <default>`.
-# Resolution: test the source's origin host against `host_patterns` in config order; first match wins.
-# No env override; no built-in defaults. Reference starting points live in `src/gww/providers/`.
+# Resolution: evaluate each provider's `when` predicate against the source URI in config order; first match wins.
+# No env override; no built-in defaults. Names are free-form.
 providers:
   github:
-    host_patterns: ['^github\.com$']
+    when: '"github" in host()'
     merged: 'gh pr list --head branch() --state merged'
   gitlab:
-    host_patterns: ['^gitlab\.com$']
+    when: '"gitlab" in host()'
     merged: 'glab mr list --source-branch branch() --state merged'
   gitea:
-    host_patterns: ['^codeberg\.org$']
+    when: '"codeberg.org" in host()'
     merged: 'tea pulls list --head branch() --state closed --output json | jq -e "[.[] | select(.merged)] | length > 0"'
 ```
 

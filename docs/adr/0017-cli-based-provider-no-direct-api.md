@@ -16,7 +16,7 @@ The cost is a subprocess per branch and a per-provider output parser. The subpro
 
 A hard-coded command per provider kind — `gh pr list --head {branch} --state merged` — would work for hosted instances but break for self-hosted ones with non-standard CLI wrappers, proxied `gh`/`glab`/`tea` binaries, or alternative output flags. Making `providers.<kind>.merged` a template (evaluated by gww's existing template engine with `branch()`, `host()`, `path()`, …) means: self-hosted / oddly-configured users can swap in their own command without us shipping a fork, and the template engine we already maintain (with its escaping, function registry, error reporting, ADR-0006) does double duty. Note that the rendered command's *exit code* is the entire contract — see ADR-0018 for why we don't parse JSON.
 
-> **Note (2026-07-13)**: Earlier drafts of this section claimed "hosted users don't write anything (defaults kick in)". That claim is superseded by ADR-0019: there are no auto-applied built-in defaults. Hosted users must declare their provider in config, or rely on the `--merged` git fallback. The per-kind modules in `src/gww/providers/<kind>.py` are reference starting points, not auto-applied values.
+> **Note (2026-07-13)**: Earlier drafts of this section claimed "hosted users don't write anything (defaults kick in)". That claim is superseded by ADR-0019: there are no auto-applied built-in defaults. Hosted users must declare their provider in config, or rely on the `--merged` git fallback. Worked reference examples live in the commented `providers:` block of the `gww init config` template, not in any per-kind source module — none exist (per ADR-0019 / ADR-0021).
 
 ## Why we don't ship a "provider detects the CLI is installed" check
 
@@ -34,4 +34,4 @@ A previous draft of this ADR said "the provider module knows what JSON its comma
 - Direct API with `httpx` + env/netrc token sourcing — rejected; trades secrets-handling complexity for one fewer subprocess per branch.
 - Direct API with `gh auth token` / `glab auth status` / `tea` shell-outs for token only — rejected; pulls token into gww's address space, removing the security property this ADR exists to give us.
 - gRPC/protobuf over the CLI — rejected; not all CLIs expose one.
-- Make the user write the entire command in config — rejected as the *only* mechanism; we keep reference defaults in `src/gww/providers/<kind>.py` for users to copy, but they are not auto-applied (per ADR-0019).
+- Make the user write the entire command in config — rejected as the *only* mechanism; we keep worked reference examples in the commented `providers:` block of the `gww init config` template for users to copy, but they are not auto-applied (per ADR-0019).

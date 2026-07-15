@@ -25,14 +25,14 @@ A previous revision considered two templates so that `--closed` could widen `--m
 ```yaml
 providers:
   github:
-    host_patterns: ['^github\.com$']
-    merged: 'gh pr list --head branch() --state merged'
+    when: '"github" in host()'  # selection mechanism, ADR-0021 (was host_patterns)
+    filter: 'gh pr list --head branch() --state tag("state", "merged") --json number --jq "length > 0"'
   gitlab:
-    host_patterns: ['^gitlab\.com$']
-    merged: 'glab mr list --source-branch branch() --state merged'
+    when: '"gitlab" in host()'
+    filter: 'glab mr list --source-branch branch() --state tag("state", "merged")'
   gitea:
-    host_patterns: ['^codeberg\.org$']
-    merged: 'tea pulls list --head branch() --state closed --output json | jq -e "[.[] | select(.merged)] | length > 0"'
+    when: '"codeberg.org" in host()'
+    filter: 'tea pulls list --head branch() --state closed --output json | jq -e "[.[] | select(.merged or tag(\"state\") == \"closed\")] | length > 0"'
 ```
 
 One template per provider, evaluated by the existing `gww.template` engine with `branch()`, `host()`, `path(n)`, etc. The rendered command is invoked via the shell; only its return code is consulted.

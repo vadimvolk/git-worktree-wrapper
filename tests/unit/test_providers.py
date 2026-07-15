@@ -1,79 +1,153 @@
-"""Unit tests for the provider resolution module (``gww.providers``)."""
+"""Unit tests for provider resolution.
+
+Providers select by a ``when`` predicate over the source's origin URI —
+the same mechanism as ``sources:`` rules (ADR-0021). This module covers
+:func:`gww.config.resolver.find_matching_provider`, the shared
+:func:`gww.config.rule_matching.first_matching_rule` primitive, and
+``providers:`` validation.
+"""
 
 from __future__ import annotations
 
 import pytest
 
-from gww.config.validator import ConfigValidationError, ProviderConfig, validate_config
-from gww.providers import match_provider
+from gww.config.resolver import find_matching_provider
+from gww.config.rule_matching import ResolverError, first_matching_rule
+from gww.config.validator import (
+    Config,
+    ConfigValidationError,
+    ProviderConfig,
+    SourceRule,
+    validate_config,
+)
+from gww.utils.uri import parse_uri
 
 
-class TestMatchProvider:
-    """``match_provider`` walks user-declared providers in config order and
-    returns the first one whose pattern matches the source's origin host."""
+def _pcfg(name: str, when: str, filter: str = "true") -> ProviderConfig:
+    return ProviderConfig(name=name, when=when, filter=filter)
 
-    def _pcfg(self, kind: str, patterns: list[str], merged: str = "true") -> ProviderConfig:
-        return ProviderConfig(kind=kind, host_patterns=patterns, merged=merged)
+
+def _config(providers: dict[str, ProviderConfig]) -> Config:
+    return Config(
+        default_sources="~/sources/default",
+        default_worktrees="~/worktrees/default",
+        providers=providers,
+    )
+
+
+class TestFindMatchingProvider:
+    """``find_matching_provider`` returns the first provider whose ``when``
+    predicate matches the URI, in config order."""
 
     def test_returns_none_when_no_providers_declared(self) -> None:
-        assert match_provider({}, "github.com") is None
+        config = _config({})
+        uri = parse_uri("https://github.com/user/repo.git")
+        assert find_matching_provider(config, uri) is None
 
-    def test_returns_none_when_no_pattern_matches(self) -> None:
-        providers = {
-            "github": self._pcfg("github", [r"^github\.com$"]),
-            "gitlab": self._pcfg("gitlab", [r"^gitlab\.com$"]),
-        }
-        assert match_provider(providers, "codeberg.org") is None
+    def test_returns_none_when_no_when_matches(self) -> None:
+        config = _config(
+            {
+                "github": _pcfg("github", '"github" in host()'),
+                "gitlab": _pcfg("gitlab", '"gitlab" in host()'),
+            }
+        )
+        uri = parse_uri("https://codeberg.org/user/repo.git")
+        assert find_matching_provider(config, uri) is None
 
-    def test_matches_when_pattern_matches(self) -> None:
-        providers = {
-            "github": self._pcfg("github", [r"^github\.com$"]),
-        }
-        result = match_provider(providers, "github.com")
+    def test_matches_when_predicate_matches(self) -> None:
+        config = _config({"github": _pcfg("github", '"github" in host()')})
+        uri = parse_uri("https://github.com/user/repo.git")
+        result = find_matching_provider(config, uri)
         assert result is not None
-        assert result.kind == "github"
+        assert result.name == "github"
 
     def test_first_match_wins_in_config_order(self) -> None:
-        providers = {
-            "first": self._pcfg("first", [r"^.*\.example\.com$"]),
-            "second": self._pcfg("second", [r"^github\.com$"]),
-        }
-        result = match_provider(providers, "github.com.example.com")
+        config = _config(
+            {
+                "first": _pcfg("first", "True"),
+                "second": _pcfg("second", '"github" in host()'),
+            }
+        )
+        uri = parse_uri("https://github.com/user/repo.git")
+        result = find_matching_provider(config, uri)
         assert result is not None
-        assert result.kind == "first"
+        assert result.name == "first"
 
-    def test_multiple_patterns_first_match_wins(self) -> None:
-        providers = {
-            "github": self._pcfg(
-                "github",
-                [r"^github\.com$", r"^.*\.github\.com$"],
-            ),
-        }
-        result = match_provider(providers, "api.github.com")
+    def test_substring_match_is_not_anchored(self) -> None:
+        """``"github" in host()`` matches any host containing the substring
+        (unlike the old anchored regex)."""
+        config = _config({"github": _pcfg("github", '"github" in host()')})
+        assert find_matching_provider(
+            config, parse_uri("https://mygithub.com/user/repo.git")
+        ) is not None
+        assert find_matching_provider(
+            config, parse_uri("https://api.github.com/user/repo.git")
+        ) is not None
+
+    def test_when_with_path_access(self) -> None:
+        config = _config({"myorg": _pcfg("myorg", 'path(0) == "myorg"')})
+        uri = parse_uri("https://git.example.com/myorg/project.git")
+        result = find_matching_provider(config, uri)
         assert result is not None
-        assert result.kind == "github"
+        assert result.name == "myorg"
 
-    def test_regex_patterns_supported(self) -> None:
-        providers = {
-            "github": self._pcfg("github", [r"^.*\.?github\.com$"]),
-        }
-        assert match_provider(providers, "github.com") is not None
-        assert match_provider(providers, "api.github.com") is not None
-        assert match_provider(providers, "gitlab.com") is None
+    def test_when_with_tag(self) -> None:
+        config = _config({"tagged": _pcfg("tagged", 'tag_exist("forge")')})
+        uri = parse_uri("https://example.com/user/repo.git")
+        assert find_matching_provider(config, uri, {}) is None
+        result = find_matching_provider(config, uri, {"forge": "gitea"})
+        assert result is not None
+        assert result.name == "tagged"
 
-    def test_anchored_patterns(self) -> None:
-        """Patterns are matched with ``re.fullmatch`` so ``^github.com$``
-        does NOT match ``mygithub.com``."""
-        providers = {
-            "github": self._pcfg("github", [r"^github\.com$"]),
+    def test_invalid_when_raises_resolver_error(self) -> None:
+        config = _config({"invalid": _pcfg("invalid", "undefined_variable")})
+        uri = parse_uri("https://github.com/user/repo.git")
+        with pytest.raises(
+            ResolverError, match="Error evaluating 'when' for provider 'invalid'"
+        ):
+            find_matching_provider(config, uri)
+
+
+class TestFirstMatchingRule:
+    """The shared primitive underpinning both source-rule and provider
+    selection."""
+
+    def test_returns_none_on_empty(self) -> None:
+        uri = parse_uri("https://github.com/user/repo.git")
+        from gww.config.resolver import _build_uri_context
+
+        context = _build_uri_context(uri)
+        assert first_matching_rule({}, context, label="provider") is None
+
+    def test_first_match_wins(self) -> None:
+        uri = parse_uri("https://github.com/user/repo.git")
+        from gww.config.resolver import _build_uri_context
+
+        context = _build_uri_context(uri)
+        rules = {
+            "a": SourceRule(name="a", when="True"),
+            "b": SourceRule(name="b", when="True"),
         }
-        assert match_provider(providers, "mygithub.com") is None
+        result = first_matching_rule(rules, context, label="source rule")
+        assert result is not None
+        assert result.name == "a"
+
+    def test_error_message_uses_label(self) -> None:
+        uri = parse_uri("https://github.com/user/repo.git")
+        from gww.config.resolver import _build_uri_context
+
+        context = _build_uri_context(uri)
+        rules = {"x": SourceRule(name="x", when="undefined_variable")}
+        with pytest.raises(
+            ResolverError, match="Error evaluating 'when' for widget 'x'"
+        ):
+            first_matching_rule(rules, context, label="widget")
 
 
 class TestProviderConfigValidation:
     """The validator accepts ``providers:`` blocks and rejects malformed
-    entries. Bad regex must be caught at config-validation time
-    (ADR-0019)."""
+    entries. Providers require a non-empty ``when`` and ``filter`` string
+    (ADR-0021)."""
 
     def test_valid_provider_block_loads(self) -> None:
         data = {
@@ -81,15 +155,30 @@ class TestProviderConfigValidation:
             "default_worktrees": "~/worktrees",
             "providers": {
                 "github": {
-                    "host_patterns": [r"^github\.com$"],
-                    "merged": "gh pr list --head branch() --state merged",
+                    "when": '"github" in host()',
+                    "filter": "gh pr list --head branch() --state merged",
                 },
             },
         }
         config = validate_config(data)
         assert "github" in config.providers
-        assert config.providers["github"].kind == "github"
-        assert config.providers["github"].host_patterns == [r"^github\.com$"]
+        assert config.providers["github"].name == "github"
+        assert config.providers["github"].when == '"github" in host()'
+
+    def test_free_form_provider_name_allowed(self) -> None:
+        """Names are free-form — no github/gitlab/gitea constraint."""
+        data = {
+            "default_sources": "~/sources",
+            "default_worktrees": "~/worktrees",
+            "providers": {
+                "my-self-hosted-forge": {
+                    "when": '"git.example.com" in host()',
+                    "filter": "true",
+                },
+            },
+        }
+        config = validate_config(data)
+        assert config.providers["my-self-hosted-forge"].name == "my-self-hosted-forge"
 
     def test_empty_providers_block_is_allowed(self) -> None:
         data = {
@@ -126,92 +215,78 @@ class TestProviderConfigValidation:
         with pytest.raises(ConfigValidationError, match="must be a mapping"):
             validate_config(data)
 
-    def test_missing_host_patterns_rejected(self) -> None:
+    def test_missing_when_rejected(self) -> None:
         data = {
             "default_sources": "~/sources",
             "default_worktrees": "~/worktrees",
-            "providers": {"github": {"merged": "true"}},
+            "providers": {"github": {"filter": "true"}},
         }
-        with pytest.raises(ConfigValidationError, match="host_patterns"):
+        with pytest.raises(ConfigValidationError, match="missing required 'when'"):
             validate_config(data)
 
-    def test_empty_host_patterns_rejected(self) -> None:
+    def test_empty_when_rejected(self) -> None:
         data = {
             "default_sources": "~/sources",
             "default_worktrees": "~/worktrees",
-            "providers": {"github": {"host_patterns": [], "merged": "true"}},
+            "providers": {"github": {"when": "   ", "filter": "true"}},
         }
-        with pytest.raises(ConfigValidationError, match="non-empty"):
+        with pytest.raises(ConfigValidationError, match="cannot be empty"):
             validate_config(data)
 
-    def test_host_patterns_not_a_list_rejected(self) -> None:
+    def test_when_must_be_string(self) -> None:
         data = {
             "default_sources": "~/sources",
             "default_worktrees": "~/worktrees",
-            "providers": {
-                "github": {"host_patterns": "^github\\.com$", "merged": "true"},
-            },
-        }
-        with pytest.raises(ConfigValidationError, match="non-empty"):
-            validate_config(data)
-
-    def test_host_pattern_must_be_string(self) -> None:
-        data = {
-            "default_sources": "~/sources",
-            "default_worktrees": "~/worktrees",
-            "providers": {
-                "github": {"host_patterns": [42], "merged": "true"},
-            },
+            "providers": {"github": {"when": 42, "filter": "true"}},
         }
         with pytest.raises(ConfigValidationError, match="must be a string"):
             validate_config(data)
 
-    def test_invalid_regex_rejected(self) -> None:
+    def test_missing_filter_rejected(self) -> None:
         data = {
             "default_sources": "~/sources",
             "default_worktrees": "~/worktrees",
-            "providers": {
-                "github": {"host_patterns": ["("], "merged": "true"},
-            },
+            "providers": {"github": {"when": '"github" in host()'}},
         }
-        with pytest.raises(ConfigValidationError, match="valid regex"):
+        with pytest.raises(ConfigValidationError, match="filter"):
             validate_config(data)
 
-    def test_missing_merged_rejected(self) -> None:
+    def test_empty_filter_rejected(self) -> None:
         data = {
             "default_sources": "~/sources",
             "default_worktrees": "~/worktrees",
             "providers": {
-                "github": {"host_patterns": [r"^github\.com$"]},
-            },
-        }
-        with pytest.raises(ConfigValidationError, match="merged"):
-            validate_config(data)
-
-    def test_empty_merged_rejected(self) -> None:
-        data = {
-            "default_sources": "~/sources",
-            "default_worktrees": "~/worktrees",
-            "providers": {
-                "github": {
-                    "host_patterns": [r"^github\.com$"],
-                    "merged": "   ",
-                },
+                "github": {"when": '"github" in host()', "filter": "   "},
             },
         }
         with pytest.raises(ConfigValidationError, match="cannot be empty"):
             validate_config(data)
 
-    def test_merged_must_be_string(self) -> None:
+    def test_filter_must_be_string(self) -> None:
+        data = {
+            "default_sources": "~/sources",
+            "default_worktrees": "~/worktrees",
+            "providers": {
+                "github": {"when": '"github" in host()', "filter": 42},
+            },
+        }
+        with pytest.raises(ConfigValidationError, match="filter"):
+            validate_config(data)
+
+    def test_lingering_host_patterns_key_ignored(self) -> None:
+        """A leftover ``host_patterns`` key is silently ignored — unknown
+        keys aren't rejected today, and there's no back-compat migration."""
         data = {
             "default_sources": "~/sources",
             "default_worktrees": "~/worktrees",
             "providers": {
                 "github": {
                     "host_patterns": [r"^github\.com$"],
-                    "merged": 42,
+                    "when": '"github" in host()',
+                    "filter": "true",
                 },
             },
         }
-        with pytest.raises(ConfigValidationError, match="merged"):
-            validate_config(data)
+        config = validate_config(data)
+        assert config.providers["github"].when == '"github" in host()'
+        assert not hasattr(config.providers["github"], "host_patterns")

@@ -5,16 +5,20 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Optional
 
-from gww.config.validator import Config, SourceRule
-from gww.template.evaluator import TemplateError, evaluate_predicate, evaluate_template
+from gww.config.rule_matching import ResolverError, first_matching_rule
+from gww.config.validator import Config, ProviderConfig, SourceRule
+from gww.template.evaluator import TemplateError, evaluate_template
 from gww.template.functions import TemplateContext, create_function_registry
 from gww.utils.uri import ParsedURI
 
-
-class ResolverError(Exception):
-    """Raised when path resolution fails."""
-
-    pass
+__all__ = [
+    "ResolverError",
+    "find_matching_source_rule",
+    "find_matching_provider",
+    "resolve_source_path",
+    "resolve_worktree_path",
+    "get_source_path_for_worktree",
+]
 
 
 def _expand_home(path: str) -> str:
@@ -68,17 +72,32 @@ def find_matching_source_rule(
         ResolverError: If predicate evaluation fails.
     """
     context = _build_uri_context(uri, tags)
+    return first_matching_rule(config.sources, context, label="source rule")
 
-    for name, rule in config.sources.items():
-        try:
-            if evaluate_predicate(rule.when, context):
-                return rule
-        except TemplateError as e:
-            raise ResolverError(
-                f"Error evaluating 'when' for source rule '{name}': {e}"
-            ) from e
 
-    return None
+def find_matching_provider(
+    config: Config,
+    uri: ParsedURI,
+    tags: dict[str, str] = {},
+) -> Optional[ProviderConfig]:
+    """Find the first matching provider for a URI (used by ``gww clean``).
+
+    Providers select exactly like source rules — a ``when`` predicate over
+    the URI+tag context, first match wins in config order (ADR-0021).
+
+    Args:
+        config: Validated configuration.
+        uri: Parsed URI to match against.
+        tags: Optional dictionary of tag key-value pairs.
+
+    Returns:
+        Matching ProviderConfig, or None if no provider matches.
+
+    Raises:
+        ResolverError: If predicate evaluation fails.
+    """
+    context = _build_uri_context(uri, tags)
+    return first_matching_rule(config.providers, context, label="provider")
 
 
 def resolve_source_path(
