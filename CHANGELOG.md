@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-15
+
+### Changed
+
+- **BREAKING**: Provider selection now uses `when` predicates instead of `host_patterns`. Providers are matched using the same URI+tag context as `sources:` and `actions:` rules. The first provider whose `when` predicate evaluates to true is selected. (ADR-0021)
+- **BREAKING**: Provider `merged` field renamed to `filter` to reflect its general exit-code-based filtering purpose.
+- **BREAKING**: Provider `kind` field renamed to `name`. Provider names are now free-form identifiers rather than constrained to `github`/`gitlab`/`gitea`.
+- Removed `src/gww/providers/` package (`base.py` and `__init__.py`) — the `when` predicate makes provider kinds unnecessary.
+
+### Added
+
+- Tags passed via `gww clean --tag key=value` are now available in both provider `when` predicates (for selection) and `filter` templates (for per-branch logic).
+- The `tag()` template function now accepts an optional default parameter: `tag("name", "default")` returns the default value if the tag is missing.
+
+### Notes
+
+- Provider `when` predicates have access to the same URI context as source rules: `host()`, `port()`, `protocol()`, `path(n)`, `uri()`, and tags. The `branch()` function remains available only in the `filter` template.
+- The git fallback behavior is unchanged: when no providers match or no origin exists, `gww clean --merged` falls back to `git branch --merged`.
+- Existing configs with `host_patterns` or `merged` keys will silently ignore those fields — manual migration to `when` and `filter` is required.
+
 ### Breaking Changes
 
 - **`gww clean` provider config**: Renamed `merged` field to `filter` to reflect its general purpose (exit 0 = cleanable branch, not strictly "merged state"). Update your config:
@@ -101,7 +121,8 @@ First published release.
 - See `CONTEXT.md` for domain terminology and `docs/adr/` for
   architectural decisions.
 
-[Unreleased]: https://github.com/vadimvolk/git-worktree-wrapper/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/vadimvolk/git-worktree-wrapper/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/vadimvolk/git-worktree-wrapper/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/vadimvolk/git-worktree-wrapper/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/vadimvolk/git-worktree-wrapper/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/vadimvolk/git-worktree-wrapper/releases/tag/v0.1.0
