@@ -1,6 +1,6 @@
 [project]
 name = "git-worktree-wrapper"
-version = "0.2.1"
+version = "0.3.0"
 description = "Git Worktree Wrapper - CLI tool for managing git worktrees with configurable path templates"
 readme = "README.md"
 requires-python = ">=3.11"
