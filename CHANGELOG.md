@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- **`gww clean` provider config**: Renamed `merged` field to `filter` to reflect its general purpose (exit 0 = cleanable branch, not strictly "merged state"). Update your config:
+  ```yaml
+  # Before:
+  providers:
+    github:
+      merged: 'gh pr list --head branch() --state merged'
+  
+  # After:
+  providers:
+    github:
+      filter: 'gh pr list --head branch() --state merged'
+  ```
+
+### Added
+
+- **`gww clean --tag`**: Added `--tag key=value` support to `gww clean` command (repeatable, same as other commands). Tags are available in both provider `when` predicates (for selection) and `filter` templates (for per-branch logic).
+- **`tag()` default parameter**: The `tag()` template function now accepts an optional default value: `tag("state", "merged")` returns `"merged"` if the `state` tag is not set. Fully backward compatible—existing `tag("name")` calls still return empty string if the tag is missing.
+- **Tag-driven filtering example**: Use `gww clean --tag state=closed` to remove branches with closed (but not merged) PRs, where the provider's `filter` uses `--state tag("state", "merged")` for flexible state checking.
+
 ## [0.2.1] - 2026-07-14
 
 ### Added

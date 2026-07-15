@@ -249,8 +249,8 @@ class TestCleanMergedProvider:
         providers_block = f"""\
 providers:
   github:
-    host_patterns: ['^.*$']
-    merged: "{self._provider_cmd('exit0', fixture_dir)}"
+    when: 'True'
+    filter: "{self._provider_cmd('exit0', fixture_dir)}"
 """
         _make_config(config_dir, providers=providers_block)
         monkeypatch.chdir(local)
@@ -280,8 +280,8 @@ providers:
         providers_block = f"""\
 providers:
   github:
-    host_patterns: ['^.*$']
-    merged: "{self._provider_cmd('exit1', fixture_dir)}"
+    when: 'True'
+    filter: "{self._provider_cmd('exit1', fixture_dir)}"
 """
         _make_config(config_dir, providers=providers_block)
         monkeypatch.chdir(local)
@@ -309,8 +309,8 @@ providers:
         providers_block = """\
 providers:
   github:
-    host_patterns: ['^.*$']
-    merged: "gww-fixture-missing-binary branch()"
+    when: 'True'
+    filter: "gww-fixture-missing-binary branch()"
 """
         _make_config(config_dir, providers=providers_block)
         monkeypatch.chdir(local)
@@ -339,8 +339,8 @@ providers:
         providers_block = f"""\
 providers:
   github:
-    host_patterns: ['^.*$']
-    merged: "{self._provider_cmd('sleep', fixture_dir)}"
+    when: 'True'
+    filter: "{self._provider_cmd('sleep', fixture_dir)}"
 """
         _make_config(config_dir, providers=providers_block)
         monkeypatch.chdir(local)
@@ -475,8 +475,8 @@ class TestCleanMergedFallbackWarning:
         providers_block = """\
 providers:
   github:
-    host_patterns: ['^github\\.com$']
-    merged: "true"
+    when: '"github" in host()'
+    filter: "true"
 """
         _make_config(config_dir, providers=providers_block)
         monkeypatch.chdir(local)
@@ -526,8 +526,8 @@ providers:
         providers_block = """\
 providers:
   github:
-    host_patterns: ['^github\\.com$']
-    merged: "true"
+    when: '"github" in host()'
+    filter: "true"
 """
         _make_config(config_dir, providers=providers_block)
         monkeypatch.chdir(local)
@@ -879,8 +879,8 @@ class TestCleanExitCodes:
         providers_block = f"""\
 providers:
   github:
-    host_patterns: ['^.*$']
-    merged: "{cmd}"
+    when: 'True'
+    filter: "{cmd}"
 """
         _make_config(config_dir, providers=providers_block)
         monkeypatch.chdir(local)
@@ -890,3 +890,100 @@ providers:
 
         assert result == 0
         assert (worktrees_dir / "feature-a").exists()
+
+    def test_tag_exist_removes_when_tag_present(
+        self,
+        git_repo_with_remote: tuple[Path, str],
+        config_dir: Path,
+        worktrees_dir: Path,
+        fixture_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """tag_exist() in filter template exits 0 when tag is present."""
+        local, _ = git_repo_with_remote
+        _add_worktree(local, "feature-a", worktrees_dir / "feature-a")
+        cmd = f"PYTHONPATH={fixture_dir} python {fixture_dir / 'provider_fixture.py'} branch() tag_exist('archive')".replace(
+            "\\", "\\\\"
+        )
+        providers_block = f"""\
+providers:
+  github:
+    when: 'True'
+    filter: "{cmd}"
+"""
+        _make_config(config_dir, providers=providers_block)
+        monkeypatch.chdir(local)
+        monkeypatch.setenv("GWW_FIXTURE_MODE", "tag_exist_true")
+
+        result = run_clean(make_ctx(clean_merged=True, clean_yes=True, tags={"archive": ""}))
+
+        assert result == 0
+        assert not (worktrees_dir / "feature-a").exists()
+        captured = capsys.readouterr()
+        assert "feature-a: clean" in captured.out
+        assert "Removed 1; kept 0" in captured.out
+
+    def test_tag_with_default_uses_default_value(
+        self,
+        git_repo_with_remote: tuple[Path, str],
+        config_dir: Path,
+        worktrees_dir: Path,
+        fixture_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """tag() with default value uses default when tag not provided."""
+        local, _ = git_repo_with_remote
+        _add_worktree(local, "feature-a", worktrees_dir / "feature-a")
+        cmd = f"PYTHONPATH={fixture_dir} python {fixture_dir / 'provider_fixture.py'} branch() tag('state','merged')".replace(
+            "\\", "\\\\"
+        )
+        providers_block = f"""\
+providers:
+  github:
+    when: 'True'
+    filter: "{cmd}"
+"""
+        _make_config(config_dir, providers=providers_block)
+        monkeypatch.chdir(local)
+        monkeypatch.setenv("GWW_FIXTURE_MODE", "tag_with_default")
+
+        result = run_clean(make_ctx(clean_merged=True, clean_yes=True))
+
+        assert result == 0
+        assert not (worktrees_dir / "feature-a").exists()
+        captured = capsys.readouterr()
+        assert "feature-a: clean" in captured.out
+
+    def test_tag_with_override_uses_provided_value(
+        self,
+        git_repo_with_remote: tuple[Path, str],
+        config_dir: Path,
+        worktrees_dir: Path,
+        fixture_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """tag() with override uses provided value instead of default."""
+        local, _ = git_repo_with_remote
+        _add_worktree(local, "feature-a", worktrees_dir / "feature-a")
+        cmd = f"PYTHONPATH={fixture_dir} python {fixture_dir / 'provider_fixture.py'} branch() tag('state','merged')".replace(
+            "\\", "\\\\"
+        )
+        providers_block = f"""\
+providers:
+  github:
+    when: 'True'
+    filter: "{cmd}"
+"""
+        _make_config(config_dir, providers=providers_block)
+        monkeypatch.chdir(local)
+        monkeypatch.setenv("GWW_FIXTURE_MODE", "tag_with_override")
+
+        result = run_clean(make_ctx(clean_merged=True, clean_yes=True, tags={"state": "closed"}))
+
+        assert result == 0
+        assert not (worktrees_dir / "feature-a").exists()
+        captured = capsys.readouterr()
+        assert "feature-a: clean" in captured.out

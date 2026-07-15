@@ -32,6 +32,7 @@ from gww.cli.context import (
     print_action_failure_summary,
     resolve_source_repo,
 )
+from gww.config.resolver import find_matching_provider
 from gww.config.validator import ProviderConfig
 from gww.git.branch import (
     BranchNotFoundError,
@@ -43,7 +44,6 @@ from gww.git.repository import (
     get_remote_uri,
     run_git,
 )
-from gww.providers import match_provider
 from gww.template.functions import TemplateContext
 from gww.utils.uri import ParsedURI
 
@@ -161,7 +161,7 @@ def run_clean(ctx: CommandContext) -> int:
 
     provider: ProviderConfig | None = None
     if use_merged and parsed_uri is not None:
-        provider = match_provider(config.providers, parsed_uri.host)
+        provider = find_matching_provider(config, parsed_uri, ctx.tags)
         if provider is None and config.providers:
             print(
                 f"warning: origin host '{parsed_uri.host}' matched no configured "
@@ -178,13 +178,14 @@ def run_clean(ctx: CommandContext) -> int:
     if use_merged and provider is None:
         git_merged_set = _git_merged_branch_set(source_path, plan.default_branch)
 
-    provider_label: str | None = provider.kind if provider is not None else None
+    provider_label: str | None = provider.name if provider is not None else None
 
     selection = select_cleanable(
         plan.branches,
         use_all=use_all,
         provider=provider,
         parsed_uri=parsed_uri,
+        tags=ctx.tags,
         git_merged_set=git_merged_set,
     )
 

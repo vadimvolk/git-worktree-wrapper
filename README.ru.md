@@ -405,7 +405,7 @@ feature-a: clean       # или "keep", "skip (timeout)", "skip (gh not found)"
 Filter: --merged (provider: github). Delete matching worktrees? [y/N]
 ```
 
-Токен `--merged` заменяется на `--all` при активном фильтре `--all`; суффикс `(provider: <kind>)` появляется только когда активен `--merged` И провайдер резолвится, иначе промпт выглядит как `Filter: --merged. Delete matching worktrees? [y/N]`. Ответьте `y` (без учёта регистра) для продолжения; любой другой ответ (включая EOF) отклоняет операцию без побочных эффектов с кодом выхода `0`.
+Токен `--merged` заменяется на `--all` при активном фильтре `--all`; суффикс `(provider: <name>)` появляется только когда активен `--merged` И провайдер резолвится, иначе промпт выглядит как `Filter: --merged. Delete matching worktrees? [y/N]`. Ответьте `y` (без учёта регистра) для продолжения; любой другой ответ (включая EOF) отклоняет операцию без побочных эффектов с кодом выхода `0`.
 
 **Сводка (в конце)**:
 
@@ -426,26 +426,39 @@ Would remove N; would keep M
 
 #### 🔌 Провайдеры
 
-Чтобы включить фильтрацию по MR-merged через провайдера, объявите блок `providers:` в `config.yml` с паттернами хостов и шаблоном команды `merged` для каждого типа:
+Чтобы включить фильтрацию по MR-merged через провайдера, объявите блок `providers:` в `config.yml` с предикатом `when` и шаблоном команды `filter` для каждой записи:
 
 ```yaml
 providers:
   github:
-    host_patterns: ['^github\.com$']
-    merged: 'gh pr list --head branch() --state merged'
+    when: '"github" in host()'
+    filter: 'gh pr list --head branch() --state tag("state", "merged") --json number --jq "length > 0"'
   gitlab:
-    host_patterns: ['^gitlab\.com$']
-    merged: 'glab mr list --source-branch branch() --state merged'
+    when: '"gitlab" in host()'
+    filter: 'glab mr list --source-branch branch() --state tag("state", "merged")'
   gitea:
-    host_patterns: ['^codeberg\.org$']
-    merged: 'tea pulls list --head branch() --state closed --output json | jq -e "[.[] | select(.merged)] | length > 0"'
+    when: '"codeberg.org" in host()'
+    filter: 'tea pulls list --head branch() --state closed --output json | jq -e "[.[] | select(.merged or tag(\"state\") == \"closed\")] | length > 0"'
 ```
 
-**Разрешение**: `gww clean` проверяет origin-хост исходного репозитория против каждого `providers.<kind>.host_patterns` в порядке конфига; побеждает первое совпадение. **Без переменной окружения `GWW_PROVIDER`. Без встроенных дефолтов** — пользователи на hosted-инстансах должны объявить провайдера в конфиге или полагаться на git-fallback (`git branch --merged <default>`), если ни один паттерн не подошёл. Справочные дефолты для GitHub / GitLab / Gitea лежат в `src/gww/providers/` и задокументированы в шаблоне `gww init config`.
+**Разрешение**: `gww clean` вычисляет предикат `when` каждого объявленного провайдера против URI исходного репозитория в порядке конфига; побеждает первое совпадение — тот же механизм, что и у правил `sources:`. Имена провайдеров произвольные. **Без переменной окружения `GWW_PROVIDER`. Без встроенных дефолтов** — пользователи на hosted-инстансах должны объявить провайдера в конфиге или полагаться на git-fallback (`git branch --merged <default>`), если ни один провайдер не подошёл. Закомментированный блок `providers:` в `gww init config` содержит примеры выше; отдельных модулей-провайдеров в кодовой базе нет.
 
-**Контракт**: отрендеренная команда `merged` должна выходить с 0 тогда и только тогда, когда для ветки worktree существует MR/PR в состоянии merged. `gww clean` читает только код выхода; он никогда не парсит stdout/stderr провайдера. stdout и stderr провайдера пробрасываются в ваш терминал напрямую.
+**Контракт**: отрендеренная команда `filter` должна выходить с 0 тогда и только тогда, когда ветка является cleanable (например, для ветки worktree существует MR/PR в состоянии merged). `gww clean` читает только код выхода; он никогда не парсит stdout/stderr провайдера. stdout и stderr провайдера пробрасываются в ваш терминал напрямую.
 
-**Функции шаблонов**, доступные в `providers.<kind>.merged`: `branch()`, `host()`, `port()`, `protocol()`, `uri()`, `path(n)`, а также project-context хелперы (`source_path()`, `current_worktree()`, `file_exists()` и т.д.) и функции тегов.
+**Функции шаблонов**, доступные в `providers.<name>.filter`: `branch()`, `host()`, `port()`, `protocol()`, `uri()`, `path(n)`, `tag(name, default)`, `tag_exist(name)`, а также project-context хелперы (`source_path()`, `current_worktree()`, `file_exists()` и т.д.).
+
+**Фильтрация на основе тегов**: Используйте `gww clean --tag key=value` для передачи тегов как в предикат `when` провайдера (для выбора), так и в шаблон `filter` (для логики фильтрации по веткам):
+
+```bash
+# Очистить merged-ветки (по умолчанию)
+gww clean
+
+# Очистить closed-ветки
+gww clean --tag state=closed
+
+# Очистить draft PR
+gww clean --tag state=draft
+```
 
 ## 🔄 Обновление
 

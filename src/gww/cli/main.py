@@ -182,6 +182,13 @@ def create_parser() -> argparse.ArgumentParser:
             "-d for 'git branch'. Does NOT escalate the MR filter."
         ),
     )
+    clean_parser.add_argument(
+        "-t", "--tag",
+        action="append",
+        default=[],
+        help="Tag in format key=value or just key (can be specified multiple times)",
+        metavar="TAG",
+    )
 
     # migrate command
     migrate_parser = subparsers.add_parser(

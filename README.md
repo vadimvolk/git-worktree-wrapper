@@ -405,7 +405,7 @@ feature-a: clean       # or "keep", "skip (timeout)", "skip (gh not found)"
 Filter: --merged (provider: github). Delete matching worktrees? [y/N]
 ```
 
-The `--merged` token becomes `--all` when that filter is active; the `(provider: <kind>)` suffix appears only when `--merged` is active AND a provider resolved, otherwise the prompt is just `Filter: --merged. Delete matching worktrees? [y/N]`. Answer `y` (case-insensitive) to proceed; anything else (including EOF) declines with no side effects and exit code `0`.
+The `--merged` token becomes `--all` when that filter is active; the `(provider: <name>)` suffix appears only when `--merged` is active AND a provider resolved, otherwise the prompt is just `Filter: --merged. Delete matching worktrees? [y/N]`. Answer `y` (case-insensitive) to proceed; anything else (including EOF) declines with no side effects and exit code `0`.
 
 **Summary (end of run)**:
 
@@ -426,26 +426,39 @@ Provider failures do **not** affect the command's exit code. The summary's `kept
 
 #### 🔌 Providers
 
-To enable provider-aware merged-MR filtering, declare a `providers:` block in your `config.yml` with the host patterns and a `merged` command template for each kind:
+To enable provider-aware merged-MR filtering, declare a `providers:` block in your `config.yml` with a `when` predicate and a `filter` command template for each entry:
 
 ```yaml
 providers:
   github:
-    host_patterns: ['^github\.com$']
-    merged: 'gh pr list --head branch() --state merged'
+    when: '"github" in host()'
+    filter: 'gh pr list --head branch() --state tag("state", "merged") --json number --jq "length > 0"'
   gitlab:
-    host_patterns: ['^gitlab\.com$']
-    merged: 'glab mr list --source-branch branch() --state merged'
+    when: '"gitlab" in host()'
+    filter: 'glab mr list --source-branch branch() --state tag("state", "merged")'
   gitea:
-    host_patterns: ['^codeberg\.org$']
-    merged: 'tea pulls list --head branch() --state closed --output json | jq -e "[.[] | select(.merged)] | length > 0"'
+    when: '"codeberg.org" in host()'
+    filter: 'tea pulls list --head branch() --state closed --output json | jq -e "[.[] | select(.merged or tag(\"state\") == \"closed\")] | length > 0"'
 ```
 
-**Resolution**: `gww clean` tests the source's origin host against each declared `providers.<kind>.host_patterns` in config order; first match wins. **No `GWW_PROVIDER` env override. No auto-applied built-in defaults** — users on hosted instances must declare the provider in their config, or rely on the `--merged` git fallback (`git branch --merged <default>`) when no declared pattern matches. Reference defaults for GitHub / GitLab / Gitea live in `src/gww/providers/` and are documented in the default config template.
+**Resolution**: `gww clean` evaluates each declared provider's `when` predicate against the source's URI in config order; first match wins — the same mechanism `sources:` rules use. Provider names are free-form. **No `GWW_PROVIDER` env override. No auto-applied built-in defaults** — users on hosted instances must declare the provider in their config, or rely on the `--merged` git fallback (`git branch --merged <default>`) when no provider matches. The commented `providers:` block in `gww init config` ships the worked examples above; there are no per-kind reference modules in the codebase.
 
-**Contract**: the rendered `merged` command must exit 0 iff an MR/PR for the worktree's branch is in the merged state. `gww clean` reads only the exit code; it never parses the provider's stdout or stderr. The provider's stdout and stderr are passed through to your terminal live.
+**Contract**: the rendered `filter` command must exit 0 iff the branch is cleanable (e.g., an MR/PR for the worktree's branch is in the merged state). `gww clean` reads only the exit code; it never parses the provider's stdout or stderr. The provider's stdout and stderr are passed through to your terminal live.
 
-**Template functions** available in `providers.<kind>.merged`: `branch()`, `host()`, `port()`, `protocol()`, `uri()`, `path(n)`, plus project-context helpers (`source_path()`, `current_worktree()`, `file_exists()`, etc.) and tag functions.
+**Template functions** available in `providers.<name>.filter`: `branch()`, `host()`, `port()`, `protocol()`, `uri()`, `path(n)`, `tag(name, default)`, `tag_exist(name)`, plus project-context helpers (`source_path()`, `current_worktree()`, `file_exists()`, etc.).
+
+**Tag-driven filtering**: Use `gww clean --tag key=value` to pass tags into both the provider's `when` predicate (for selection) and the `filter` template (for per-branch logic):
+
+```bash
+# Clean merged branches (default)
+gww clean
+
+# Clean closed branches instead
+gww clean --tag state=closed
+
+# Clean draft PRs
+gww clean --tag state=draft
+```
 
 ## 🔄 Update
 

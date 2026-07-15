@@ -200,16 +200,17 @@ class FunctionRegistry:
             raise ValueError("No branch context available for norm_branch() function")
         return self._context.branch.replace("/", replacement)
 
-    def _tag(self, name: str) -> str:
-        """Get tag value by name.
+    def _tag(self, name: str, default: str = "") -> str:
+        """Get tag value by name with optional default.
 
         Args:
             name: Tag name.
+            default: Default value if tag doesn't exist (default: "").
 
         Returns:
-            Tag value if tag exists with a value, empty string otherwise.
+            Tag value if tag exists, default value otherwise.
         """
-        return self._context.tags.get(name, "")
+        return self._context.tags.get(name, default)
 
     def _tag_exist(self, name: str) -> bool:
         """Check if tag exists.

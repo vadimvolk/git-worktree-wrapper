@@ -73,27 +73,27 @@ class TestFormatSummary:
 
 
 class TestProviderTemplateRendering:
-    """``_provider_template_for_branch`` evaluates the merged template
+    """``_provider_template_for_branch`` evaluates the filter template
     against a per-branch context."""
 
-    def _pcfg(self, merged: str) -> ProviderConfig:
+    def _pcfg(self, filter: str) -> ProviderConfig:
         return ProviderConfig(
-            kind="github",
-            host_patterns=[r"^github\.com$"],
-            merged=merged,
+            name="github",
+            when='"github" in host()',
+            filter=filter,
         )
 
     def test_renders_branch_function(self) -> None:
         provider = self._pcfg("gh pr list --head branch() --state merged")
         rendered = _provider_template_for_branch(
-            provider, "feature/x", parse_uri("https://github.com/user/repo.git"),
+            provider, "feature/x", parse_uri("https://github.com/user/repo.git"), {},
         )
         assert rendered == "gh pr list --head feature/x --state merged"
 
     def test_renders_with_uri_function(self) -> None:
         provider = self._pcfg("echo host()")
         rendered = _provider_template_for_branch(
-            provider, "x", parse_uri("https://github.com/user/repo.git"),
+            provider, "x", parse_uri("https://github.com/user/repo.git"), {},
         )
         assert rendered == "echo github.com"
 
@@ -103,7 +103,7 @@ class TestProviderTemplateRendering:
         ``uri=None`` so the rendering context has no URI; using
         only ``branch()`` keeps the template evaluable."""
         provider = self._pcfg("gh pr list --head branch() --state merged")
-        rendered = _provider_template_for_branch(provider, "main", None)
+        rendered = _provider_template_for_branch(provider, "main", None, {})
         assert rendered == "gh pr list --head main --state merged"
 
 
